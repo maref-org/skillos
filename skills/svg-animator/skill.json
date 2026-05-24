@@ -1,0 +1,47 @@
+{
+  "name": "svg_animator",
+  "version": "0.1.0",
+  "description": "SVG Logo Animator — 矢量路径动画、绘制动效、Icon微交互",
+  "dependencies": [],
+  "tools": [
+    {
+      "name": "search_iconfont",
+      "description": "搜索 Iconfont 图标库",
+      "parameters": {
+        "query": "string",
+        "limit": "integer (default: 10)"
+      }
+    },
+    {
+      "name": "generate_animation",
+      "description": "基于 SVG 生成动画",
+      "parameters": {
+        "svg_input": "string | file_path",
+        "animation_type": "enum(draw|fade|scale|rotate|color_shift|morph)",
+        "duration": "number (seconds, default: 2.0)",
+        "easing": "enum(linear|ease|ease-in|ease-out|ease-in-out)",
+        "output_format": "enum(html|svg|lottie)"
+      }
+    },
+    {
+      "name": "visual_check",
+      "description": "SVG 视觉校验（安全扫描 + 动画流畅度检查）",
+      "parameters": {
+        "svg_path": "string",
+        "max_duration": "number (seconds, default: 10)"
+      }
+    }
+  ],
+  "harness": {
+    "input_filter": "svg_sanitizer",
+    "output_format": ["html", "svg", "lottie"],
+    "max_retries": 3,
+    "max_svg_size_bytes": 2097152,
+    "max_animation_duration_seconds": 10
+  },
+  "executor": {
+    "entry_point": "executor.py",
+    "react_loop": true,
+    "context_passing": "summary_only"
+  }
+}

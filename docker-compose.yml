@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  skillos:
+    build: .
+    image: skillos:0.3.0
+    ports:
+      - "8080:8080"
+    environment:
+      - SKILLOS_API_KEY=${SKILLOS_API_KEY}
+      - SKILLOS_SECRET_KEY=${SKILLOS_SECRET_KEY}
+      - SKILLOS_DATABASE_URL=${SKILLOS_DATABASE_URL:-sqlite:///data/skillos.db}
+      - SKILLOS_LOG_FORMAT=json
+      - SKILLOS_LOG_LEVEL=INFO
+      - SKILLOS_AUDIT_DIR=/app/audit_logs
+    volumes:
+      - skillos-data:/app/data
+      - skillos-audit:/app/audit_logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - skillos
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  skillos-data:
+  skillos-audit:
+  prometheus-data:
+  grafana-data:

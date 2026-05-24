@@ -1,0 +1,141 @@
+# SkillOS 告警规则
+# 
+# 用途：Prometheus Alertmanager 规则文件
+# 路径：observability/alerts.yml
+#
+# P0 告警：立即响应（错误率 > 1%、P99 延迟 > 2s、服务不可用）
+# P1 告警：30 分钟内响应（错误率 > 0.1%、P99 延迟 > 500ms）
+# P2 告警：工作时间内响应（资源使用率 > 80%、队列堆积）
+
+groups:
+  - name: skillos-critical
+    interval: 30s
+    rules:
+      # P0: 错误率超过 1%
+      - alert: SkillOSHighErrorRate
+        expr: |
+          (
+            sum(rate(skillos_errors_total[5m]))
+            /
+            sum(rate(skillos_requests_total[5m]))
+          ) > 0.01
+        for: 2m
+        labels:
+          severity: p0
+          team: sre
+        annotations:
+          summary: "SkillOS 错误率超过 1%"
+          description: "过去 5 分钟错误率为 {{ $value | humanizePercentage }}，超过 1% 阈值"
+          runbook_url: "https://wiki.skillos.dev/runbooks/high-error-rate"
+
+      # P0: P99 延迟超过 2 秒
+      - alert: SkillOSHighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(skillos_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2.0
+        for: 3m
+        labels:
+          severity: p0
+          team: sre
+        annotations:
+          summary: "SkillOS P99 延迟超过 2 秒"
+          description: "P99 延迟为 {{ $value }}s，超过 2s 阈值"
+          runbook_url: "https://wiki.skillos.dev/runbooks/high-latency"
+
+      # P0: 服务不可用（请求量为 0 但预期有流量）
+      - alert: SkillOSServiceDown
+        expr: |
+          sum(rate(skillos_requests_total[5m])) == 0
+          and
+          (
+            hour() >= 8 and hour() <= 22
+          )
+        for: 5m
+        labels:
+          severity: p0
+          team: sre
+        annotations:
+          summary: "SkillOS 服务无流量"
+          description: "过去 5 分钟请求量为 0，服务可能不可用"
+          runbook_url: "https://wiki.skillos.dev/runbooks/service-down"
+
+  - name: skillos-warning
+    interval: 1m
+    rules:
+      # P1: 错误率超过 0.1%
+      - alert: SkillOSElevatedErrorRate
+        expr: |
+          (
+            sum(rate(skillos_errors_total[5m]))
+            /
+            sum(rate(skillos_requests_total[5m]))
+          ) > 0.001
+        for: 5m
+        labels:
+          severity: p1
+          team: backend
+        annotations:
+          summary: "SkillOS 错误率超过 0.1%"
+          description: "过去 5 分钟错误率为 {{ $value | humanizePercentage }}"
+          runbook_url: "https://wiki.skillos.dev/runbooks/elevated-error-rate"
+
+      # P1: P99 延迟超过 500ms
+      - alert: SkillOSElevatedLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(skillos_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: p1
+          team: backend
+        annotations:
+          summary: "SkillOS P99 延迟超过 500ms"
+          description: "P99 延迟为 {{ $value }}s"
+          runbook_url: "https://wiki.skillos.dev/runbooks/elevated-latency"
+
+      # P1: 活跃会话数异常高
+      - alert: SkillOSHighActiveSessions
+        expr: skillos_session_active_count > 10000
+        for: 10m
+        labels:
+          severity: p1
+          team: backend
+        annotations:
+          summary: "SkillOS 活跃会话数过高"
+          description: "当前活跃会话数 {{ $value }}，超过 10000 阈值"
+          runbook_url: "https://wiki.skillos.dev/runbooks/high-sessions"
+
+  - name: skillos-info
+    interval: 5m
+    rules:
+      # P2: 审计日志写入失败（通过 errors_total 中的 audit 类型推断）
+      - alert: SkillOSAuditLogFailures
+        expr: |
+          increase(skillos_errors_total{error_type="AuditLogWriteError"}[1h]) > 0
+        for: 0m
+        labels:
+          severity: p2
+          team: security
+        annotations:
+          summary: "审计日志写入失败"
+          description: "过去 1 小时审计日志写入失败 {{ $value }} 次"
+          runbook_url: "https://wiki.skillos.dev/runbooks/audit-log-failures"
+
+      # P2: Skill 执行成功率下降
+      - alert: SkillOSLowSkillSuccessRate
+        expr: |
+          (
+            sum(rate(skillos_skill_executions_total{status="success"}[1h]))
+            /
+            sum(rate(skillos_skill_executions_total[1h]))
+          ) < 0.95
+        for: 15m
+        labels:
+          severity: p2
+          team: backend
+        annotations:
+          summary: "Skill 执行成功率低于 95%"
+          description: "过去 1 小时成功率为 {{ $value | humanizePercentage }}"
+          runbook_url: "https://wiki.skillos.dev/runbooks/low-skill-success-rate"

@@ -1,0 +1,11 @@
+detectors:
+  - name: git
+    exclude_paths:
+      - ".gitignore"
+  - name: entropy
+    exclude_paths:
+      - "*.yaml"
+      - "*.yml"
+      - "*.json"
+      - "*.toml"
+      - "*.lock"

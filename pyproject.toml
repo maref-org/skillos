@@ -1,0 +1,52 @@
+[project]
+name = "skillos"
+version = "0.3.0"
+description = "SkillOS - Skill Execution Kernel with 5/25/70 Distribution"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0" }
+authors = [
+    { name = "SkillOS Team", email = "team@skillos.dev" }
+]
+keywords = ["skill", "agent", "ai", "orchestration", "economic-model"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "PyYAML>=6.0",
+    "requests>=2.28.0",
+    "cryptography>=42.0.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-benchmark>=4.0.0",
+    "coverage>=7.0.0",
+    "bandit>=1.7.0",
+    "pip-audit>=2.0.0",
+    "responses>=0.25.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/skillos-team/skillos"
+Documentation = "https://skillos.readthedocs.io"
+Repository = "https://github.com/skillos-team/skillos"
+Issues = "https://github.com/skillos-team/skillos/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
