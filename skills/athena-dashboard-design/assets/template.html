@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN" data-mode="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Dashboard</title>
+<style>
+/* ── DESIGN SYSTEM ── */
+:root{
+  --accent:#0071e3;--accent-hover:#0066cc;--ink:#1d1d1f;--bg:#f5f5f7;
+  --surface:#ffffff;--muted:#6e6e73;--border-soft:#d2d2d7;--border-mid:#86868b;
+  --good:#2f7d4a;--warn:#b85c00;--danger:#b53a2a;
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.04);--shadow-md:0 2px 10px rgba(0,0,0,0.04);
+  --radius-sm:6px;--radius-md:10px;--radius-lg:14px;--top-h:48px;
+}
+[data-mode="dark"]{
+  --accent:#0a84ff;--accent-hover:#409cff;--ink:#f0f0f2;--bg:#1d1d1f;
+  --surface:#2c2c2e;--muted:#a8a8ad;--border-soft:#48484a;--border-mid:#727275;
+  --good:#30d158;--warn:#ff9f0a;--danger:#ff453a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.5 -apple-system,Inter,sans-serif;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden}
+#app{display:flex;width:100%;height:100%}
+
+/* LEFT SIDEBAR */
+#sidebar-left{width:240px;min-width:200px;max-width:360px;background:var(--surface);border-right:1px solid var(--border-soft);display:flex;flex-direction:column;padding:14px 10px;height:100vh;overflow:hidden;transition:width 0.25s,min-width 0.25s,padding 0.25s,opacity 0.2s}
+#sidebar-left.collapsed{width:0!important;min-width:0!important;padding:0;border-right:none;opacity:0}
+.sidebar-brand{display:flex;align-items:center;gap:10px;padding:6px 10px 16px;font-size:14px;font-weight:700}
+.sidebar-nav a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;color:var(--ink)}
+.sidebar-nav a:hover{background:var(--bg)}
+.sidebar-nav a.active{background:var(--accent);color:white}
+
+/* CENTER COLUMN */
+#center-col{flex:1;display:flex;flex-direction:column;min-width:300px}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:var(--top-h);background:rgba(255,255,255,0.85);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border-soft)}
+.v{display:none;flex-direction:column;flex:1;min-height:0}
+.v.active{display:flex}
+.v-scroll{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+
+/* RIGHT SIDEBAR */
+#sidebar-right{width:300px;min-width:240px;max-width:400px;background:var(--surface);border-left:1px solid var(--border-soft);padding:16px 14px;display:flex;flex-direction:column;gap:16px;height:100vh;overflow:hidden;transition:width 0.25s,min-width 0.25s,padding 0.25s,opacity 0.2s}
+#sidebar-right.collapsed{width:0!important;min-width:0!important;padding:0;border-left:none;opacity:0}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius-lg);padding:18px}
+.card h3{font-size:14px;font-weight:600;margin-bottom:14px;color:var(--ink)}
+.pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--border-soft)}
+.pill.running{color:var(--accent);border-color:rgba(0,113,227,0.25)}
+.pill.success{color:var(--good)}
+.pill.danger{color:var(--danger)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 8px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;border-bottom:1px solid var(--border-soft)}
+td{padding:9px 8px;border-bottom:1px solid var(--border-soft)}
+
+/* TOGGLE */
+.tog{width:40px;height:20px;border-radius:10px;cursor:pointer;border:none;flex-shrink:0;position:relative;transition:background 0.2s}
+.tog.on{background:var(--accent)}
+.tog.off{background:var(--bg);border:1px solid var(--border-soft)}
+.tog::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:white;transition:transform 0.2s}
+.tog.on::after{transform:translateX(20px)}
+</style>
+</head>
+<body>
+<div id="app">
+<aside id="sidebar-left">
+  <div class="sidebar-brand">
+    <div style="width:28px;height:28px;border-radius:7px;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800">A</div>
+    <div>App<div style="font-size:10px;color:var(--muted);font-weight:400">v0.1.0</div></div>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="#" class="active" data-view="dash">📊 Dashboard</a>
+    <a href="#" data-view="agents">🐝 Agents</a>
+    <a href="#" data-view="settings">⚙️ Settings</a>
+  </nav>
+</aside>
+
+<div id="center-col">
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button id="toggle-left" class="btn-icon" style="width:32px;height:32px;border:none;background:none;cursor:pointer;font-size:15px;color:var(--muted)">☰</button>
+      <span id="view-title" style="font-size:15px;font-weight:600">Dashboard</span>
+    </div>
+  </header>
+
+  <div class="v active" id="v-dash">
+    <div class="v-scroll">
+      <div class="card">
+        <h3>Task Pipeline</h3>
+        <table><thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Progress</th></tr></thead>
+        <tbody id="pipeline-tbody"><tr><td colspan="4">Loading...</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="v" id="v-agents">
+    <div class="v-scroll">
+      <div id="agent-grid" class="card" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+        <div>Loading agents...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="v" id="v-settings">
+    <div class="v-scroll">
+      <div class="card">
+        <h3>Appearance</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;cursor:pointer" onclick="(function(){var b=document.getElementById('tog-theme');var n=b.classList.contains('on');b.className='tog '+(n?'off':'on');var d=n?'light':'dark';document.documentElement.setAttribute('data-mode',d)})()">
+          <span>Dark Mode</span>
+          <button class="tog off" id="tog-theme"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<aside id="sidebar-right">
+  <div style="font-size:13px;font-weight:600">Diagnostics</div>
+  <div id="right-content" style="flex:1;overflow-y:auto">
+    <!-- Populate with API data -->
+  </div>
+</aside>
+</div>
+
+<script>
+(function(){
+const API='http://localhost:8123';
+var _settings={};
+
+// View switching
+const views={dash:'Dashboard',agents:'Agents',settings:'Settings'};
+document.querySelectorAll('.sidebar-nav a').forEach(function(a){
+  a.addEventListener('click',function(e){
+    e.preventDefault();
+    document.querySelectorAll('.sidebar-nav a').forEach(function(x){x.classList.remove('active')});
+    this.classList.add('active');
+    document.querySelectorAll('.v').forEach(function(x){x.classList.remove('active')});
+    document.getElementById('v-'+this.dataset.view).classList.add('active');
+    document.getElementById('view-title').textContent=views[this.dataset.view];
+  });
+});
+
+// Load tasks into pipeline
+function loadPipeline(){
+  var x=new XMLHttpRequest();
+  x.open('GET',API+'/api/v1/tasks');
+  x.onload=function(){
+    if(x.status!==200)return;
+    try{
+      var tasks=JSON.parse(x.responseText);
+      var tb=document.getElementById('pipeline-tbody');
+      if(!tb||!tasks.length)return;
+      var h='';
+      tasks.forEach(function(t){
+        var sc={'done':'success','fail':'danger','running':'running','pending':''}[t.status]||'';
+        var st={'done':'Done','fail':'Failed','running':'Running','pending':'Pending'}[t.status]||t.status;
+        h+='<tr><td>'+t.id+'</td><td>'+t.name+'</td><td><span class="pill '+sc+'">'+st+'</span></td><td>'+(t.progress||0)+'%</td></tr>';
+      });
+      tb.innerHTML=h||'<tr><td colspan="4">No tasks</td></tr>';
+    }catch(e){}
+  };
+  x.send();
+}
+
+// Load settings from API
+function loadSettings(){
+  var x=new XMLHttpRequest();
+  x.open('GET',API+'/api/v1/settings');
+  x.onload=function(){
+    if(x.status!==200)return;
+    try{
+      _settings=JSON.parse(x.responseText);
+      var tog=document.getElementById('tog-theme');
+      if(tog){tog.className='tog '+(_settings.theme==='dark'?'on':'off');document.documentElement.setAttribute('data-mode',_settings.theme||'light')}
+    }catch(e){}
+  };
+  x.send();
+}
+
+setTimeout(loadPipeline,500);
+setTimeout(loadSettings,1000);
+setInterval(loadPipeline,15000);
+})();
+</script>
+</body>
+</html>

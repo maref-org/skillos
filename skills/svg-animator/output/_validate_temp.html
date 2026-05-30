@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SVG Animation — draw</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  display: flex; justify-content: center; align-items: center;
+  min-height: 100vh; background: #f5f5f7; font-family: -apple-system, sans-serif;
+}
+.container { width: 400px; height: 400px; display: flex; justify-content: center; align-items: center; }
+
+@keyframes draw {
+  from { stroke-dashoffset: 1000; }
+  to { stroke-dashoffset: 0; }
+}
+svg path, svg circle, svg rect {
+  stroke-dasharray: 1000;
+  animation: draw 2.0s ease-in-out forwards;
+  stroke: #0071e3;
+  fill: none;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="40" stroke="#0071e3" stroke-width="2" fill="none"/>
+  <text x="50" y="55" text-anchor="middle" font-size="14" fill="#0071e3">L</text>
+</svg>
+</div>
+</body>
+</html>
