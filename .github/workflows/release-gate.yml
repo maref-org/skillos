@@ -1,0 +1,77 @@
+name: Release Gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gate-a-code-readiness:
+    name: Gate A — Code Readiness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+
+      - name: A-1 Ruff Lint
+        run: pip install ruff && ruff check kernel/ protocol/ distribution/ --output-format=github
+
+      - name: A-2 Test & Coverage
+        run: |
+          pip install pytest-cov
+          pytest tests/ --cov=kernel --cov=distribution --cov=protocol --cov-fail-under=70 -v
+
+      - name: A-3 SAST (Bandit)
+        run: |
+          pip install bandit
+          bandit -r kernel/ protocol/ distribution/ -c pyproject.toml
+
+      - name: A-4 Dep Audit
+        run: |
+          pip install pip-audit
+          pip-audit
+
+  gate-b-functional:
+    name: Gate B — Functional
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+
+      - name: B-1 Distribution Model Verify
+        run: python scripts/verify_distribution.py
+
+      - name: B-2 Core Module Tests
+        run: |
+          pip install pytest-cov
+          pytest tests/test_entry_kernel.py tests/test_distribution_engine.py tests/test_agent_scheduler.py -v
+
+      - name: B-3 Architecture Module Check
+        run: python scripts/arch_check.py
+
+  gate-c-security:
+    name: Gate C — Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+
+      - name: C-1 Secret Scan
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          extra_args: --only-verified
+
+      - name: C-2 Error Code Audit
+        run: python scripts/audit_error_codes.py

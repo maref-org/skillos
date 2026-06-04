@@ -544,10 +544,10 @@ tests/
 
 ### 8.1 参考文档
 
-- [OpenSkill Protocol v0.3 白皮书](/Volumes/1TB-M2/Athena知识库/执行项目/2026/003-open human（碳硅基共生）/021-战略与商业/OpenSkill_Protocol_白皮书_v0.3-20260517.md)
-- [Men0 互操作协议 SKILL.md](/Volumes/1TB-M2/public/skillos/skillos-contrib/openhuman/men0-interop/SKILL.md)
-- [CSWDP 主权数字化工厂协议 SKILL.md](/Volumes/1TB-M2/public/skillos/skillos-contrib/openhuman/openhuman-cswdp/SKILL.md)
-- [SkillOS 架构设计](/Volumes/1TB-M2/Athena知识库/OPC工作区/2-战略/SkillOS操作系统/01-核心文档/03-架构设计.md)
+- [OpenSkill Protocol v0.3 白皮书]（内部知识库: OpenSkill_Protocol_白皮书）
+- [Men0 互操作协议 SKILL.md]（内部知识库: men0-interop）
+- [CSWDP 主权数字化工厂协议 SKILL.md]（内部知识库: openhuman-cswdp）
+- [SkillOS 架构设计]（内部知识库: SkillOS架构设计）
 
 ### 8.2 关键人员
 
