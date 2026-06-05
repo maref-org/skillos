@@ -1,9 +1,14 @@
 """Verify 5/25/70 distribution model constants and arithmetic."""
 
 import sys
-sys.path.insert(0, ".")
+from pathlib import Path
 
-from distribution.engine import (
+_self = Path(__file__).resolve()
+_proj_parent = _self.parent.parent.parent  # scripts/../.. = skillos root's parent
+if str(_proj_parent) not in sys.path:
+    sys.path.insert(0, str(_proj_parent))
+
+from skillos.distribution.engine import (
     DistributionEngine,
     CONTRIBUTOR_SECONDARY_SPLIT,
     ECOSYSTEM_FUND_ALLOCATION,

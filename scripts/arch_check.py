@@ -12,7 +12,9 @@ DECLARED_LAYERS = {
 }
 
 ALLOWED_ROOTS = {"kernel", "protocol", "distribution", "skills", "tests", "scripts", "docs"}
+ALLOWED_ROOT_FILES = {"_types.py", "__init__.py"}
 ALLOWED_SKILL_PREFIXES = {"platforms", "references", "templates", "utils", "tools", "tests", "reports"}
+IGNORED_DIRS = {".venv", ".git", "__pycache__", ".pytest_cache"}
 
 errors = []
 
@@ -31,12 +33,17 @@ for layer_dir in DECLARED_LAYERS:
 undocumented = []
 for f in BASE.rglob("*.py"):
     parts = f.relative_to(BASE).parts
-    root = parts[0] if parts else ""
-    if root in ALLOWED_ROOTS:
+    if not parts:
+        continue
+    root = parts[0]
+    if root in ALLOWED_ROOTS or root in IGNORED_DIRS:
         continue
     if root in ALLOWED_SKILL_PREFIXES:
         continue
     if root == "data" and f.name == "__init__.py":
+        continue
+    # Root-level files like _types.py, __init__.py are package root entries
+    if len(parts) == 1 and f.name in ALLOWED_ROOT_FILES:
         continue
     undocumented.append(str(f))
 
