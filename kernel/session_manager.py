@@ -14,8 +14,8 @@ import logging
 import time
 from typing import Any
 
-from skillos.kernel.state_persistor import PersistentState, StatePersistor
 from skillos._types import Session, SessionStatus
+from skillos.kernel.state_persistor import PersistentState, StatePersistor
 
 logger = logging.getLogger(__name__)
 

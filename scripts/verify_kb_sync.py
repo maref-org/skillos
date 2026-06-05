@@ -1,7 +1,7 @@
 """Verify pyproject.toml version tag alignment for KB-code sync."""
 
-import sys
 import re
+import sys
 from pathlib import Path
 
 errors = []

@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 
+from skillos._types import Contributor, SkillCall
 from skillos.distribution.engine import (
     CONTRIBUTOR_SECONDARY_SPLIT,
     ECOSYSTEM_FUND_ALLOCATION,
@@ -11,7 +12,6 @@ from skillos.distribution.engine import (
     DistributionEngine,
     SettlementPeriod,
 )
-from skillos._types import Contributor, SkillCall
 
 
 class TestSettlementPeriod:

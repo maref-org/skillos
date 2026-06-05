@@ -1,6 +1,6 @@
 [project]
 name = "skillos"
-version = "0.3.0"
+version = "0.4.0-alpha"
 description = "SkillOS - Skill Execution Kernel with 5/25/70 Distribution (Open Source, AGPL-3.0)"
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0" }
@@ -19,6 +19,8 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=6.0",
     "pytest-asyncio>=0.23",
+    "bandit>=1.9.4",
+    "ruff>=0.15.16",
 ]
 
 [tool.pytest.ini_options]
@@ -43,6 +45,19 @@ exclude_lines = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+lint.select = ["E", "F", "I", "N", "W"]
+lint.ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["SIM", "E402"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", ".git"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["kernel", "distribution", "protocol", "skills"]
-include = ["types.py", "__init__.py"]
+include = ["_types.py", "__init__.py"]

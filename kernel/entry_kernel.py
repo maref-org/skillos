@@ -74,7 +74,7 @@ class EntryKernel:
             intent_type = _INTENT_MAP.get(result["intent"], IntentType.CHAT)
             confidence = result["confidence"]
         else:
-            intent_type = _classify_keyword(user_input)
+            intent_type = self._classify_keyword(user_input)
             confidence = 0.5
 
         requires_gate = self._check_human_gate_required(intent_type, user_input)

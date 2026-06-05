@@ -8,7 +8,6 @@
   - 支持多种提取模式: full, article, links, metadata
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any

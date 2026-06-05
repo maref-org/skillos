@@ -8,11 +8,12 @@ _proj_parent = _self.parent.parent.parent  # scripts/../.. = skillos root's pare
 if str(_proj_parent) not in sys.path:
     sys.path.insert(0, str(_proj_parent))
 
-from skillos.distribution.engine import (
-    DistributionEngine,
+from skillos._types import SkillCall  # noqa: E402
+from skillos.distribution.engine import (  # noqa: E402
     CONTRIBUTOR_SECONDARY_SPLIT,
     ECOSYSTEM_FUND_ALLOCATION,
     WEIGHT_FORMULA_COEFFICIENTS,
+    DistributionEngine,
 )
 
 errors = []
@@ -43,11 +44,12 @@ if abs(eco_sum - 0.25) > 1e-9:
 weight_sum = sum(WEIGHT_FORMULA_COEFFICIENTS.values())
 if abs(weight_sum - 1.0) > 1e-9:
     errors.append(f"WEIGHT_FORMULA_COEFFICIENTS sums to {weight_sum}, expected 1.0")
-if set(WEIGHT_FORMULA_COEFFICIENTS.keys()) != {"historical_contribution", "current_attribution", "success_rate", "governance_participation"}:
+expected_keys = {"historical_contribution", "current_attribution", "success_rate", "governance_participation"}
+if set(WEIGHT_FORMULA_COEFFICIENTS.keys()) != expected_keys:
     errors.append("WEIGHT_FORMULA_COEFFICIENTS keys mismatch")
 
 # Single $1.00 distribution arithmetic
-from skillos._types import SkillCall
+
 call = SkillCall(skill_id="test", caller_id="test", input_data={}, revenue_usd=1.0)
 record = engine.distribute(call)
 platform_expected = 0.05

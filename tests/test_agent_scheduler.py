@@ -5,13 +5,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from skillos._types import Task
 from skillos.kernel.agent_scheduler import (
     AgentAssignment,
     AgentScheduler,
     ConsensusResult,
     ModelRoute,
 )
-from skillos._types import Task
 
 
 class TestAgentAssignment:

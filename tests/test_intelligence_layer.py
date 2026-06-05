@@ -8,22 +8,22 @@
 
 import pytest
 
-pytest.importorskip("skillos.intelligence")
+intelligence = pytest.importorskip("skillos.intelligence")
 
+from skillos.intelligence.distillation import KnowledgeChunk, KnowledgeDistiller
+from skillos.intelligence.evolution import (
+    FailureCategory,
+    FailureRecord,
+    FailureSeverity,
+    RecursiveEvolution,
+)
 from skillos.intelligence.intent_compiler import (
-    IntentCompiler,
     ExecutionPlan,
-    ValidationResult,
+    IntentCompiler,
     PlanStep,
     PlanStepType,
+    ValidationResult,
 )
-from skillos.intelligence.evolution import (
-    RecursiveEvolution,
-    FailureRecord,
-    FailureCategory,
-    FailureSeverity,
-)
-from skillos.intelligence.distillation import KnowledgeDistiller, KnowledgeChunk
 
 
 class TestIntentCompiler:

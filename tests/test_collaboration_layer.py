@@ -7,7 +7,7 @@
 
 import pytest
 
-pytest.importorskip("skillos.collaboration")
+collaboration = pytest.importorskip("skillos.collaboration")
 
 from skillos.collaboration.consensus import (
     ByzantineConsensus,
@@ -19,7 +19,6 @@ from skillos.collaboration.reputation import (
     Review,
     TrustReputationEngine,
 )
-
 
 # ---------------------------------------------------------------------------
 # ByzantineConsensus tests

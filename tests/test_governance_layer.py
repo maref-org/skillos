@@ -8,14 +8,14 @@
 
 import pytest
 
-pytest.importorskip("skillos.governance")
+governance = pytest.importorskip("skillos.governance")
 
-from skillos.governance.dao import (
-    DAOGovernance,
-    Proposal,
-    ProposalStatus,
-    ProposalType,
-    VoteType,
+from skillos.governance.compliance import (
+    AuditStatus,
+    ComplianceAuditor,
+    ComplianceReport,
+    DataComplianceReport,
+    SecurityAuditReport,
 )
 from skillos.governance.contracts import (
     ContractStatus,
@@ -24,14 +24,12 @@ from skillos.governance.contracts import (
     ExecutionResult,
     SmartContractEngine,
 )
-from skillos.governance.compliance import (
-    AuditStatus,
-    ComplianceAuditor,
-    ComplianceReport,
-    DataComplianceReport,
-    SecurityAuditReport,
+from skillos.governance.dao import (
+    DAOGovernance,
+    ProposalStatus,
+    ProposalType,
+    VoteType,
 )
-
 
 # ---------------------------------------------------------------------------
 # DAOGovernance tests
@@ -257,7 +255,6 @@ class TestComplianceAuditor:
 
     @pytest.mark.asyncio
     async def test_generate_compliance_report(self, auditor):
-        from datetime import datetime, timezone
 
         report = await auditor.generate_compliance_report("2026-05")
         assert isinstance(report, ComplianceReport)

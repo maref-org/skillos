@@ -3,8 +3,8 @@
 import time
 from unittest.mock import MagicMock, patch
 
-from skillos.protocol.registry_client import RegistryClient, RegistryConfig, SearchResult
 from skillos._types import SkillManifest, SkillStatus
+from skillos.protocol.registry_client import RegistryClient, RegistryConfig, SearchResult
 
 
 class TestRegistryConfig:

@@ -6,8 +6,8 @@ import time
 
 import pytest
 
-from skillos.kernel.skill_kernel import SkillKernel, SkillNFT, ToolChain
 from skillos._types import SkillCall, SkillManifest, SkillStatus
+from skillos.kernel.skill_kernel import SkillKernel, SkillNFT, ToolChain
 
 
 class TestToolChain:

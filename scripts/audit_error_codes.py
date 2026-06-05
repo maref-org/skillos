@@ -1,7 +1,7 @@
 """Scan for hardcoded error patterns and undocumented error codes."""
 
-import sys
 import re
+import sys
 from pathlib import Path
 
 SCAN_DIRS = ["kernel", "protocol", "distribution"]

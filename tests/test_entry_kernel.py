@@ -4,7 +4,6 @@ import time
 
 import pytest
 
-from skillos.kernel.entry_kernel import EntryKernel, RoutingDecision
 from skillos._types import (
     Approval,
     ApprovalStatus,
@@ -12,6 +11,7 @@ from skillos._types import (
     Intent,
     IntentType,
 )
+from skillos.kernel.entry_kernel import EntryKernel, RoutingDecision
 
 
 class TestRoutingDecision:

@@ -12,12 +12,12 @@ import asyncio
 import logging
 import shutil
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_BASE_DIR = "/tmp/skillos-isolation"
+_DEFAULT_BASE_DIR = "/tmp/skillos-isolation"  # nosec B108
 
 
 @dataclass

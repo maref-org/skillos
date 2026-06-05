@@ -11,11 +11,12 @@
 import asyncio
 import json
 import logging
-from croniter import croniter
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from croniter import croniter
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,7 @@ class TaskScheduler:
             try:
                 await self._scheduler_task
             except asyncio.CancelledError:
-                pass
+                logger.warning("Task scheduler cancelled")
         logger.info("Task scheduler stopped")
 
     async def _scheduler_loop(self) -> None:

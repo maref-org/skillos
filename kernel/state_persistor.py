@@ -11,7 +11,6 @@
 import json
 import logging
 import sqlite3
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -148,7 +147,8 @@ class StatePersistor:
         """列出会话所有状态键"""
         with self._get_conn() as conn:
             cursor = conn.execute(
-                "SELECT state_key, updated_at, ttl_seconds FROM session_states WHERE session_id=? ORDER BY updated_at DESC",
+                "SELECT state_key, updated_at, ttl_seconds FROM session_states"
+                " WHERE session_id=? ORDER BY updated_at DESC",
                 (session_id,),
             )
             return [

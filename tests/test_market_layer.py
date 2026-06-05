@@ -6,21 +6,18 @@
   - SettlementEngine: 结算
 """
 
-import asyncio
 import pytest
 
-pytest.importorskip("skillos.market")
+market = pytest.importorskip("skillos.market")
 
+from skillos._types import SkillManifest
+from skillos.market.pricing import PricePoint, PricingEngine
 from skillos.market.registry import (
     MarketStatus,
     SkillFilters,
-    SkillInfo,
     SkillRegistry,
-    SkillReview,
     SkillSort,
-    SkillVersion,
 )
-from skillos.market.pricing import PricePoint, PricingEngine
 from skillos.market.settlement import (
     SettlementEngine,
     SettlementRecord,
@@ -28,8 +25,6 @@ from skillos.market.settlement import (
     SettlementStatus,
     TokenType,
 )
-from skillos._types import SkillManifest
-
 
 # ---------------------------------------------------------------------------
 # SkillRegistry tests
