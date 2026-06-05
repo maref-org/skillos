@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from skillos.types import (
+from skillos._types import (
     Contributor,
     Intent,
     IntentType,

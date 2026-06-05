@@ -11,7 +11,7 @@ from skillos.distribution.engine import (
     DistributionEngine,
     SettlementPeriod,
 )
-from skillos.types import Contributor, SkillCall
+from skillos._types import Contributor, SkillCall
 
 
 class TestSettlementPeriod:

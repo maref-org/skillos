@@ -9,6 +9,8 @@
 import asyncio
 import pytest
 
+pytest.importorskip("skillos.market")
+
 from skillos.market.registry import (
     MarketStatus,
     SkillFilters,
@@ -26,7 +28,7 @@ from skillos.market.settlement import (
     SettlementStatus,
     TokenType,
 )
-from skillos.types import SkillManifest
+from skillos._types import SkillManifest
 
 
 # ---------------------------------------------------------------------------

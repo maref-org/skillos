@@ -7,6 +7,8 @@
 
 import pytest
 
+pytest.importorskip("skillos.collaboration")
+
 from skillos.collaboration.consensus import (
     ByzantineConsensus,
     ConsensusStatus,

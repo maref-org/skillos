@@ -42,7 +42,7 @@ if set(WEIGHT_FORMULA_COEFFICIENTS.keys()) != {"historical_contribution", "curre
     errors.append("WEIGHT_FORMULA_COEFFICIENTS keys mismatch")
 
 # Single $1.00 distribution arithmetic
-from skillos.types import SkillCall
+from skillos._types import SkillCall
 call = SkillCall(skill_id="test", caller_id="test", input_data={}, revenue_usd=1.0)
 record = engine.distribute(call)
 platform_expected = 0.05

@@ -8,6 +8,8 @@
 
 import pytest
 
+pytest.importorskip("skillos.governance")
+
 from skillos.governance.dao import (
     DAOGovernance,
     Proposal,

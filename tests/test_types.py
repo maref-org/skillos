@@ -3,7 +3,7 @@
 import time
 import uuid
 
-from skillos.types import (
+from skillos._types import (
     Approval,
     ApprovalStatus,
     Contributor,

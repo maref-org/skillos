@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from skillos.types import Contributor, SkillCall
+from skillos._types import Contributor, SkillCall
 
 logger = logging.getLogger(__name__)
 

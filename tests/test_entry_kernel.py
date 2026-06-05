@@ -5,7 +5,7 @@ import time
 import pytest
 
 from skillos.kernel.entry_kernel import EntryKernel, RoutingDecision
-from skillos.types import (
+from skillos._types import (
     Approval,
     ApprovalStatus,
     ExecutionPath,

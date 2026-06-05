@@ -11,7 +11,7 @@ from skillos.kernel.agent_scheduler import (
     ConsensusResult,
     ModelRoute,
 )
-from skillos.types import Task
+from skillos._types import Task
 
 
 class TestAgentAssignment:

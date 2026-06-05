@@ -17,7 +17,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from skillos.types import ModelTier, Task
+from skillos._types import ModelTier, Task
 
 logger = logging.getLogger(__name__)
 

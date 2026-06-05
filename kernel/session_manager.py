@@ -7,13 +7,15 @@
   - 资产面板同步
   - 会话搜索与过滤
   - 内存使用监控
+  - 跨会话状态持久化
 """
 
 import logging
 import time
 from typing import Any
 
-from skillos.types import Session, SessionStatus
+from skillos.kernel.state_persistor import PersistentState, StatePersistor
+from skillos._types import Session, SessionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ class SessionManager:
         self._sessions: dict[str, Session] = {}
         self._user_sessions: dict[str, list[str]] = {}
         self._max_sessions = max_sessions
+        self._state_store = StatePersistor()
 
     def create_session(self, user_id: str, metadata: dict[str, Any] | None = None) -> Session:
         """创建新会话"""
@@ -211,3 +214,42 @@ class SessionManager:
         for sid in expired:
             self._sessions.pop(sid, None)
             user_sessions.remove(sid)
+
+    async def save_session_state(self, session_id: str, key: str, value: Any, ttl_seconds: int = 0) -> bool:
+        """保存会话状态到持久化存储"""
+        state = PersistentState(
+            session_id=session_id,
+            state_key=key,
+            state_value=value,
+            created_at="",
+            updated_at="",
+            ttl_seconds=ttl_seconds,
+        )
+        return self._state_store.save_state(state)
+
+    async def load_session_state(self, session_id: str, key: str) -> Any | None:
+        """从持久化存储加载会话状态"""
+        return self._state_store.load_state(session_id, key)
+
+    async def delete_session_state(self, session_id: str, key: str) -> bool:
+        """从持久化存储删除会话状态"""
+        return self._state_store.delete_state(session_id, key)
+
+    async def list_session_states(self, session_id: str) -> list[dict]:
+        """列出会话所有状态键"""
+        return self._state_store.list_states(session_id)
+
+    async def save_task_result(
+        self,
+        task_id: str,
+        session_id: str,
+        result: dict,
+        context: dict,
+        status: str = "completed",
+    ) -> bool:
+        """保存任务执行结果到 memory"""
+        return self._state_store.save_task_result(task_id, session_id, result, context, status)
+
+    async def get_task_history(self, session_id: str, limit: int = 10) -> list[dict]:
+        """获取会话任务历史"""
+        return self._state_store.get_task_history(session_id, limit)

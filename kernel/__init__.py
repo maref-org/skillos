@@ -6,4 +6,7 @@ Contains:
   - Skill Kernel (skill lifecycle management)
   - Agent Scheduler (model routing + Byzantine consensus)
   - Session Manager (conversation lifecycle)
+  - Session Isolator (worktree/sandbox isolation)
+  - State Persistor (cross-session state persistence)
+  - Task Scheduler (cron-based scheduling)
 """

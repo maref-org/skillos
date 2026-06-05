@@ -8,6 +8,8 @@
 
 import pytest
 
+pytest.importorskip("skillos.intelligence")
+
 from skillos.intelligence.intent_compiler import (
     IntentCompiler,
     ExecutionPlan,

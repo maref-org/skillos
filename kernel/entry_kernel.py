@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from skillos.types import (
+from skillos._types import (
     Approval,
     ApprovalStatus,
     ExecutionPath,

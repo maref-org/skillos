@@ -6,4 +6,5 @@ Contains:
   - Matcher Client (intent-skill matching)
   - Settlement Client (payment and revenue distribution)
   - Identity Client (cryptographic identity verification)
+  - Remote Bridge Control (remote API control interface)
 """

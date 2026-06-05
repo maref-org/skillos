@@ -17,7 +17,7 @@ from typing import Any
 
 import requests  # type: ignore[import-untyped]
 
-from skillos.types import SkillManifest, SkillStatus
+from skillos._types import SkillManifest, SkillStatus
 
 logger = logging.getLogger(__name__)
 
