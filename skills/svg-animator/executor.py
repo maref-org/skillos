@@ -15,12 +15,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+# 本地模块
+from harness import SVGHarness
 from tools.iconfont_search import search_icons
 from tools.lottie_exporter import export_lottie
 from tools.svg_parser import parse_svg
-
-# 本地模块
-from harness import SVGHarness
 
 
 class SVGAnimator:

@@ -14,7 +14,7 @@ uv run pytest
 ## Architecture
 
 ```
-L3 经济层    5/25/70 分配引擎 · 贡献者权重 · 生态基金
+L3 经济层    5/25/70 分配引擎 · NegMarket 负样本市场 · 生态基金
 L2 协议层    Registry / Matcher / Settlement / Identity / Remote Bridge
 L1 内核层    EntryKernel · AgentScheduler · SkillKernel · SessionManager
              SessionIsolator · StatePersistor · TaskScheduler · WebFetcher

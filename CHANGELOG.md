@@ -3,6 +3,14 @@
 ## [0.4.0-alpha] - 2026-06-05
 
 ### Added
+- **NegMarket MVP**: 7-module negative sample market (`negmarket/`)
+  - 4-step desensitization pipeline (PII replace → ZK → anti-pattern → dynamic mask)
+  - AES-256-GCM encrypted SQLite storage via `cryptography`
+  - Anti-pattern Skill generator with risk-level warnings
+  - HMAC-SHA256 simulated ZK verifier
+  - Optional FastAPI adapter (`pip install skillos[web]`)
+  - 5/25/70 revenue integration in DistributionEngine
+  - 42 test cases (100% core module coverage)
 - **SessionIsolator**: git worktree sandbox execution isolation with resource limits
 - **StatePersistor**: SQLite-based cross-session state persistence with TTL expiry
 - **TaskScheduler**: cron expression async task scheduling with persistence
@@ -18,8 +26,8 @@
 - **arch_check.py**: .venv/.git exclusion for accurate layer audit
 
 ### Changed
-- **pyproject.toml**: added ruff/bandit config, `requests` dependency, corrected hatch include
-- **Dependencies**: 9 runtime + 7 dev (ruff, bandit, pytest, pytest-cov, pytest-asyncio)
+- **pyproject.toml**: added ruff/bandit config, `cryptography` dep, `web` extras group, hatch include `negmarket`
+- **Dependencies**: 10 runtime + 7 dev + 2 web extras (fastapi, uvicorn)
 
 ---
 

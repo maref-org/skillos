@@ -7,6 +7,7 @@ PENTA 五层提示词模板，适配各平台 AI 视频生成。
 # Athena 角色定妆照路径 (用于 I2V 模式)
 # 设置环境变量 ATHENA_REF_IMAGE 覆盖默认值
 import os as _os
+
 _DEFAULT_WORKSPACE = _os.environ.get("COMFYUI_WORKSPACE", _os.path.expanduser("~/comfyui_workspace"))
 ATHENA_REF_IMAGE = _os.environ.get(
     "ATHENA_REF_IMAGE",

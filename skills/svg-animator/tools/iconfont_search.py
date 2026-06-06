@@ -5,11 +5,9 @@
 """
 
 import json
-import urllib.request
 import urllib.parse
-from pathlib import Path
+import urllib.request
 from typing import Any
-
 
 # ── 图标源配置 ──
 ICON_SOURCES = {
@@ -67,7 +65,7 @@ def _search_lucide(query: str, limit: int) -> list[dict[str, Any]]:
     try:
         # Lucide 图标以单独 SVG 文件存储在 GitHub
         # 通过文件名匹配搜索
-        url = f"https://api.github.com/repos/lucide-icons/lucide/contents/icons?per_page=100"
+        url = "https://api.github.com/repos/lucide-icons/lucide/contents/icons?per_page=100"
         req = urllib.request.Request(url, headers={"User-Agent": "svg-animator/0.1.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             files = json.loads(resp.read())
