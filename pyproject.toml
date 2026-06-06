@@ -12,9 +12,14 @@ dependencies = [
     "httpx>=0.27",
     "readability-lxml>=0.8",
     "requests>=2.31",
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]
+web = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=6.0",
@@ -59,5 +64,5 @@ lint.ignore = []
 exclude_dirs = ["tests", ".venv", ".git"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["kernel", "distribution", "protocol", "skills"]
+packages = ["kernel", "distribution", "protocol", "skills", "negmarket"]
 include = ["_types.py", "__init__.py"]

@@ -250,6 +250,25 @@ class DistributionEngine:
 
         return report
 
+    def allocate_negmarket_revenue(self, sample_id: str, amount: float, contributor_id: str) -> DistributionRecord:
+        """将 NegMarket 反模式 Skill 调用收入纳入 5/25/70 分配"""
+        from skillos._types import SkillCall
+        call = SkillCall(
+            skill_id=f"negmarket:{sample_id}",
+            caller_id=contributor_id,
+            input_data={},
+            revenue_usd=amount,
+            status="completed",
+        )
+        record = self.distribute(call)
+        ecosystem_fee = amount * self.ECOSYSTEM_RATIO
+        ecosystem_negmarket = ecosystem_fee * ECOSYSTEM_FUND_ALLOCATION["neg_market_acquisition"]
+        logger.info(
+            "NegMarket revenue $%.4f: ecosystem=$%.4f negmarket_share=$%.4f",
+            amount, ecosystem_fee, ecosystem_negmarket,
+        )
+        return record
+
     def register_contributor(self, contributor: Contributor) -> None:
         self._contributor_registry[contributor.contributor_id] = contributor
 

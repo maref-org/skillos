@@ -35,8 +35,8 @@ SkillOS 的经济核心——收入分配与贡献者激励。
 ### 规划中 / 存根
 | 功能 | 状态 | 说明 |
 |------|------|------|
-| 双 Token 系统 (SkillCoin+GovToken) | **存根** | `types.py` 中 `ModelTier` 枚举已存在，无实际 token 操作 |
-| NegMarket（负样本市场） | **未实现** | 白皮书 §2.2 规划，零代码 |
+| 双 Token 系统 (SkillCoin+GovToken) | **存根** | `_types.py` 中 `ModelTier` 枚举已存在，无实际 token 操作 |
+| NegMarket（负样本市场） | **MVP** | `negmarket/` 四步脱敏 + 加密存储 + 反模式 Skill 生成 + SQLite |
 
 ---
 

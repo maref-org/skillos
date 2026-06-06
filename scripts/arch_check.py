@@ -9,9 +9,10 @@ DECLARED_LAYERS = {
     "kernel": "L1 内核层",
     "protocol": "L2 协议层",
     "distribution": "L3 经济层",
+    "negmarket": "L3 经济层",
 }
 
-ALLOWED_ROOTS = {"kernel", "protocol", "distribution", "skills", "tests", "scripts", "docs"}
+ALLOWED_ROOTS = {"kernel", "protocol", "distribution", "negmarket", "skills", "tests", "scripts", "docs"}
 ALLOWED_ROOT_FILES = {"_types.py", "__init__.py"}
 ALLOWED_SKILL_PREFIXES = {"platforms", "references", "templates", "utils", "tools", "tests", "reports"}
 IGNORED_DIRS = {".venv", ".git", "__pycache__", ".pytest_cache"}
