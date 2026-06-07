@@ -1,7 +1,7 @@
 # SkillOS 2026 工程实施路线图
 
-> 版本：v0.3.0 → v0.6.0  
-> 日期：2026-05-27  
+> 版本：v0.5.0-beta → v0.6.0  
+> 日期：2026-06-06  
 > 状态：规划中  
 > 基于：全量审计报告 & OpenSkill Protocol v0.3 白皮书
 
@@ -48,7 +48,7 @@ v0.3.0 (当前) ──→ v0.4.0 ──→ v0.5.0 ──→ v0.6.0
 
 ---
 
-## 3. v0.4.0 — NegMarket MVP（6-8 周）
+## 3. NegMarket — 负样本市场（已实现 v0.5.0-beta）
 
 ### 3.1 目标
 
@@ -168,20 +168,24 @@ async def discover_anti_patterns(
 
 ### 3.3 验收标准
 
-- [ ] 负样本上传后原始文本不可通过 API 获取
-- [ ] 反模式 Skill 调用仅返回风险等级、抽象警告、反模式 ID
-- [ ] 贡献者可下载自己的解密密钥（本地持有）
-- [ ] 集成到 5/25/70 分配引擎（NegMarket 收益计入生态基金）
-- [ ] pytest 覆盖率 >= 80%
+- [x] 负样本上传后原始文本不可通过 API 获取
+- [x] 反模式 Skill 调用仅返回风险等级、抽象警告、反模式 ID
+- [x] 贡献者可下载自己的解密密钥（本地持有）
+- [x] 集成到 5/25/70 分配引擎（NegMarket 收益计入生态基金）
+- [x] pytest 覆盖率 >= 80%
 
 ### 3.4 依赖
 
 - `cryptography>=42.0.0`（已有）
 - 新增可选：`presidio-analyzer>=2.2`（PII 识别）
 
+**注**: 实际在 v0.5.0-beta 中作为 negmarket/ 模块交付，含四步脱敏流水线、AES-256-GCM 加密存储、反模式 Skill 生成、REST API。plan 阶段实际比 roadmap 提前交付。
+
 ---
 
-## 4. v0.5.0 — Men0 协议核心（8-10 周）
+## 4. Men0 协议 — Agent 通信协议（部分实现 v0.5.0-beta）
+
+- AgentCard 注册与发现 ✅ (protocol/agent_card.py 已实现)
 
 ### 4.1 目标
 
@@ -327,6 +331,8 @@ async def agent_heartbeat(agent_id: str):
 
 - 新增：`watchdog>=3.0`（inotify 跨平台封装）
 - 新增：`sse-starlette>=2.0`（SSE 支持）
+
+**注**: JSONL 消息路由和五协议网关的完整实现在 roadmap 中仍为计划项。
 
 ---
 
