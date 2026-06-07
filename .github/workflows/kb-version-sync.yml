@@ -1,0 +1,23 @@
+name: KB-Version Sync
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'pyproject.toml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'pyproject.toml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check version sync
+        run: python3 scripts/verify_kb_version_sync.py
