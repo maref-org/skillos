@@ -21,6 +21,8 @@ from negmarket.api import (
 
 import negmarket.api as _api_mod
 
+LONG_TEXT = "error " * 16000  # 96000 chars, within 100000 max_length
+
 
 @pytest.fixture
 def sample():
@@ -273,16 +275,19 @@ class TestUploadEndpointIntegration:
         })
         assert resp.status_code == 200
         data = resp.json()
-        assert data["risk_level"] in ("high", "medium")
+        assert data["risk_level"] == "high"
 
     def test_upload_long_text(self, client):
         resp = client.post("/negmarket/upload", json={
-            "raw_text": "error " * 16000,  # 96000 chars, within 100000 max_length
+            "raw_text": LONG_TEXT,
             "category": "general",
             "contributor_id": "user-1",
             "contributor_secret": "secret-1",
         })
         assert resp.status_code == 200
+        data = resp.json()
+        assert "sample_id" in data
+        assert "anti_pattern_skill_id" in data
 
 
 class TestCallEndpointIntegration:
@@ -314,11 +319,18 @@ class TestCallEndpointIntegration:
             "contributor_secret": "secret-3",
         })
         sample_id = upload.json()["sample_id"]
+        skill_id = upload.json()["anti_pattern_skill_id"]
 
-        client.post(f"/negmarket/{sample_id}/call", json={})
-        client.post(f"/negmarket/{sample_id}/call", json={})
-        resp = client.post(f"/negmarket/{sample_id}/call", json={})
-        assert resp.status_code == 200
+        for _ in range(3):
+            resp = client.post(f"/negmarket/{sample_id}/call", json={})
+            assert resp.status_code == 200
+            assert resp.json()["anti_pattern_id"] == skill_id
+
+        resp = client.get("/negmarket/discover")
+        skills = resp.json()["skills"]
+        matched = [s for s in skills if s["id"] == skill_id]
+        assert len(matched) == 1
+        assert matched[0]["call_count"] >= 3
 
 
 class TestDiscoverEndpointIntegration:
@@ -359,14 +371,18 @@ class TestDiscoverEndpointIntegration:
 
     def test_discover_filter_by_risk_level(self, client):
         client.post("/negmarket/upload", json={
-            "raw_text": "Critical: data corruption in transaction log, customer-456 balance incorrect",
-            "category": "data_integrity",
+            "raw_text": "Critical: API key sk-abcdef1234567890abcdef1234567890 leaked in transaction log",
+            "category": "security",
             "contributor_id": "user-3",
             "contributor_secret": "secret-3",
         })
 
         resp = client.get("/negmarket/discover?risk_level=high")
         assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] >= 1
+        for s in data["skills"]:
+            assert s["risk_level"] == "high"
 
     def test_discover_empty_when_no_data(self, client):
         resp = client.get("/negmarket/discover?category=nonexistent")

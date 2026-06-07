@@ -9,15 +9,15 @@
 """
 
 import hashlib
-import logging
 import re
 from abc import ABC, abstractmethod
 from typing import Any
 
+from skillos.kernel.logging_config import get_logger
 from skillos.negmarket.models import DesensitizationContext, NegativeSample
 from skillos.negmarket.zk_verifier import ZKVerifier
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _PII_PATTERNS: list[tuple[str, str, str]] = [
     (r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", "email", "<REDACTED:EMAIL>"),
@@ -33,6 +33,9 @@ class DesensitizationStep(ABC):
     def process(self, ctx: DesensitizationContext) -> DesensitizationContext: ...
 
 
+_HIGH_RISK_PII = {"api_key", "id_card"}
+
+
 class LocalPIIReplaceStep(DesensitizationStep):
     def process(self, ctx: DesensitizationContext) -> DesensitizationContext:
         text = ctx.raw_text
@@ -42,9 +45,12 @@ class LocalPIIReplaceStep(DesensitizationStep):
                 logger.info("PII replaced: %d %s instances", len(matches), pii_type)
                 text = re.sub(pattern, replacement, text)
         ctx.desensitized_text = text
-        ctx.extra["pii_types_found"] = list(
+        pii_found = list(
             {pii_type for pattern, pii_type, _ in _PII_PATTERNS if re.search(pattern, ctx.raw_text)}
         )
+        ctx.extra["pii_types_found"] = pii_found
+        if any(p in _HIGH_RISK_PII for p in pii_found):
+            ctx.risk_level = "high"
         return ctx
 
 
