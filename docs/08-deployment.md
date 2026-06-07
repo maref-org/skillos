@@ -1,7 +1,7 @@
 # 08. SkillOS 部署方案
 
-**版本**: v0.3.0
-**更新日期**: 2026-05-24
+**版本**: v0.5.0-beta
+**更新日期**: 2026-06-06
 
 ---
 
@@ -72,7 +72,7 @@ python -c "
 from skillos.version import get_version_manager
 mgr = get_version_manager()
 mgr.record_deployment(
-    version='0.3.0',
+    version='0.5.0-beta',
     alembic_revision='$(alembic current | head -1 | cut -d' ' -f1)',
     deployed_by='$(whoami)',
     notes='Standard deployment'
@@ -93,7 +93,7 @@ curl -s http://localhost:8080/health | grep ok
 python -c "
 from skillos.feature_flags import get_feature_flag_manager
 mgr = get_feature_flag_manager()
-mgr.create_flag('v0.3.0-rollout', 'percentage', 'rollout', value=1)
+mgr.create_flag('v0.5.0-beta-rollout', 'percentage', 'rollout', value=1)
 "
 
 # Step 2: 监控 15 分钟
@@ -106,14 +106,14 @@ mgr.create_flag('v0.3.0-rollout', 'percentage', 'rollout', value=1)
 python -c "
 from skillos.feature_flags import get_feature_flag_manager
 mgr = get_feature_flag_manager()
-mgr.update_flag('v0.3.0-rollout', value=5)
+mgr.update_flag('v0.5.0-beta-rollout', value=5)
 "
 
 # Step 4: 全量发布后关闭灰度开关
 python -c "
 from skillos.feature_flags import get_feature_flag_manager
 mgr = get_feature_flag_manager()
-mgr.update_flag('v0.3.0-rollout', state='enabled')
+mgr.update_flag('v0.5.0-beta-rollout', state='enabled')
 "
 ```
 
@@ -121,7 +121,7 @@ mgr.update_flag('v0.3.0-rollout', state='enabled')
 
 ```bash
 # 构建镜像
-docker build -t skillos:v0.3.0 .
+docker build -t skillos:v0.5.0-beta .
 
 # 运行容器
 docker run -d \
@@ -130,7 +130,7 @@ docker run -d \
   -e SKILLOS_API_KEY="${SKILLOS_API_KEY}" \
   -e SKILLOS_SECRET_KEY="${SKILLOS_SECRET_KEY}" \
   -v skillos-data:/app/data \
-  skillos:v0.3.0
+  skillos:v0.5.0-beta
 
 # 或使用 docker-compose
 docker-compose up -d
@@ -143,7 +143,7 @@ docker-compose up -d
 version: '3.8'
 services:
   skillos:
-    image: skillos:v0.3.0
+    image: skillos:v0.5.0-beta
     ports:
       - "8080:8080"
     environment:
