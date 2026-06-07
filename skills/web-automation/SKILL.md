@@ -63,7 +63,7 @@ changelog:
 
 ## Overview
 
-Browser automation via agent-browser CLI (Vercel Labs, Rust + CDP). Provides a programmatic interface for Chrome browser control: navigation, element interaction, content extraction, and visual capture. Serves as the Web execution layer (L1) for multi-agent CLI operating systems.
+Browser automation via agent-browser CLI (Vercel Labs, Rust + CDP). Provides a programmatic interface for Chrome browser control: navigation, element interaction, content extraction, and visual capture. Serves as the Web execution layer (L1) for the OpenClaw multi-agent CLI operating system.
 
 ## When to Use
 

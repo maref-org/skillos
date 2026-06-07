@@ -56,7 +56,7 @@ description: SVG Logo Animator — 矢量路径动画、绘制动效、Icon微�
 
 ```bash
 # 基础调用
-python3 executor.py --prompt "为品牌设计一个 Logo 绘制动画，配色 #0071e3"
+python3 executor.py --prompt "为 Athena 设计一个 Logo 绘制动画，配色 #0071e3"
 
 # 带上下文（从 opendesign 传递 VI 结果）
 python3 executor.py \
@@ -115,7 +115,7 @@ context = {
     "color_primary": "#0071e3",      # 主色
     "color_secondary": "#2f7d4a",    # 辅色
     "font_family": "Inter, sans-serif",
-    "brand_name": "BrandName",
+    "brand_name": "Athena",
     "style": "minimal"               # minimal | geometric | handdrawn
 }
 ```
@@ -135,7 +135,7 @@ context = {
 # Step 1: Open Design 生成静态 SVG
 curl -s -X POST http://127.0.0.1:60479/api/runs \
   -H "Content-Type: application/json" \
-  -d '{"message": "Design a minimalist logo for brand"}'
+  -d '{"message": "Design a minimalist logo for Athena"}'
 
 # Step 2: svg-animator 添加动画
 python3 executor.py --input logo.svg --prompt "添加绘制动画，时长2s"

@@ -6,7 +6,9 @@ SKILL.md spec reference:
   - Cross-platform stagger: 5min intervals
   - Status: draft → scheduled → published → failed
 """
+
 import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -40,18 +42,24 @@ class CalendarEntry:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.id, "content_type": self.content_type,
-            "source_content_id": self.source_content_id, "title": self.title,
+            "id": self.id,
+            "content_type": self.content_type,
+            "source_content_id": self.source_content_id,
+            "title": self.title,
             "platform_variants": self.platform_variants,
-            "scheduled_at": self.scheduled_at, "status": self.status,
-            "published_ids": self.published_ids, "metrics": self.metrics,
-            "created_at": self.created_at, "updated_at": self.updated_at,
+            "scheduled_at": self.scheduled_at,
+            "status": self.status,
+            "published_ids": self.published_ids,
+            "metrics": self.metrics,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "CalendarEntry":
         return cls(
-            id=d["id"], content_type=d.get("content_type", "general"),
+            id=d["id"],
+            content_type=d.get("content_type", "general"),
             source_content_id=d.get("source_content_id", ""),
             title=d.get("title", ""),
             platform_variants=d.get("platform_variants", {}),
@@ -66,9 +74,19 @@ class CalendarEntry:
 
 # Platform priority (lower = publish first)
 PLATFORM_PRIORITY = [
-    "github", "twitter", "linkedin", "discord",
-    "youtube", "bilibili", "threads", "instagram",
-    "xiaohongshu", "douyin", "tiktok", "weibo", "jike",
+    "github",
+    "twitter",
+    "linkedin",
+    "discord",
+    "youtube",
+    "bilibili",
+    "threads",
+    "instagram",
+    "xiaohongshu",
+    "douyin",
+    "tiktok",
+    "weibo",
+    "jike",
 ]
 
 # Optimal posting windows (UTC, 24hr weekdays)
@@ -91,7 +109,10 @@ PLATFORM_WINDOWS = {
 
 class ContentCalendar:
     def __init__(self, db_path: str | None = None):
-        self.db_path = db_path or os.environ.get("CONTENT_CALENDAR_DB", "./data/content_calendar.db")
+        self.db_path = db_path or os.environ.get(
+            "SKILLOS_DB_PATH",
+            os.path.expanduser("~/.skillos/data/content_calendar.db"),
+        )
         self._entries: dict[str, CalendarEntry] = {}
         self._db = None
 
@@ -105,13 +126,9 @@ class ContentCalendar:
             self._db.init()
         return self._db
 
-    def schedule(self,
-                content_type: str,
-                source_content_id: str,
-                platforms: list[str],
-                base_time: str,
-                title: str = "",
-                **kwargs) -> CalendarEntry:
+    def schedule(
+        self, content_type: str, source_content_id: str, platforms: list[str], base_time: str, title: str = "", **kwargs
+    ) -> CalendarEntry:
         """Schedule content across platforms with auto-staggered times."""
         entry_id = str(uuid.uuid4())[:12]
 
@@ -148,8 +165,7 @@ class ContentCalendar:
 
         return entry
 
-    def _detect_conflicts(self, entry: CalendarEntry,
-                        scheduled: dict[str, str]) -> list[str]:
+    def _detect_conflicts(self, entry: CalendarEntry, scheduled: dict[str, str]) -> list[str]:
         conflicts = []
         for platform, iso_ts in scheduled.items():
             target_dt = datetime.fromisoformat(iso_ts)
@@ -162,15 +178,14 @@ class ContentCalendar:
                     if diff < 7200:  # 2-hour minimum
                         conflicts.append(
                             f"{platform}: {iso_ts} conflicts with {existing.id} "
-                            f"({existing.scheduled_at[platform]}, diff={diff/60:.0f}min)"
+                            f"({existing.scheduled_at[platform]}, diff={diff / 60:.0f}min)"
                         )
         return conflicts
 
     def get_entry(self, entry_id: str) -> CalendarEntry | None:
         return self._entries.get(entry_id)
 
-    def update_status(self, entry_id: str, status: str,
-                     published_ids: dict[str, str] | None = None):
+    def update_status(self, entry_id: str, status: str, published_ids: dict[str, str] | None = None):
         entry = self._entries.get(entry_id)
         if not entry:
             return
@@ -183,8 +198,7 @@ class ContentCalendar:
         except Exception:
             pass
 
-    def get_upcoming(self, platform: str | None = None,
-                    limit: int = 20) -> list[CalendarEntry]:
+    def get_upcoming(self, platform: str | None = None, limit: int = 20) -> list[CalendarEntry]:
         upcoming = []
         for e in self._entries.values():
             if e.status not in ("scheduled", "draft"):
@@ -205,8 +219,7 @@ class ContentCalendar:
                     break
         return results
 
-    def suggest_time(self, platform: str, after: str | None = None
-                    ) -> str | None:
+    def suggest_time(self, platform: str, after: str | None = None) -> str | None:
         """Suggest an optimal publishing time for a platform."""
         window = PLATFORM_WINDOWS.get(platform, {})
         if not window:
@@ -224,10 +237,7 @@ class ContentCalendar:
             if candidate_day not in target_days:
                 continue
 
-            suggested = datetime(
-                candidate.year, candidate.month, candidate.day,
-                target_hours[0], 0, 0, tzinfo=UTC
-            )
+            suggested = datetime(candidate.year, candidate.month, candidate.day, target_hours[0], 0, 0, tzinfo=UTC)
 
             # Check no conflict within 2hr window
             has_conflict = False

@@ -7,19 +7,19 @@
 """
 
 import argparse
+import asyncio
 import json
 import os
 import sys
 import urllib.request
-import asyncio
 from pathlib import Path
 from typing import Any
 
 # 本地模块
 from harness import SVGHarness
-from tools.iconfont_search import search_icons, get_icon_svg
-from tools.svg_parser import parse_svg, optimize_svg, extract_animation_paths
+from tools.iconfont_search import search_icons
 from tools.lottie_exporter import export_lottie
+from tools.svg_parser import parse_svg
 
 
 class SVGAnimator:
@@ -141,7 +141,7 @@ class SVGAnimator:
 
 SVG 内容：
 ```svg
-{svg_data.get('raw', '')[:2000]}
+{svg_data.get("raw", "")[:2000]}
 ```
 
 上下文：
@@ -150,15 +150,17 @@ SVG 内容：
 请输出完整的 HTML 文件代码。"""
 
         try:
-            body = json.dumps({
-                "model": "gpt-4o",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": 0.7,
-                "max_tokens": 4000,
-            }).encode()
+            body = json.dumps(
+                {
+                    "model": "gpt-4o",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 4000,
+                }
+            ).encode()
 
             req = urllib.request.Request(
                 self.llm_api_url,
@@ -184,10 +186,13 @@ SVG 内容：
         anim_type = self.context.get("animation_type", "draw")
         duration = self.context.get("duration", 2.0)
         easing = self.context.get("easing", "ease-in-out")
-        colors = self.context.get("colors", {
-            "primary": self.context.get("color_primary", "#0071e3"),
-            "secondary": self.context.get("color_secondary", "#2f7d4a"),
-        })
+        colors = self.context.get(
+            "colors",
+            {
+                "primary": self.context.get("color_primary", "#0071e3"),
+                "secondary": self.context.get("color_secondary", "#2f7d4a"),
+            },
+        )
 
         svg_raw = svg_data.get("raw", "")
         css = self._build_css(anim_type, duration, easing, colors)
@@ -233,14 +238,12 @@ svg path, svg circle, svg rect {{
   stroke: {primary};
   fill: none;
 }}""",
-
             "fade": f"""
 @keyframes fadeIn {{
   from {{ opacity: 0; transform: translateY(10px); }}
   to {{ opacity: 1; transform: translateY(0); }}
 }}
 svg {{ animation: fadeIn {duration}s {easing} forwards; }}""",
-
             "scale": f"""
 @keyframes scaleBounce {{
   0% {{ transform: scale(0) rotate(-10deg); }}
@@ -248,14 +251,12 @@ svg {{ animation: fadeIn {duration}s {easing} forwards; }}""",
   100% {{ transform: scale(1) rotate(0deg); }}
 }}
 svg {{ animation: scaleBounce {duration}s {easing} forwards; }}""",
-
             "rotate": f"""
 @keyframes rotateIn {{
   from {{ transform: rotate(-180deg) scale(0); opacity: 0; }}
   to {{ transform: rotate(0deg) scale(1); opacity: 1; }}
 }}
 svg {{ animation: rotateIn {duration}s {easing} forwards; }}""",
-
             "color_shift": f"""
 @keyframes colorShift {{
   0% {{ stroke: {primary}; fill: transparent; }}
@@ -266,7 +267,6 @@ svg path, svg circle {{
   animation: colorShift {duration}s {easing} infinite alternate;
   stroke-width: 2;
 }}""",
-
             "morph": f"""
 @keyframes morph {{
   0% {{ d: path("M50 10 L90 50 L50 90 L10 50 Z"); }}
@@ -285,14 +285,16 @@ svg path {{ animation: morph {duration}s {easing} infinite; }}""",
         # 简单修复策略
         fixed = animation
         for err in errors:
-            if "xmlns" in err and 'xmlns=' not in fixed:
+            if "xmlns" in err and "xmlns=" not in fixed:
                 fixed = fixed.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"', 1)
             if "script" in err.lower():
                 import re
-                fixed = re.sub(r'<script\b[^>]*>.*?</script>', '', fixed, flags=re.IGNORECASE | re.DOTALL)
+
+                fixed = re.sub(r"<script\b[^>]*>.*?</script>", "", fixed, flags=re.IGNORECASE | re.DOTALL)
             if "on*" in err or "event handler" in err.lower():
                 import re
-                fixed = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', '', fixed, flags=re.IGNORECASE)
+
+                fixed = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', "", fixed, flags=re.IGNORECASE)
 
         return fixed
 
@@ -308,7 +310,8 @@ svg path {{ animation: morph {duration}s {easing} infinite; }}""",
             output_path = output_dir / "animation.svg"
             # 提取 SVG 部分
             import re
-            svg_match = re.search(r'<svg[^>]*>.*?</svg>', animation, re.DOTALL)
+
+            svg_match = re.search(r"<svg[^>]*>.*?</svg>", animation, re.DOTALL)
             if svg_match:
                 output_path.write_text(svg_match.group())
             else:

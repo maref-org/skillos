@@ -2,8 +2,8 @@
 
 import time
 
+from skillos._types import Session, SessionStatus
 from skillos.kernel.session_manager import SessionManager
-from skillos.types import Session, SessionStatus
 
 
 class TestCreateSession:

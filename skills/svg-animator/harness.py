@@ -11,6 +11,7 @@ from typing import Any
 
 try:
     from playwright.async_api import async_playwright
+
     HAS_PLAYWRIGHT = True
 except ImportError:
     HAS_PLAYWRIGHT = False
@@ -120,15 +121,15 @@ class SVGHarness:
         errors = []
 
         # 检测 <script> 标签
-        if re.search(r'<script\b', content, re.IGNORECASE):
+        if re.search(r"<script\b", content, re.IGNORECASE):
             errors.append("SECURITY: Contains <script> tag — must be removed")
 
         # 检测 on* 事件属性
-        if re.search(r'\bon\w+\s*=', content, re.IGNORECASE):
+        if re.search(r"\bon\w+\s*=", content, re.IGNORECASE):
             errors.append("SECURITY: Contains event handler (on*) — must be removed")
 
         # 检测 javascript: URL
-        if re.search(r'javascript:', content, re.IGNORECASE):
+        if re.search(r"javascript:", content, re.IGNORECASE):
             errors.append("SECURITY: Contains javascript: URL — must be removed")
 
         return errors
@@ -142,7 +143,7 @@ class SVGHarness:
             errors.append("FORMAT: Missing xmlns declaration for SVG namespace")
 
         # 检查 viewBox
-        if 'viewBox' not in content and 'width' not in content:
+        if "viewBox" not in content and "width" not in content:
             errors.append("FORMAT: Missing viewBox or width/height attributes")
 
         return errors
@@ -152,14 +153,14 @@ class SVGHarness:
         errors = []
 
         # 检查是否包含动画定义
-        has_css_animation = '@keyframes' in content or 'animation:' in content
-        has_smil_animation = '<animate' in content or '<animateTransform' in content
+        has_css_animation = "@keyframes" in content or "animation:" in content
+        has_smil_animation = "<animate" in content or "<animateTransform" in content
 
         if not has_css_animation and not has_smil_animation:
             errors.append("ANIMATION: No animation found (expected @keyframes or <animate>)")
 
         # 检查动画时长是否超限
-        duration_match = re.search(r'animation:\s*\w+\s+([\d.]+)s', content)
+        duration_match = re.search(r"animation:\s*\w+\s+([\d.]+)s", content)
         if duration_match:
             duration = float(duration_match.group(1))
             if duration > self.MAX_DURATION_SECONDS:
@@ -170,13 +171,13 @@ class SVGHarness:
     def sanitize(self, content: str) -> str:
         """清理 SVG 内容（移除危险元素）。"""
         # 移除 <script> 标签
-        content = re.sub(r'<script\b[^>]*>.*?</script>', '', content, flags=re.IGNORECASE | re.DOTALL)
+        content = re.sub(r"<script\b[^>]*>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
 
         # 移除 on* 事件属性
-        content = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', '', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', "", content, flags=re.IGNORECASE)
 
         # 移除 javascript: URL
-        content = re.sub(r'href\s*=\s*["\']javascript:[^"\']*["\']', '', content, flags=re.IGNORECASE)
+        content = re.sub(r'href\s*=\s*["\']javascript:[^"\']*["\']', "", content, flags=re.IGNORECASE)
 
         return content
 
@@ -189,7 +190,6 @@ def validate_animation(content: str) -> tuple[bool, list[str]]:
 
 if __name__ == "__main__":
     import sys
-    import asyncio
 
     if len(sys.argv) < 2:
         print("Usage: python harness.py <svg_file>")

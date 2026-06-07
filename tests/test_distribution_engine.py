@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 
+from skillos._types import Contributor, SkillCall
 from skillos.distribution.engine import (
     CONTRIBUTOR_SECONDARY_SPLIT,
     ECOSYSTEM_FUND_ALLOCATION,
@@ -11,7 +12,6 @@ from skillos.distribution.engine import (
     DistributionEngine,
     SettlementPeriod,
 )
-from skillos.types import Contributor, SkillCall
 
 
 class TestSettlementPeriod:
@@ -120,10 +120,7 @@ class TestDistributionEngineDistribute:
         call = self.make_skill_call(revenue=1.0)
         record = engine.distribute(call)
 
-        expected_breakdown = {
-            key: record.ecosystem_fee * ratio
-            for key, ratio in ECOSYSTEM_FUND_ALLOCATION.items()
-        }
+        expected_breakdown = {key: record.ecosystem_fee * ratio for key, ratio in ECOSYSTEM_FUND_ALLOCATION.items()}
         for key, value in expected_breakdown.items():
             assert record.ecosystem_breakdown[key] == pytest.approx(value, abs=1e-6)
 
@@ -141,8 +138,7 @@ class TestDistributionEngineDistribute:
         record = engine.distribute(call)
 
         expected = {
-            role: round(record.contributor_pool * ratio, 6)
-            for role, ratio in CONTRIBUTOR_SECONDARY_SPLIT.items()
+            role: round(record.contributor_pool * ratio, 6) for role, ratio in CONTRIBUTOR_SECONDARY_SPLIT.items()
         }
         for role, value in expected.items():
             assert record.secondary_distribution[role] == pytest.approx(value, abs=1e-6)

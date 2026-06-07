@@ -88,7 +88,7 @@ changelog:
 
 ```csv
 GENDER,CHARACTER,COPYRIGHT,DESCRIPTION,EMOTION_ARC,STYLE_TAGS
-1girl,Protagonist,Cyberpunk Goddess,"European female face, clear cheekbones, sharp jawline, straight nose, natural brown eyebrows, ice-blue iris (#4488EE), dark brown hair swept back, white luminous continuous ring halo above head, obsidian black high-collar tech-armor with neon blue (#00AAFF) and electric orange (#FF8800) circuit patterns, hexagonal glowing core (#00BBFF) at chest center, fiber-optic hair strands with golden particles, realistic human skin texture with visible pores, natural subsurface scattering, warm undertone, subtle skin imperfections",沉睡→觉醒→庄严→警觉→邀请,"cyberpunk,goddess,armor,glowing,halo"
+1girl,Athena,Cyberpunk Goddess,"European female face, clear cheekbones, sharp jawline, straight nose, natural brown eyebrows, ice-blue iris (#4488EE), dark brown hair swept back, white luminous continuous ring halo above head, obsidian black high-collar tech-armor with neon blue (#00AAFF) and electric orange (#FF8800) circuit patterns, hexagonal glowing core (#00BBFF) at chest center, fiber-optic hair strands with golden particles, realistic human skin texture with visible pores, natural subsurface scattering, warm undertone, subtle skin imperfections",沉睡→觉醒→庄严→警觉→邀请,"cyberpunk,goddess,armor,glowing,halo"
 1boy,Mentor,Wise Guide,"Old man with white beard, deep wrinkles, warm brown eyes, weathered face, silver hair, sage robes with gold trim, wooden staff with crystal orb",平静→严肃→欣慰→智慧,"fantasy,mentor,wise,old,robes"
 ```
 
@@ -97,7 +97,7 @@ GENDER,CHARACTER,COPYRIGHT,DESCRIPTION,EMOTION_ARC,STYLE_TAGS
 | 字段 | 用途 | 示例 |
 |------|------|------|
 | GENDER | 1girl/1boy/2girls/2boys | 1girl |
-| CHARACTER | 角色名称 | Protagonist |
+| CHARACTER | 角色名称 | Athena |
 | COPYRIGHT | 角色所属世界观 | Cyberpunk Goddess |
 | DESCRIPTION | 外貌详细描述（注入 L3） | European female face... |
 | EMOTION_ARC | 情绪弧线 | 觉醒→庄严→警觉 |
@@ -178,8 +178,8 @@ def load_character_csv(csv_path: str) -> dict:
 
 ```python
 def match_character(scene: dict, characters: dict) -> dict:
-    focus = scene.get('character_focus', 'Protagonist')
-    return characters.get(focus, characters.get('Protagonist', {}))
+    focus = scene.get('character_focus', 'Athena')
+    return characters.get(focus, characters.get('Athena', {}))
 ```
 
 ### 步骤 3: 构建 PENTA 提示词
@@ -259,8 +259,9 @@ For each scene, match the character_focus to CSV entry and inject description.
   {
     "scene_id": "01",
     "scene_name": "觉醒时刻",
-    "penta_prompt": "masterpiece, cinematic, vertical 9:16, 8K ultra-detailed, IMAX quality, rating:safe, score:9, 2024\nLow-angle close-up shot, symmetrical composition, slow push-in\nProtagonist cyberpunk goddess avatar: European female face, clear cheekbones, ice-blue iris (#4488EE), obsidian black high-collar tech-armor with neon blue circuit patterns, white luminous continuous ring halo above head, eyes slowly open, subtle lip part,觉醒 energy visualized as golden aura\nDeep space black background, cool blue rim light, warm gold fill, volumetric haze\nphotorealistic CGI, Unreal Engine 5, 8K ultra-detailed, masterpiece, low quality, blurry, deformed, bad anatomy...",
-    "character_used": "Protagonist",
+    "penta_prompt": "masterpiece, cinematic, vertical 9:16, 8K ultra-detailed, IMAX quality, rating:safe, score:9, 2024\nLow-angle close-up shot, symmetrical composition, slow push-in\nAthena cyberpunk goddess avatar: European female face, clear cheekbones, ice-blue iris (#4488EE), obsidian black high-collar tech-armor with neon blue circuit patterns, white luminous continuous ring halo above head, eyes slowly open, subtle lip part,觉醒 energy visualized as golden aura\nDeep space black background, cool blue rim light, warm gold fill, volumetric haze\nphotorealistic CGI, Unreal Engine 5, 8K ultra-detailed, masterpiece, low quality, blurry, deformed, bad anatomy...",
+    "penta_score": 10,
+    "character_used": "Athena",
     "quality_tags": ["masterpiece", "best quality", "8K", "rating:safe", "score:9"],
     "validation": {
       "L1_style": true,

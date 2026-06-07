@@ -56,7 +56,7 @@ changelog:
 
 ## Overview
 
-Unified CLI operator that routes automation tasks across 4 platform types: Web (agent-browser), Social (Agent-Reach), Desktop (CLI-Anything), and Mobile (ADB Agent). Acts as the single entry point for all CLI-driven platform automation.
+Unified CLI operator that routes automation tasks across 4 platform types: Web (agent-browser), Social (Agent-Reach), Desktop (CLI-Anything), and Mobile (Z Flip3 ADB Agent). Acts as the single entry point for all CLI-driven platform automation within OpenClaw/Athena.
 
 ## When to Use
 
@@ -74,7 +74,7 @@ Trigger when a task involves:
 | **Web** | agent-browser | `agent-browser {action} [url]` | CDP-based Chrome automation, snapshot refs, session persistence |
 | **Social** | Agent-Reach | `agent-reach {action} --platform {name}` | 10+ social platform coverage, safe mode, dry-run |
 | **Desktop** | CLI-Anything | (future) Claude Code plugin | Desktop app automation via community harness |
-| **Mobile** | ADB Agent | `python mobile_agent.py "{task}" --real` | ADB-based device control, Vision system |
+| **Mobile** | Z Flip3 Agent | `python run_athena.py "{task}" --real` | ADB-based Samsung control, Vision 9-module system |
 
 ## Decision Rules
 
@@ -84,7 +84,7 @@ Route tasks based on target pattern matching:
 URL pattern (http/https)              → Web: agent-browser
 Social media platform mention         → Social: Agent-Reach
 Desktop app / file / window mention   → Desktop: CLI-Anything (future)
-Mobile app / phone / device mention   → Mobile: ADB Agent
+Mobile app / phone / device mention   → Mobile: Z Flip3 Agent
 Ambiguous / cross-platform            → SmartOrchestrator routing
 ```
 
@@ -118,7 +118,7 @@ mobile_keywords:
 
 ### Domain Restrictions (agent-browser)
 - Default: allow-list mode — only whitelisted domains navigable
-- Whitelist management: `<PROJECT_ROOT>/config/browser_allowed_domains.yaml`
+- Whitelist management: `$SKILLOS_ROOT/config/browser_allowed_domains.yaml`
 - Production domains must be pre-approved via HumanGate
 
 ### Social Media Safety (Agent-Reach)
@@ -138,15 +138,15 @@ mobile_keywords:
 |------------|----------|----------|
 | agent-browser unavailable | Log + notify | Fallback to HTTP request via Python aiohttp |
 | Social platform API rate limit | Exponential backoff (1s, 4s, 16s) | Queue for next cycle |
-| ADB device disconnected | 3x retry (1s interval) | Notify user to reconnect device |
+| Z Flip3 ADB disconnected | 3x retry (1s interval) | Notify user to reconnect device |
 | CDP bridge unavailable | Fallback pure ADB | Skip web-dependent operations |
 
 ## State Integration
 
-All CLI operations feed into the governance system:
+All CLI operations feed into the MAREF 16-state governance system:
 - Each operation generates a state transition event
 - Budget tracking: operations consume from budget_engine allocations
-- Failure states trigger automatic escalation per monitoring rules
+- Failure states trigger automatic escalation per patrol_agent rules
 
 ## Examples
 
@@ -160,21 +160,21 @@ agent-browser screenshot --annotate --output /tmp/github.png
 ### Social: Post to Twitter
 ```bash
 agent-reach post --platform twitter \
-  --text "Check out our project: AI-powered workflow automation" \
-  --media /tmp/teaser.mp4 \
+  --text "Check out OpenHuman: carbon-silicon symbiosis for the AI age" \
+  --media /tmp/athena_teaser.mp4 \
   --safe
 ```
 
-### Mobile: Open Settings
+### Mobile: Open Settings on Z Flip3
 ```bash
-cd <PROJECT_ROOT>/agent_system
-python mobile_agent.py "打开设置" --real --verbose
+cd $SKILLOS_ROOT
+python run_athena.py "打开设置" --real --verbose
 ```
 
 ### Cross-Platform: Publish Video Everywhere
 ```bash
 python -m agents.content_distribution_agent.dispatch \
-  --source /tmp/demo_60s.mp4 \
+  --source /tmp/athena_60s.mp4 \
   --platforms twitter,youtube,bilibili,linkedin,discord
 ```
 

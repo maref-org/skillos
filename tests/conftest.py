@@ -1,17 +1,10 @@
 """Shared fixtures for skillos tests"""
 
-import os
-import sys
-
-# Ensure project root is on sys.path before any imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from skillos.kernel.entry_kernel import EntryKernel
-from skillos.types import (
+from skillos._types import (
     Contributor,
     Intent,
     IntentType,
@@ -24,43 +17,10 @@ from skillos.types import (
 )
 
 
-@pytest.fixture(scope="session", autouse=True)
-def init_test_database():
-    """初始化测试数据库（session 级别，只执行一次）"""
-    import os
-    os.environ["SKILLOS_DATABASE_URL"] = "sqlite:///:memory:"
-    from skillos.db.engine import reset_db
-    reset_db()
-    yield
-    del os.environ["SKILLOS_DATABASE_URL"]
-
-
-@pytest.fixture(autouse=True)
-def reset_tables():
-    """每个测试前重置所有表数据"""
-    from skillos.db.engine import reset_db
-    reset_db()
-    yield
-
-
-@pytest.fixture
-def db_session():
-    """提供数据库会话，测试结束后自动回滚"""
-    from sqlalchemy.orm import sessionmaker
-    from skillos.db.engine import get_engine
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.rollback()
-        session.close()
-
-
 @pytest.fixture
 def mock_intent_classifier():
-    """Mock skillos.kernel.entry_kernel._classify_intent"""
-    with patch.object(EntryKernel, "_classify_intent") as mock:
+    """Mock athena.core.intent_classifier.classify_intent"""
+    with patch("skillos.kernel.entry_kernel.classify_intent") as mock:
         mock.return_value = {"intent": "chat", "confidence": 0.85}
         yield mock
 

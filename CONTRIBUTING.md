@@ -1,22 +1,23 @@
-# Contributing to SkillOS
+# Contributing to MAREF
 
-Thank you for contributing to the Skill Execution Kernel.
+Thank you for contributing to the Multi-Agent Recursive Engineering Framework.
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/skillos-team/skillos.git
-cd skillos
+git clone https://github.com/maref-team/maref.git
+cd maref
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,desktop]"
 ```
 
 ## Code Style
 
-- **ruff**: `ruff check .` — 0 violations required
-- **mypy**: `mypy .` — strict type checking with `disallow_untyped_defs=true`
-- **Python**: 3.11+ with `from __future__ import annotations`
+- **ruff**: `ruff check src tests` — 0 violations required
+- **mypy**: `mypy src/` — strict type checking with `disallow_untyped_defs=true`
+- **Python**: 3.10+ with `from __future__ import annotations`
+- **Docstrings**: Google style (`[tool.ruff.lint.pydocstyle] convention = "google"`)
 
 ## Testing
 
@@ -25,16 +26,21 @@ pip install -e ".[dev]"
 pytest tests/ -v --cov
 
 # Specific test categories
-pytest tests/test_skill_kernel.py -v
-pytest tests/test_distribution_engine.py -v
-pytest tests/test_entry_kernel.py -v
+pytest tests/unit/ -v
+pytest tests/integration/ -v
+pytest tests/desktop/ -v
+pytest tests/security/ -v
+pytest tests/benchmark/ -v
+
+# New features require >= 90% coverage
+pytest tests/ -v --cov --cov-report=term --cov-fail-under=90
 ```
 
 ## Pull Request Process
 
 1. Create a feature branch from `main`
 2. Write tests for your changes
-3. Run `ruff check .` and `mypy .` — both must be clean
+3. Run `ruff check src tests` and `mypy src/` — both must be clean
 4. Run `pytest tests/ -v --cov` — all tests must pass
 5. Update CHANGELOG.md under the `## Unreleased` section
 6. Submit a PR with a descriptive title and body
@@ -53,8 +59,8 @@ Brief description of changes.
 - [ ] Security fix
 
 ## Verification
-- [ ] ruff clean (`ruff check .`)
-- [ ] mypy clean (`mypy .`)
+- [ ] ruff clean (`ruff check src tests`)
+- [ ] mypy clean (`mypy src/`)
 - [ ] Tests pass (`pytest tests/ -v --cov`)
 - [ ] New tests added for changed functionality
 ```

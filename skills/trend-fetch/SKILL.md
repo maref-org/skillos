@@ -39,7 +39,7 @@ changelog:
 
 ## Overview
 
-Real-time trend fetching from multiple sources to feed the content strategy engine. Integrates with the content planning pipeline to ensure social media content stays relevant.
+Real-time trend fetching from multiple sources to feed the content strategy engine. Integrates with the content planning pipeline to ensure OpenHuman social media content stays relevant.
 
 ## Data Sources
 

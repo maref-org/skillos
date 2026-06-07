@@ -1,52 +1,71 @@
 [project]
 name = "skillos"
-version = "0.3.0"
-description = "SkillOS - Skill Execution Kernel with 5/25/70 Distribution"
-readme = "README.md"
+version = "0.5.0-beta"
+description = "SkillOS - Skill Execution Kernel with 5/25/70 Distribution (Open Source, AGPL-3.0)"
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0" }
-authors = [
-    { name = "SkillOS Team", email = "team@skillos.dev" }
-]
-keywords = ["skill", "agent", "ai", "orchestration", "economic-model"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
+authors = [ { name = "frankiehot-tech" } ]
 dependencies = [
     "PyYAML>=6.0",
-    "requests>=2.28.0",
+    "croniter>=2.0",
+    "beautifulsoup4>=4.12",
+    "httpx>=0.27",
+    "readability-lxml>=0.8",
+    "requests>=2.31",
     "cryptography>=42.0.0",
-    "sqlalchemy>=2.0.0",
-    "alembic>=1.13.0",
 ]
 
 [project.optional-dependencies]
+web = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+]
+llm = [
+    "litellm>=1.40.0",
+]
 dev = [
-    "ruff>=0.15.0",
-    "mypy>=1.0.0",
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-benchmark>=4.0.0",
-    "coverage>=7.0.0",
-    "bandit>=1.7.0",
-    "pip-audit>=2.0.0",
-    "responses>=0.25.0",
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+    "pytest-asyncio>=0.23",
+    "bandit>=1.9.4",
+    "ruff>=0.15.16",
 ]
 
-[project.urls]
-Homepage = "https://github.com/skillos-team/skillos"
-Documentation = "https://skillos.readthedocs.io"
-Repository = "https://github.com/skillos-team/skillos"
-Issues = "https://github.com/skillos-team/skillos/issues"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["kernel", "distribution", "protocol", "skillos", "negmarket"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 70
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+lint.select = ["E", "F", "I", "N", "W"]
+lint.ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["SIM", "E402"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", ".git"]
+
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+packages = ["kernel", "distribution", "protocol", "skills", "negmarket"]
+include = ["_types.py", "__init__.py"]

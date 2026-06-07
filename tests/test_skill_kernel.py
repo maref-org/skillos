@@ -6,8 +6,8 @@ import time
 
 import pytest
 
+from skillos._types import SkillCall, SkillManifest, SkillStatus
 from skillos.kernel.skill_kernel import SkillKernel, SkillNFT, ToolChain
-from skillos.types import SkillCall, SkillManifest, SkillStatus
 
 
 class TestToolChain:
@@ -240,7 +240,7 @@ class TestAssembleTools:
         nft = kernel.mint_nft(skill_manifest)
         kernel._skill_cache[skill_manifest.id] = skill_manifest
         chain = kernel.assemble_tools(nft)
-        assert chain.mcp_connectors == [f"mcp://{skill_manifest.id}"]
+        assert chain.mcp_connectors == [f"http://localhost:8000/mcp/v1/{skill_manifest.id}"]
 
     def test_assemble_tools_a2a_adapter(self, skill_manifest):
         kernel = SkillKernel()
@@ -257,7 +257,7 @@ class TestAssembleTools:
             owner="alice",
             metadata_hash="hash",
         )
-        with pytest.raises(ValueError, match="Skill nonexistent not found"):
+        with pytest.raises(ValueError, match="not found in cache"):
             kernel.assemble_tools(nft)
 
 

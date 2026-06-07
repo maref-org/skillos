@@ -34,7 +34,7 @@ bin/start-open-design.sh
 ## Base URL
 
 ```
-API_BASE=${OPEN_DESIGN_API_BASE:-http://127.0.0.1:60479}
+API_BASE=http://127.0.0.1:60479
 ```
 
 ## Quick Reference
@@ -315,7 +315,7 @@ curl -s -X POST http://127.0.0.1:60479/api/design-systems/import/local \
   -H "Content-Type: application/json" \
   -d '{
     "baseDir": "/path/to/project-directory",
-    "name": "dashboard-project"
+    "name": "athena-dashboard"
   }'
 ```
 
@@ -325,7 +325,7 @@ curl -s -X POST http://127.0.0.1:60479/api/design-systems/import/local \
 # Create project
 PROJECT_ID=$(curl -s -X POST http://127.0.0.1:60479/api/projects \
   -H "Content-Type: application/json" \
-  -d '{"name": "Dashboard Project", "kind": "web"}' \
+  -d '{"name": "Athena Dashboard", "kind": "web"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # Generate a hero image

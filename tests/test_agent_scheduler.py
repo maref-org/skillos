@@ -5,13 +5,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from skillos._types import Task
 from skillos.kernel.agent_scheduler import (
     AgentAssignment,
     AgentScheduler,
     ConsensusResult,
     ModelRoute,
 )
-from skillos.types import Task
 
 
 class TestAgentAssignment:
@@ -214,11 +214,13 @@ class TestCascade:
 class TestByzantineConsensus:
     def test_consensus_engine_used(self):
         mock_engine = MagicMock()
-        mock_engine.consensus = AsyncMock(return_value=MagicMock(
-            consensus_text="consensus result",
-            agreement_score=0.85,
-            arbitration_needed=False,
-        ))
+        mock_engine.consensus = AsyncMock(
+            return_value=MagicMock(
+                consensus_text="consensus result",
+                agreement_score=0.85,
+                arbitration_needed=False,
+            )
+        )
         scheduler = AgentScheduler(consensus_engine=mock_engine)
         outputs = [
             {"text": "result A", "prompt": "test"},

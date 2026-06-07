@@ -3,7 +3,7 @@
 import time
 import uuid
 
-from skillos.types import (
+from skillos._types import (
     Approval,
     ApprovalStatus,
     Contributor,
@@ -337,12 +337,8 @@ class TestSkillManifestDataclass:
         assert manifest.metadata == {"category": "analysis"}
 
     def test_dependencies_isolation(self):
-        m1 = SkillManifest(
-            id="a", name="a", version="1.0", author="a", description="a"
-        )
-        m2 = SkillManifest(
-            id="b", name="b", version="1.0", author="b", description="b"
-        )
+        m1 = SkillManifest(id="a", name="a", version="1.0", author="a", description="a")
+        m2 = SkillManifest(id="b", name="b", version="1.0", author="b", description="b")
         m1.dependencies.append("dep")
         assert "dep" not in m2.dependencies
 
@@ -442,6 +438,7 @@ class TestTaskDataclass:
 
     def test_custom_values(self):
         import time
+
         task = Task(
             task_id="custom-id",
             description="do something",

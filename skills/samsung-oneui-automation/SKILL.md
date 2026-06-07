@@ -98,7 +98,7 @@ ADB 命令序列:
 ### 4. IME 键盘切换 (输入英文)
 
 ```
-问题: 三星中文键盘(HoneyBoard)拦截 input text/keyevent, 
+问题: 三星中文键盘(HoneyBoard)拦截 input text/keyevent,
       将英文转为中文候选或乱码
 
 解决方案:
@@ -109,7 +109,7 @@ ADB 命令序列:
   adb shell ime set com.touchtype.swiftkey/com.touchtype.KeyboardService
 
   # 输入文本
-  adb shell cmd input text "SkillOS"
+  adb shell cmd input text "Athena"
 
   # 恢复三星键盘
   adb shell ime set com.samsung.android.honeyboard/.service.HoneyBoardService
@@ -183,7 +183,7 @@ org.compact_page(page_num=2)
 ```python
 # 1. 裁剪头像 400x400
 from PIL import Image
-img = Image.open("portrait.jpg")
+img = Image.open("athena_portrait.jpg")
 cropped = img.crop((left, top, left+min(w,h), top+min(w,h)))
 avatar = cropped.resize((400, 400), Image.LANCZOS)
 avatar.save("/tmp/avatar.jpg")

@@ -41,7 +41,7 @@ changelog:
 
 ## Overview
 
-Cross-platform content calendar system for multi-agent media workflows. Provides SQLite-based scheduling, conflict detection, and cross-platform timing optimization. Supports 12 target platforms.
+Cross-platform content calendar system for the OpenClaw multi-agent media center. Provides SQLite-based scheduling, conflict detection, and cross-platform timing optimization. Supports 12 target platforms.
 
 ## When to Use
 
@@ -74,7 +74,7 @@ entry = ContentCalendarEntry(
     id=generate_id(),
     content_type="announcement",
     source_content_id="src_001",
-    scheduled_at={"twitter": "2026-05-10T09:00:00Z", "github": "2026-05-10T09:05:00Z"},
+    scheduled_at={"twitter": "2024-01-01T09:00:00Z", "github": "2024-01-01T09:05:00Z"},
     status="scheduled",
 )
 ```
@@ -109,7 +109,7 @@ draft → scheduled → published → (metrics collected)
 
 ## Storage
 
-SQLite database at: `./data/content_calendar.db` (configurable via `CONTENT_CALENDAR_DB` env var)
+SQLite database at: `$SKILLOS_ROOT/data/content_calendar.db`
 
 ## Examples
 
@@ -119,7 +119,7 @@ entry = calendar.schedule(
     content_type="announcement",
     source_content_id="launch_001",
     platforms=["github", "twitter", "linkedin", "discord"],
-    base_time="2026-06-01T09:00:00Z",
+    base_time="2024-01-01T09:00:00Z",
 )
 # Auto-generates staggered times:
 #   github: 09:00, twitter: 09:05, linkedin: 09:10, discord: 09:15

@@ -1,7 +1,7 @@
 ---
 name: deerflow-pipeline
 description: |
-  DeerFlow v2 — 通用工作流执行引擎。负责复杂任务的 DAG 分解、编排与执行。
+  DeerFlow v2 — Athena 战略大脑的工作流执行引擎。负责复杂任务的 DAG 分解、编排与执行。
   吸收 ByteDance DeerFlow 2.0 的八项核心能力，构建 L3-L7 完整工作流光谱。
   触发条件：工作流编排、DAG执行、任务分解、HITL审批、流水线设计、Recovery处理。
 version: "1.0.0"
@@ -121,13 +121,13 @@ deerflow retry --run-id <uuid> --from-node test
 ## 典型任务生命周期
 
 ```
-Dashboard 创建任务
-  → DeerFlow DAG 分解
-    → 任务广播
+OpenHuman Dashboard 创建任务
+  → Athena DeerFlow DAG 分解
+    → OpenClaw Men0 v2 广播任务
       → Agent CLAIM 节点
         → ReAct Loop 执行
           → HITL 分级审批
-            → 结果汇聚 + 归档
+            → 结果汇聚 + Obsidian 归档
 ```
 
 ## 与其他模块集成
@@ -136,11 +136,11 @@ Dashboard 创建任务
 |------|--------|
 | Men0 | Task 状态机对齐 A2A 规范 |
 | MAREF | 故障注入测试 Recovery Rate |
-| OpenHuman | HITL 审批通过 Dashboard |
-| Obsidian | 自动归档到知识库 |
+| OpenHuman | HITL 审批通过 OpenHuman Dashboard |
+| Obsidian | 自动归档到 Athena 知识库 |
 
 ## 参考文档
-- DeerFlow v2 核心定义
+- Athena v0.2.0 方案（DeerFlow v2 核心定义）
 - Agent智能工作流综合研究报告
 - DeerFlow 2.0 类Agent架构增量升级方案
 - 规划框架与人机协同编排 ReAct-HITL-KAIROS

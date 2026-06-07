@@ -3,7 +3,8 @@ name: cross-platform-content-adaptation
 description: "跨平台内容格式适配 — 12 平台字符限制、Hashtag 策略、智能截断算法、媒体规格、最佳发布时间。Invoke 当需要将一份内容适配到多个社媒平台、调整文案长度、选择标签、裁剪媒体格式。"
 version: "1.0.0"
 autoApply: false
-dependencies: []
+dependencies:
+  - multi-agent-media-orchestration
 platforms:
   - claude
   - opencode
@@ -76,12 +77,12 @@ changelog:
 
 ```python
 PLATFORM_HASHTAGS = {
-    "twitter": ["#AI", "#OpenSource", "#Tech"],
-    "linkedin": ["#AI", "#OpenSource", "#Innovation"],
-    "xiaohongshu": ["#AI", "#开源项目", "#科技"],
-    "douyin": ["#AI", "#科技"],
-    "weibo": ["#AI开源", "#科技"],
-    "jike": ["#Tech"],
+    "twitter": ["#OpenHuman", "#AI", "#OpenSource", "#CarbonSilicon"],
+    "linkedin": ["#OpenHuman", "#AIAgent", "#OpenSource", "#Innovation"],
+    "xiaohongshu": ["#OpenHuman", "#AI", "#开源项目", "#科技"],
+    "douyin": ["#OpenHuman", "#AI", "#科技"],
+    "weibo": ["#OpenHuman", "#AI开源", "#科技"],
+    "jike": ["#OpenHuman"],
     # github, discord: 无 hashtag 惯例
 }
 ```
@@ -181,7 +182,7 @@ adapter = PlatformAdapter()
 src = SourceContent(
     content_id="ann_001",
     content_type="announcement",
-    title="Project v0.1",
+    title="OpenHuman v0.1",
     text="We are excited to announce... " * 20,
     tags=["AI", "OpenSource"],
 )
@@ -189,9 +190,9 @@ src = SourceContent(
 for p in ["twitter", "linkedin", "xiaohongshu"]:
     pc = adapter.adapt(src, p)
     print(f"{p}: {len(pc.text)} chars, {pc.hashtags}")
-    # twitter: 207 chars, ['#AI', '#OpenSource', '#Tech']
-    # linkedin: 832 chars, ['#AI', '#OpenSource', '#Innovation', '#Tech']
-    # xiaohongshu: 832 chars, ['#AI', '#开源项目', '#科技', '#OpenSource']
+    # twitter: 207 chars, ['#OpenHuman', '#AI', '#OpenSource']
+    # linkedin: 832 chars, ['#OpenHuman', '#AIAgent', '#OpenSource', '#Innovation', '#AI']
+    # xiaohongshu: 832 chars, ['#OpenHuman', '#AI', '#开源项目', '#科技', '#OpenSource']
 ```
 
 ---

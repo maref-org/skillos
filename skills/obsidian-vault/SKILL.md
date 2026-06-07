@@ -1,8 +1,8 @@
 ---
 name: obsidian-vault
 description: |
-  通过 Obsidian CLI 操作知识库。用于检索笔记、创建/追加内容、管理属性和任务。
-  触发关键词：obsidian、笔记、知识库、vault、记录、检索、wiki、每日笔记
+  通过 Obsidian CLI 操作 Athena 知识库。用于检索笔记、创建/追加内容、管理属性和任务。
+  触发关键词：obsidian、笔记、知识库、vault、记录、检索、Athena、wiki、每日笔记
 version: "1.0.0"
 sla:
   target_success_rate: 0.96
@@ -18,19 +18,19 @@ changelog:
 ## 前置条件
 - Obsidian 桌面端必须运行（IPC 依赖）
 - CLI 已注册：`/Applications/Obsidian.app/Contents/MacOS/obsidian`
-- 默认 Vault：通过 `--vault` 参数指定，或配置环境变量 `OBSIDIAN_VAULT_NAME`
+- 默认 Vault：`knowledge-base` (`./knowledge-base/`)
 
 ## 核心操作
 
 ### 1. 检索知识库
 ```
-obsidian search:context "{{query}}" --vault "<VAULT_NAME>"
+obsidian search:context "{{query}}" --vault "knowledge-base"
 ```
 用途：Agent 先检索再回答，实现 RAG。需在引号内转义特殊字符。
 
 ### 2. 创建笔记
 ```
-obsidian create "{{title}}" --template "{{template}}" --vault "<VAULT_NAME>"
+obsidian create "{{title}}" --template "{{template}}" --vault "knowledge-base"
 ```
 用途：按标准模板生成结构化笔记。
 
@@ -61,8 +61,7 @@ obsidian task complete "{{task_id}}"
 
 ## 知识库结构
 
-参考 `wiki/CROSS_PROJECT.md` 了解知识库的完整索引结构。
-项目文档通过 Obsidian Vault 组织管理。
+参考项目的 CROSS_PROJECT.md 了解知识库完整索引结构。
 
 ## 注意事项
 - Obsidian 必须运行：确保 Mac mini / MacBook 上 Obsidian 保持运行

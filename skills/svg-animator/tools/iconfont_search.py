@@ -5,11 +5,9 @@
 """
 
 import json
-import urllib.request
 import urllib.parse
-from pathlib import Path
+import urllib.request
 from typing import Any
-
 
 # ── 图标源配置 ──
 ICON_SOURCES = {
@@ -67,7 +65,7 @@ def _search_lucide(query: str, limit: int) -> list[dict[str, Any]]:
     try:
         # Lucide 图标以单独 SVG 文件存储在 GitHub
         # 通过文件名匹配搜索
-        url = f"https://api.github.com/repos/lucide-icons/lucide/contents/icons?per_page=100"
+        url = "https://api.github.com/repos/lucide-icons/lucide/contents/icons?per_page=100"
         req = urllib.request.Request(url, headers={"User-Agent": "svg-animator/0.1.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             files = json.loads(resp.read())
@@ -78,13 +76,15 @@ def _search_lucide(query: str, limit: int) -> list[dict[str, Any]]:
         for f in files:
             name = f["name"].replace(".svg", "")
             if query_lower in name.lower():
-                matched.append({
-                    "id": f"lucide-{name}",
-                    "name": name,
-                    "source": "lucide",
-                    "svg_url": f["download_url"],
-                    "license": "MIT",
-                })
+                matched.append(
+                    {
+                        "id": f"lucide-{name}",
+                        "name": name,
+                        "source": "lucide",
+                        "svg_url": f["download_url"],
+                        "license": "MIT",
+                    }
+                )
                 if len(matched) >= limit:
                     break
 
@@ -116,14 +116,16 @@ def _search_simple_icons(query: str, limit: int) -> list[dict[str, Any]]:
             aka = [a.lower() for a in aliases.get("aka", [])]
 
             if query_lower in title.lower() or query_lower in slug or any(query_lower in a for a in aka):
-                matched.append({
-                    "id": f"simple-{slug}",
-                    "name": title,
-                    "source": "simple-icons",
-                    "svg_url": f"{ICON_SOURCES['simple-icons']['base_url']}/{slug}.svg",
-                    "color": f"#{icon.get('hex', '')}",
-                    "license": "CC0-1.0",
-                })
+                matched.append(
+                    {
+                        "id": f"simple-{slug}",
+                        "name": title,
+                        "source": "simple-icons",
+                        "svg_url": f"{ICON_SOURCES['simple-icons']['base_url']}/{slug}.svg",
+                        "color": f"#{icon.get('hex', '')}",
+                        "license": "CC0-1.0",
+                    }
+                )
                 if len(matched) >= limit:
                     break
 
