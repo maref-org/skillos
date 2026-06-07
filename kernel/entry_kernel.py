@@ -12,7 +12,6 @@
   - Qwen-3 意图解析（通过 LiteLLM Router）
 """
 
-import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -24,8 +23,9 @@ from skillos._types import (
     Intent,
     IntentType,
 )
+from skillos.kernel.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 _INTENT_MAP = {
@@ -57,6 +57,11 @@ try:
 except ImportError:
     classify_intent = None
 
+try:
+    from litellm import completion as litellm_completion
+except ImportError:
+    litellm_completion = None
+
 
 class EntryKernel:
     """20/80 入口控制器 — 意图识别与分流"""
@@ -73,6 +78,8 @@ class EntryKernel:
             result = classify_intent(user_input)
             intent_type = _INTENT_MAP.get(result["intent"], IntentType.CHAT)
             confidence = result["confidence"]
+        elif litellm_completion is not None:
+            intent_type, confidence = self._classify_with_llm(user_input)
         else:
             intent_type = self._classify_keyword(user_input)
             confidence = 0.5
@@ -178,6 +185,33 @@ class EntryKernel:
         if any(kw in low for kw in ["analyze", "analyse", "评估", "compare", "对比", "summary"]):
             return IntentType.ANALYSIS
         return IntentType.CHAT
+
+    def _classify_with_llm(self, user_input: str, model: str = "gpt-4o-mini") -> tuple[IntentType, float]:
+        if litellm_completion is None:
+            return self._classify_keyword(user_input), 0.5
+        try:
+            import json
+            response = litellm_completion(
+                model=model,
+                messages=[
+                    {"role": "system", "content": (
+                        "Classify the user intent into one of: "
+                        "skill_call, research, content_creation, analysis, execution, chat. "
+                        "Respond with JSON: {\"intent\": \"...\", \"confidence\": 0.0-1.0}"
+                    )},
+                    {"role": "user", "content": user_input},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.0,
+                max_tokens=50,
+            )
+            result = json.loads(response.choices[0].message.content)
+            intent_type = _INTENT_MAP.get(result.get("intent", "chat"), IntentType.CHAT)
+            confidence = float(result.get("confidence", 0.5))
+            return intent_type, confidence
+        except Exception as e:
+            logger.warning("LLM classification failed, falling back to keyword: %s", e)
+            return self._classify_keyword(user_input), 0.5
 
     def _check_human_gate_required(self, intent_type: IntentType, user_input: str) -> bool:
         low = user_input.lower()
