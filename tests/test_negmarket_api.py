@@ -226,3 +226,150 @@ class TestDiscoverEndpoint:
         data = resp.json()
         assert data["total"] == 0
         assert data["skills"] == []
+
+
+@pytest.fixture
+def client(tmp_path, db_path=None):
+    _db_path = db_path or str(tmp_path / "test_negmarket.db")
+
+    def get_test_storage():
+        from negmarket.storage import SQLiteNegMarketStorage
+        return SQLiteNegMarketStorage(_db_path)
+
+    overrides = {_orig_get_storage: get_test_storage}
+    return _build_client(overrides)
+
+
+class TestUploadEndpointIntegration:
+    def test_upload_success(self, client):
+        resp = client.post("/negmarket/upload", json={
+            "raw_text": "API call failed with timeout after 30s on user-123 login",
+            "category": "api_error",
+            "contributor_id": "user-1",
+            "contributor_secret": "secret-1",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "sample_id" in data
+        assert "risk_level" in data
+        assert "anti_pattern_skill_id" in data
+        assert data["risk_level"] == "medium"
+
+    def test_upload_empty_text_rejected(self, client):
+        resp = client.post("/negmarket/upload", json={
+            "raw_text": "",
+            "category": "general",
+            "contributor_id": "user-1",
+            "contributor_secret": "secret-1",
+        })
+        assert resp.status_code == 422
+
+    def test_upload_high_risk_content(self, client):
+        resp = client.post("/negmarket/upload", json={
+            "raw_text": "Security breach: API key exposed in git commit containing sk-123456789012345678901234",
+            "category": "security",
+            "contributor_id": "user-2",
+            "contributor_secret": "secret-2",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["risk_level"] in ("high", "medium")
+
+    def test_upload_long_text(self, client):
+        resp = client.post("/negmarket/upload", json={
+            "raw_text": "error " * 16000,  # 96000 chars, within 100000 max_length
+            "category": "general",
+            "contributor_id": "user-1",
+            "contributor_secret": "secret-1",
+        })
+        assert resp.status_code == 200
+
+
+class TestCallEndpointIntegration:
+    def test_call_existing_anti_pattern(self, client):
+        upload = client.post("/negmarket/upload", json={
+            "raw_text": "Database connection pool exhausted after 100 concurrent requests",
+            "category": "database",
+            "contributor_id": "user-1",
+            "contributor_secret": "secret-1",
+        })
+        sample_id = upload.json()["sample_id"]
+
+        resp = client.post(f"/negmarket/{sample_id}/call", json={"params": {}})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "risk_level" in data
+        assert "warning" in data
+        assert "anti_pattern_id" in data
+
+    def test_call_nonexistent_sample(self, client):
+        resp = client.post("/negmarket/nonexistent-id/call", json={"params": {}})
+        assert resp.status_code == 404
+
+    def test_call_tracks_incrementing_stats(self, client):
+        upload = client.post("/negmarket/upload", json={
+            "raw_text": "Memory leak in cache layer after 1M entries",
+            "category": "performance",
+            "contributor_id": "user-3",
+            "contributor_secret": "secret-3",
+        })
+        sample_id = upload.json()["sample_id"]
+
+        client.post(f"/negmarket/{sample_id}/call", json={})
+        client.post(f"/negmarket/{sample_id}/call", json={})
+        resp = client.post(f"/negmarket/{sample_id}/call", json={})
+        assert resp.status_code == 200
+
+
+class TestDiscoverEndpointIntegration:
+    def test_discover_all(self, client):
+        client.post("/negmarket/upload", json={
+            "raw_text": "Rate limit exceeded for API endpoint /v1/users",
+            "category": "api_error",
+            "contributor_id": "user-1",
+            "contributor_secret": "secret-1",
+        })
+        client.post("/negmarket/upload", json={
+            "raw_text": "SSL certificate expired on prod.example.com",
+            "category": "security",
+            "contributor_id": "user-2",
+            "contributor_secret": "secret-2",
+        })
+
+        resp = client.get("/negmarket/discover")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "skills" in data
+        assert "total" in data
+        assert data["total"] >= 2
+
+    def test_discover_filter_by_category(self, client):
+        client.post("/negmarket/upload", json={
+            "raw_text": "Timeout while connecting to database cluster",
+            "category": "database",
+            "contributor_id": "user-1",
+            "contributor_secret": "secret-1",
+        })
+
+        resp = client.get("/negmarket/discover?category=database")
+        assert resp.status_code == 200
+        data = resp.json()
+        for s in data["skills"]:
+            assert s["category"] == "database"
+
+    def test_discover_filter_by_risk_level(self, client):
+        client.post("/negmarket/upload", json={
+            "raw_text": "Critical: data corruption in transaction log, customer-456 balance incorrect",
+            "category": "data_integrity",
+            "contributor_id": "user-3",
+            "contributor_secret": "secret-3",
+        })
+
+        resp = client.get("/negmarket/discover?risk_level=high")
+        assert resp.status_code == 200
+
+    def test_discover_empty_when_no_data(self, client):
+        resp = client.get("/negmarket/discover?category=nonexistent")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 0
