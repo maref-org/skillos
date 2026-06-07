@@ -12,14 +12,14 @@
 """
 
 import hashlib
-import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from skillos._types import SkillCall, SkillManifest, SkillStatus
+from skillos.kernel.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -101,7 +101,7 @@ class SkillKernel:
         return ToolChain(
             skill_id=nft.skill_id,
             tools=tools,
-            mcp_connectors=[f"mcp://{nft.skill_id}"],
+            mcp_connectors=[f"http://localhost:8000/mcp/v1/{nft.skill_id}"],
             a2a_adapters=[f"a2a://{nft.skill_id}"],
         )
 
