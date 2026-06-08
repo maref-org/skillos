@@ -3,21 +3,21 @@ repos:
     hooks:
       - id: athena-leak-check
         name: Athena T3/T2 leak prevention
-        entry: >
+        entry: |
           bash -c '
           FAILURES=0
           for f in "$@"; do
             if test -f "$f"; then
               if grep -Pn "(/Users/|/Volumes/|sk-[a-zA-Z0-9]{20,}|\$\d+\.\d+/)" "$f" 2>/dev/null; then
-                echo "❌ T3 leak detected in $f"
+                printf "T3 leak detected in %s\n" "$f"
                 FAILURES=$((FAILURES + 1))
               fi
             fi
           done
           exit $FAILURES
-          '
+          ' --
         language: system
-        stages: [commit]
+        stages: [pre-commit]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.0
