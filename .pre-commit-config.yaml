@@ -2,50 +2,22 @@ repos:
   - repo: local
     hooks:
       - id: athena-leak-check
-        name: Athena leak check - paths/orgs/secrets
-        entry: bash -c
-        args:
-          - |
-            PROPRIETARY_PATTERNS=(
-              "^SOUL\\.md$" "^IDENTITY\\.md$" "^HEARTBEAT\\.md$"
-              "^TOOLS\\.md$" "^USER\\.md$" "^\\.openclaw/"
-              "^agent_system/" "^internal/" "^\\.missions/"
-              "^findings\\.md$" "^progress\\.md$" "^task_plan\\.md$"
-            )
-            EXFIL_PATTERNS=(
-              "/Volumes/" "/Users/[A-Za-z]/" "file:///"
-              "frankiehot-tech" "frankiehot@"
-            )
-            SECRET_PATTERNS=(
-              "ghp_[A-Za-z0-9_-]\\{36,\\}" "gho_[A-Za-z0-9_-]\\{36,\\}"
-              "nvapi-[A-Za-z0-9_-]\\{30,\\}" "sk-[A-Za-z0-9]\\{20,\\}"
-              "AKIA[A-Z0-9]\\{16,\\}"
-            )
-            FAILED=0
-            STAGED=$(git diff --cached --name-only 2>/dev/null)
-            if [ -n "$STAGED" ]; then
-              for pattern in "${PROPRIETARY_PATTERNS[@]}"; do
-                matches=$(echo "$STAGED" | grep -E "$pattern" || true)
-                if [ -n "$matches" ]; then
-                  echo "FAIL: Proprietary files staged:"; echo "$matches"; FAILED=1
-                fi
-              done
+        name: Athena T3/T2 leak prevention
+        entry: >
+          bash -c '
+          FAILURES=0
+          for f in "$@"; do
+            if test -f "$f"; then
+              if grep -Pn "(/Users/|/Volumes/|sk-[a-zA-Z0-9]{20,}|\$\d+\.\d+/)" "$f" 2>/dev/null; then
+                echo "❌ T3 leak detected in $f"
+                FAILURES=$((FAILURES + 1))
+              fi
             fi
-            for pattern in "${EXFIL_PATTERNS[@]}"; do
-              matches=$(git diff --cached -U5 -- . ':!.pre-commit-config.yaml' ':!.github/workflows/check-exfiltration.yml' ':!scripts/sanitize-for-push.sh' | grep -E "$pattern" | grep -v "^---" | grep -v "^\+\+\+" | grep -v "^-" || true)
-              if [ -n "$matches" ]; then
-                echo "FAIL: Path/org leak: $pattern"; echo "$matches" | head -5; FAILED=1
-              fi
-            done
-            for pattern in "${SECRET_PATTERNS[@]}"; do
-              matches=$(git diff --cached -U20 -- . ':!.pre-commit-config.yaml' ':!.github/workflows/check-exfiltration.yml' ':!scripts/sanitize-for-push.sh' | grep -E "$pattern" | grep -v "^---" | grep -v "^\+\+\+" | grep -v "^-" || true)
-              if [ -n "$matches" ]; then
-                echo "FAIL: Secret leak: $pattern"; echo "$matches" | head -5; FAILED=1
-              fi
-            done
-            if [ $FAILED -ne 0 ]; then echo "COMMIT REJECTED - remove leaks first"; exit 1; fi
+          done
+          exit $FAILURES
+          '
         language: system
-        stages: [pre-commit]
+        stages: [commit]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.0

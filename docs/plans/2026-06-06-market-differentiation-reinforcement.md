@@ -92,7 +92,7 @@ class TestUploadEndpoint:
 
     def test_upload_high_risk_content(self, client):
         resp = client.post("/negmarket/upload", json={
-            "raw_text": "Security breach: API key exposed in git commit containing sk-123456789012345678901234",
+            "raw_text": "Security breach: API key exposed in git commit containing sk-placeholder-value",
             "category": "security",
             "contributor_id": "user-2",
             "contributor_secret": "secret-2",

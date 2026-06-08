@@ -128,3 +128,17 @@ class Contributor:
     current_period_attribution: float = 0.0
     success_rate: float = 1.0
     governance_participation: float = 0.0
+
+
+@dataclass
+class SkillBody:
+    rules: list[str] = field(default_factory=list)
+    examples: list[dict[str, Any]] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SkillAppendix:
+    reminders: list[str] = field(default_factory=list)
+    execution_lapses: list[str] = field(default_factory=list)
+    edge_cases: list[str] = field(default_factory=list)

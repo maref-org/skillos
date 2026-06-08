@@ -1,0 +1,63 @@
+name: 宪法第三十一条 — 外部 Agent 配置文件检查
+on:
+  pull_request:
+    paths:
+      - 'CLAUDE.md'
+      - '.cursorrules'
+      - 'opencode.jsonc'
+      - '.trae/rules/constitution.md'
+  push:
+    branches: [main]
+    paths:
+      - 'CLAUDE.md'
+      - '.cursorrules'
+      - 'opencode.jsonc'
+      - '.trae/rules/constitution.md'
+
+jobs:
+  check-agent-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 验证 Agent 配置文件含宪法引用 + 安全红线
+        run: |
+          echo "🔍 验证 Agent 配置文件..."
+          VIOLATIONS=0
+          REQUIRED_PATTERNS="Athena 系统宪法\|安全红线\|宪法优先"
+
+          for f in CLAUDE.md .cursorrules .trae/rules/constitution.md; do
+            if [ ! -f "$f" ]; then
+              echo "❌ 缺失: $f"
+              VIOLATIONS=$((VIOLATIONS + 1))
+              continue
+            fi
+            matches=0
+            for pattern in $(echo "$REQUIRED_PATTERNS" | tr '|' ' '); do
+              if grep -q "$pattern" "$f" 2>/dev/null; then
+                matches=$((matches + 1))
+              fi
+            done
+            if [ "$matches" -eq 3 ]; then
+              echo "✅ $f — 含宪法引用 + 安全红线 + 宪法优先"
+            else
+              echo "⚠️ $f — 缺失 $((3 - matches)) 项"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+
+          # 检查 opencode.jsonc
+          if [ -f "opencode.jsonc" ]; then
+            if grep -q "constitution_ref" opencode.jsonc 2>/dev/null; then
+              echo "✅ opencode.jsonc — 含 constitution_ref"
+            else
+              echo "⚠️ opencode.jsonc — 缺失 constitution_ref"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          fi
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "❌ Agent 配置文件未通过宪法引用检查"
+            echo "   宪法第三十一条要求所有外部 Agent 配置文件含宪法引用 + 安全红线 + 宪法优先声明"
+            exit 1
+          fi
+          echo "✅ 所有 Agent 配置文件合规"
