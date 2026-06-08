@@ -8,8 +8,8 @@
 
 调度策略：
   - 简单任务 → 本地 Gemma 4（$0）
-  - 中等任务 → DeepSeek V4（$0.003/次）
-  - 复杂任务 → Kimi 2.6（$0.005/次）
+  - 中等任务 → DeepSeek V4
+  - 复杂任务 → Kimi 2.6
   - 争议任务 → 多模型辩论（3 模型 + 多数决）
 """
 
@@ -61,9 +61,9 @@ class AgentScheduler:
 
     MODEL_MAP = {
         ModelTier.FREE: ("gemma-4", "local", 0.0, 200.0),
-        ModelTier.LOW: ("deepseek-chat", "primary", 0.003, 800.0),
-        ModelTier.MEDIUM: ("moonshot-v1-8k", "secondary", 0.005, 1200.0),
-        ModelTier.HIGH: ("moonshot-v1-32k", "secondary", 0.010, 2000.0),
+        ModelTier.LOW: ("deepseek-chat", "primary", 0.0, 800.0),  # cost from env
+        ModelTier.MEDIUM: ("moonshot-v1-8k", "secondary", 0.0, 1200.0),  # cost from env
+        ModelTier.HIGH: ("moonshot-v1-32k", "secondary", 0.0, 2000.0),  # cost from env
     }
 
     BYZANTINE_FAULT_TOLERANCE = 1
@@ -112,9 +112,7 @@ class AgentScheduler:
 
     def cascade(self, task: Task, confidence: float) -> ModelRoute:
         """级联策略：置信度不足时升级模型"""
-        primary_model, primary_group, _, _ = self.MODEL_MAP[
-            self._resolve_tier(task.complexity)
-        ]
+        primary_model, primary_group, _, _ = self.MODEL_MAP[self._resolve_tier(task.complexity)]
 
         cascade_map = {
             ModelTier.FREE: (ModelTier.LOW, ModelTier.MEDIUM),
@@ -146,10 +144,10 @@ class AgentScheduler:
             prompt: str = outputs[0].get("prompt", "")
             result = await self.consensus_engine.consensus(prompt)
             return ConsensusResult(
-                consensus_text=result.consensus_text if hasattr(result, 'consensus_text') else str(result),
-                agreement_score=result.agreement_score if hasattr(result, 'agreement_score') else 0.0,
+                consensus_text=result.consensus_text if hasattr(result, "consensus_text") else str(result),
+                agreement_score=result.agreement_score if hasattr(result, "agreement_score") else 0.0,
                 model_votes=[],
-                arbitration_needed=result.arbitration_needed if hasattr(result, 'arbitration_needed') else True,
+                arbitration_needed=result.arbitration_needed if hasattr(result, "arbitration_needed") else True,
                 pairwise_scores=[],
             )
 
