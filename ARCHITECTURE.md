@@ -121,7 +121,7 @@ SkillOS 的核心逻辑——Agent 路由、调度、会话管理、隔离执行
 |------|---------|---------|
 | `skillos.collaboration` | 8 层架构声明 | **缺失** — 仅有 `test_collaboration_layer.py` 引用 |
 | `skillos.governance` | 8 层架构声明 | **缺失** — 仅有 `test_governance_layer.py` 引用 |
-| `skillos.intelligence` | 8 层架构声明 | **缺失** — 仅有 `test_intelligence_layer.py` 引用 |
+| `skillos.intelligence` | 8 层架构声明 | **[已实现]** `intent_compiler.py` / `evolution.py` / `distillation.py` |
 | `skillos.market` | 增强 8 层架构 | **缺失** — 仅有 `test_market_layer.py` 引用 |
 | NegMarket (负样本市场) | OpenSkill Protocol §2.2 | **未实现** |
 | HaaS API | 架构 v1.0 §2.2.2 | **未实现** |

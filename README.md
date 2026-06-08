@@ -31,6 +31,17 @@ make lint     # ruff check
 make audit    # full release gate
 ```
 
+## Inspiration
+
+The L5 Intelligence Layer design was inspired by concurrent academic research on skill self-evolution
+(independently implemented, no code or data shared):
+
+- **SkillEvolver: Skill Learning as a Meta-Skill** — Genrui Zhang et al., arXiv:2605.10500, May 2026
+- **EmbodiSkill: Skill-Aware Reflection for Self-Evolving Embodied Agents** — Ruofei Ju et al., arXiv:2605.10332, May 2026
+
+SkillOS's evolution loop uses its own Agent execution logs and architecture vocabulary,
+not derived from any external codebase.
+
 ## License
 
 AGPL-3.0 — see [LICENSE](LICENSE).
