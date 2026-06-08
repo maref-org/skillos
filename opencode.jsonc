@@ -1,8 +1,9 @@
 {
   // OpenCode — SkillOS 治理框架约束
-  // 上位法: GOVERNANCE.md
-  // 冲突时以治理框架为准
+  // 上位法: Athena 系统宪法 v1.4-p1 → GOVERNANCE.md
+  // 冲突时以宪法优先，其次以治理框架为准
 
+  "constitution_ref": "athena/constitution/v1.4-p1",
   "governance_ref": "GOVERNANCE.md",
 
   "security_redlines": {

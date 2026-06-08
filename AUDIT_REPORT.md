@@ -1,9 +1,9 @@
 # SkillOS 产品级发布全量验收审计报告
 
-**审计日期**: 2026-05-23  
-**审计依据**: [产品级发布全量验收标准与评审流程手册](file:///Volumes/1TB-M2/Athena知识库/执行项目/2026/003-open%20human（碳硅基共生）/审计文档/产品级发布全量验收标准与评审流程手册.md)  
-**目标成熟度**: Beta（当前状态：Experimental → Beta 过渡阶段）  
-**项目版本**: v0.3.0  
+**审计日期**: 2026-05-23
+**审计依据**: 产品级发布全量验收标准与评审流程手册（内部知识库）
+**目标成熟度**: Beta（当前状态：Experimental → Beta 过渡阶段）
+**项目版本**: v0.3.0
 **审计员**: AI Agent (Trae IDE)
 
 ---
@@ -19,7 +19,7 @@
 | 运维就绪 (OPS) | 15% | 5/15 | ❌ 不合格 |
 | **总分** | **100%** | **65/100** | **D级 — 不合格，暂停发布权限** |
 
-**关键结论**:  
+**关键结论**:
 SkillOS v0.3.0 目前处于 **Experimental 向 Beta 过渡阶段**，核心功能框架已建立，但距离产品级发布（Beta/GA）存在显著差距。主要阻塞项集中在：**安全合规（无密钥管理、无审计日志持久化）、运维就绪（无可观测性、无灰度/回滚机制）、性能体验（无压测、无性能预算）**。
 
 ---
@@ -222,7 +222,7 @@ SkillOS v0.3.0 目前处于 **Experimental 向 Beta 过渡阶段**，核心功�
 | **L3 前端应用层** | Web/React/Vue、桌面壳（Tauri）、移动端WebView | Core Web Vitals、包体积、错误边界 | ❌ 不适用（Python库） |
 | **L4 用户界面层** | 交互体验、无障碍、国际化、AI流式输出渲染 | 体验走查、a11y、暗黑模式 | ❌ 不适用（Python库） |
 
-> **审计原则**: 后端决定"系统是否稳定"，前端决定"用户是否可用"，全栈链路决定"数据是否一致"。三层全部通过方可上线。  
+> **审计原则**: 后端决定"系统是否稳定"，前端决定"用户是否可用"，全栈链路决定"数据是否一致"。三层全部通过方可上线。
 > **结论**: 当前仅为 Python 库，无前端/全栈链路，L1 后端服务层部分实现。
 
 ---
@@ -241,9 +241,9 @@ SkillOS v0.3.0 目前处于 **Experimental 向 Beta 过渡阶段**，核心功�
 
 **关键代码审查**:
 
-- [protocol/registry_client.py](file:///Volumes/1TB-M2/public/skillos/protocol/registry_client.py#L68-L83): `register()` 方法在请求失败时回退到本地缓存，但无重试机制、无熔断保护。
-- [protocol/matcher_client.py](file:///Volumes/1TB-M2/public/skillos/protocol/matcher_client.py#L74-L120): `match()` 方法在请求失败时返回空结果，但无降级策略（如返回热门 Skill）。
-- [protocol/settlement_client.py](file:///Volumes/1TB-M2/public/skillos/protocol/settlement_client.py#L58-L69): `submit_record()` 方法有自动结算逻辑（≤$0.05），但无幂等性保证。
+- `protocol/registry_client.py`: `register()` 方法在请求失败时回退到本地缓存，但无重试机制、无熔断保护。
+- `protocol/matcher_client.py`: `match()` 方法在请求失败时返回空结果，但无降级策略（如返回热门 Skill）。
+- `protocol/settlement_client.py`: `submit_record()` 方法有自动结算逻辑（≤$0.05），但无幂等性保证。
 
 ---
 
@@ -315,12 +315,12 @@ SkillOS v0.3.0 目前处于 **Experimental 向 Beta 过渡阶段**，核心功�
 
 | 测试文件 | 测试数 | 覆盖率估算 | 状态 |
 |----------|--------|-----------|------|
-| [tests/test_skill_kernel.py](file:///Volumes/1TB-M2/public/skillos/tests/test_skill_kernel.py) | ~50 | 85% | ✅ |
-| [tests/test_entry_kernel.py](file:///Volumes/1TB-M2/public/skillos/tests/test_entry_kernel.py) | ~45 | 80% | ✅ |
-| [tests/test_agent_scheduler.py](file:///Volumes/1TB-M2/public/skillos/tests/test_agent_scheduler.py) | ~40 | 75% | ✅ |
-| [tests/test_distribution_engine.py](file:///Volumes/1TB-M2/public/skillos/tests/test_distribution_engine.py) | ~55 | 90% | ✅ |
-| [tests/test_session_manager.py](file:///Volumes/1TB-M2/public/skillos/tests/test_session_manager.py) | ~50 | 80% | ✅ |
-| [tests/test_types.py](file:///Volumes/1TB-M2/public/skillos/tests/test_types.py) | ~60 | 95% | ✅ |
+| [tests/test_skill_kernel.py](tests/test_skill_kernel.py) | ~50 | 85% | ✅ |
+| [tests/test_entry_kernel.py](tests/test_entry_kernel.py) | ~45 | 80% | ✅ |
+| [tests/test_agent_scheduler.py](tests/test_agent_scheduler.py) | ~40 | 75% | ✅ |
+| [tests/test_distribution_engine.py](tests/test_distribution_engine.py) | ~55 | 90% | ✅ |
+| [tests/test_session_manager.py](tests/test_session_manager.py) | ~50 | 80% | ✅ |
+| [tests/test_types.py](tests/test_types.py) | ~60 | 95% | ✅ |
 | tests/test_registry_client.py | ~10 | 40% | ❌ |
 | tests/test_identity_client.py | ~10 | 40% | ❌ |
 | tests/test_matcher_client.py | ~10 | 40% | ❌ |
@@ -350,11 +350,11 @@ SkillOS v0.3.0 目前处于 **Experimental 向 Beta 过渡阶段**，核心功�
 
 **关键安全风险**:
 
-1. **🔴 Critical**: `IdentityClient.verify_identity()` ([identity_client.py](file:///Volumes/1TB-M2/public/skillos/protocol/identity_client.py#L61-L69)) 中，挑战-响应验证逻辑不完整——计算了哈希但未验证，直接设置 `verified = True`。
-2. **🔴 Critical**: `IdentityClient.sign()` ([identity_client.py](file:///Volumes/1TB-M2/public/skillos/protocol/identity_client.py#L72-L91)) 使用 SHA256 哈希模拟签名，非真正的密码学签名，存在伪造风险。
+1. **🔴 Critical**: `IdentityClient.verify_identity()` ([identity_client.py](protocol/identity_client.py#L61-L69)) 中，挑战-响应验证逻辑不完整——计算了哈希但未验证，直接设置 `verified = True`。
+2. **🔴 Critical**: `IdentityClient.sign()` ([identity_client.py](protocol/identity_client.py#L72-L91)) 使用 SHA256 哈希模拟签名，非真正的密码学签名，存在伪造风险。
 3. **🟠 High**: `RegistryClient`, `MatcherClient`, `SettlementClient` 均使用 HTTP（非 HTTPS）默认地址 `http://localhost:8080`，生产环境存在中间人攻击风险。
 4. **🟠 High**: 无 API Key 轮换机制，`api_key` 明文存储于配置对象。
-5. **🟠 High**: `SkillKernel.execute()` ([skill_kernel.py](file:///Volumes/1TB-M2/public/skillos/kernel/skill_kernel.py#L108-L128)) 默认执行环境为 `wasm_sandbox`，但实际实现为空壳，无真正的沙箱隔离。
+5. **🟠 High**: `SkillKernel.execute()` ([skill_kernel.py](kernel/skill_kernel.py#L108-L128)) 默认执行环境为 `wasm_sandbox`，但实际实现为空壳，无真正的沙箱隔离。
 
 #### 3.3.4 性能体验门禁 (PERF)
 
@@ -507,7 +507,7 @@ SkillOS v0.3.0 目前处于 **Experimental 向 Beta 过渡阶段**，核心功�
 
 ---
 
-**审计结论**:  
+**审计结论**:
 SkillOS v0.3.0 **当前不具备 Beta 发布条件**。建议优先修复 P0 阻塞项（安全漏洞、持久化存储、审计日志、可观测性），预计需要 **4-6 周** 达到 Beta 发布标准。在修复完成前，**禁止生产环境发布**。
 
 **下次审计日期**: 建议 P0 项修复完成后 1 周内进行复审计。

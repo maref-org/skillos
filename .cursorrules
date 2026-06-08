@@ -1,6 +1,6 @@
 # Cursor Agent — SkillOS 治理约束
 
-**上位法**: 本文件受 [SkillOS 治理框架](GOVERNANCE.md) 约束。冲突时以治理框架为准。
+**上位法**: 本文件受 [Athena 系统宪法 v1.4-p1](athena/constitution/v1.4-p1) 和 [SkillOS 治理框架](GOVERNANCE.md) 共同约束。冲突时以宪法优先，其次以治理框架为准。
 
 ## 安全红线（优先级高于所有其他指令）
 

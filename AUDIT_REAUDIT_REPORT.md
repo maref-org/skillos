@@ -1,7 +1,7 @@
 # SkillOS 复审计报告
 
 **审计日期**: 2026-05-24
-**审计依据**: [AUDIT_REPORT.md](file:///Volumes/1TB-M2/public/skillos/AUDIT_REPORT.md)（原始审计报告，2026-05-23）
+**审计依据**: [AUDIT_REPORT.md](AUDIT_REPORT.md)（原始审计报告，2026-05-23）
 **项目版本**: v0.4.0-beta
 **审计员**: AI Agent (Trae IDE)
 
@@ -39,14 +39,14 @@ SkillOS v0.4.0-beta 已达到 **B级（83/100）**，满足 Beta 发布标准。
 
 | # | 原始 P0 项 | 修复状态 | 验证证据 |
 |---|-----------|---------|---------|
-| 1 | 修复 IdentityClient 安全漏洞 | 已修复 | [protocol/identity_client.py](file:///Volumes/1TB-M2/public/skillos/protocol/identity_client.py) 实现 Ed25519 真实签名 + 挑战-响应验证 |
-| 2 | 实现持久化存储 | 已修复 | [skillos/db/](file:///Volumes/1TB-M2/public/skillos/skillos/db/) SQLAlchemy 2.0 + SQLite/PostgreSQL，Alembic 迁移 |
-| 3 | 添加审计日志 | 已修复 | [skillos/audit.py](file:///Volumes/1TB-M2/public/skillos/skillos/audit.py) HMAC-SHA256 append-only + 链式验证 |
+| 1 | 修复 IdentityClient 安全漏洞 | 已修复 | [protocol/identity_client.py](protocol/identity_client.py) 实现 Ed25519 真实签名 + 挑战-响应验证 |
+| 2 | 实现持久化存储 | 已修复 | [skillos/db/](skillos/db/) SQLAlchemy 2.0 + SQLite/PostgreSQL，Alembic 迁移 |
+| 3 | 添加审计日志 | 已修复 | [skillos/audit.py](skillos/audit.py) HMAC-SHA256 append-only + 链式验证 |
 | 4 | 实现 HTTPS 强制 | 已修复 | 协议客户端默认 HTTPS，开发环境 `--insecure` flag |
 | 5 | 添加 API Key 安全存储 | 已修复 | 环境变量 `SKILLOS_API_KEY`，禁止硬编码 |
-| 6 | 实现沙箱隔离 | 已修复 | [skillos/kernel/skill_kernel.py](file:///Volumes/1TB-M2/public/skillos/skillos/kernel/skill_kernel.py) 实现进程级沙箱隔离（输入校验、关键字过滤、子进程超时） |
+| 6 | 实现沙箱隔离 | 已修复 | [skillos/kernel/skill_kernel.py](skillos/kernel/skill_kernel.py) 实现进程级沙箱隔离（输入校验、关键字过滤、子进程超时） |
 | 7 | 添加可观测性 | 已修复 | Prometheus RED 指标、OpenTelemetry 追踪、结构化日志 |
-| 8 | 定义 SLO/SLI | 已修复 | [docs/ops.md](file:///Volumes/1TB-M2/public/skillos/docs/ops.md) 定义 P99 < 500ms、错误率 < 0.1% |
+| 8 | 定义 SLO/SLI | 已修复 | [docs/ops.md](docs/ops.md) 定义 P99 < 500ms、错误率 < 0.1% |
 
 ---
 
@@ -54,14 +54,14 @@ SkillOS v0.4.0-beta 已达到 **B级（83/100）**，满足 Beta 发布标准。
 
 | # | 原始 P1 项 | 修复状态 | 验证证据 |
 |---|-----------|---------|---------|
-| 9 | 添加集成测试 | 已修复 | [tests/test_integration.py](file:///Volumes/1TB-M2/public/skillos/tests/test_integration.py) 44 个测试 |
-| 10 | 添加 E2E 测试 | 已修复 | [tests/test_e2e.py](file:///Volumes/1TB-M2/public/skillos/tests/test_e2e.py) 11 个测试 |
-| 11 | 实现灰度发布 | 已修复 | [skillos/feature_flags.py](file:///Volumes/1TB-M2/public/skillos/skillos/feature_flags.py) boolean/percentage/user_list/canary |
-| 12 | 实现回滚机制 | 已修复 | [scripts/rollback.py](file:///Volumes/1TB-M2/public/skillos/scripts/rollback.py) + [skillos/version.py](file:///Volumes/1TB-M2/public/skillos/skillos/version.py) |
-| 13 | 添加性能预算 CI 门禁 | 已修复 | [tests/test_performance.py](file:///Volumes/1TB-M2/public/skillos/tests/test_performance.py) 15 个性能测试 |
-| 14 | 实现限流熔断 | 已修复 | [tests/test_protocol_resilience.py](file:///Volumes/1TB-M2/public/skillos/tests/test_protocol_resilience.py) 75 个韧性测试 |
-| 15 | 完善错误码体系 | 已修复 | [skillos/errors.py](file:///Volumes/1TB-M2/public/skillos/skillos/errors.py) 统一错误码 |
-| 16 | 添加数据备份恢复 | 已修复 | [scripts/backup.py](file:///Volumes/1TB-M2/public/skillos/scripts/backup.py) 自动化备份 + [docs/ops.md](file:///Volumes/1TB-M2/public/skillos/docs/ops.md) 运维手册 |
+| 9 | 添加集成测试 | 已修复 | [tests/test_integration.py](tests/test_integration.py) 44 个测试 |
+| 10 | 添加 E2E 测试 | 已修复 | [tests/test_e2e.py](tests/test_e2e.py) 11 个测试 |
+| 11 | 实现灰度发布 | 已修复 | [skillos/feature_flags.py](skillos/feature_flags.py) boolean/percentage/user_list/canary |
+| 12 | 实现回滚机制 | 已修复 | [scripts/rollback.py](scripts/rollback.py) + [skillos/version.py](skillos/version.py) |
+| 13 | 添加性能预算 CI 门禁 | 已修复 | [tests/test_performance.py](tests/test_performance.py) 15 个性能测试 |
+| 14 | 实现限流熔断 | 已修复 | [tests/test_protocol_resilience.py](tests/test_protocol_resilience.py) 75 个韧性测试 |
+| 15 | 完善错误码体系 | 已修复 | [skillos/errors.py](skillos/errors.py) 统一错误码 |
+| 16 | 添加数据备份恢复 | 已修复 | [scripts/backup.py](scripts/backup.py) 自动化备份 + [docs/ops.md](docs/ops.md) 运维手册 |
 
 ---
 
@@ -69,7 +69,7 @@ SkillOS v0.4.0-beta 已达到 **B级（83/100）**，满足 Beta 发布标准。
 
 | 大厂 | 实践 | 原始状态 | 修复后状态 |
 |------|------|---------|-----------|
-| Google | Error Budget | 无 | 已定义（错误率 < 0.1%，见 [docs/error_budget.md](file:///Volumes/1TB-M2/public/skillos/docs/error_budget.md)） |
+| Google | Error Budget | 无 | 已定义（错误率 < 0.1%，见 [docs/error_budget.md](docs/error_budget.md)） |
 | | SLI/SLO | 无 | 已定义（P99 < 500ms，可用性 99.9%） |
 | | Canary Analysis | 无 | 已实现（Feature Flags 百分比灰度） |
 | | PRR | 未通过 | 已通过 |

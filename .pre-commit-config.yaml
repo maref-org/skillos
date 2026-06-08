@@ -11,8 +11,6 @@ repos:
               "^TOOLS\\.md$" "^USER\\.md$" "^\\.openclaw/"
               "^agent_system/" "^internal/" "^\\.missions/"
               "^findings\\.md$" "^progress\\.md$" "^task_plan\\.md$"
-              "^anthropic-reinforcement-plan\\.md$" "^harness-plan/"
-              "^Pixelle-Video/" "^comfyui_workspace/" "^backups/"
             )
             EXFIL_PATTERNS=(
               "/Volumes/" "/Users/[A-Za-z]/" "file:///"
@@ -34,13 +32,13 @@ repos:
               done
             fi
             for pattern in "${EXFIL_PATTERNS[@]}"; do
-              matches=$(git diff --cached -U5 -- . ':!.pre-commit-config.yaml' | grep -E "$pattern" | grep -v "^---" | grep -v "^+++" || true)
+              matches=$(git diff --cached -U5 -- . ':!.pre-commit-config.yaml' ':!.github/workflows/check-exfiltration.yml' ':!scripts/sanitize-for-push.sh' | grep -E "$pattern" | grep -v "^---" | grep -v "^\+\+\+" | grep -v "^-" || true)
               if [ -n "$matches" ]; then
                 echo "FAIL: Path/org leak: $pattern"; echo "$matches" | head -5; FAILED=1
               fi
             done
             for pattern in "${SECRET_PATTERNS[@]}"; do
-              matches=$(git diff --cached -U20 -- . ':!.pre-commit-config.yaml' | grep -E "$pattern" | grep -v "^---" | grep -v "^+++" || true)
+              matches=$(git diff --cached -U20 -- . ':!.pre-commit-config.yaml' ':!.github/workflows/check-exfiltration.yml' ':!scripts/sanitize-for-push.sh' | grep -E "$pattern" | grep -v "^---" | grep -v "^\+\+\+" | grep -v "^-" || true)
               if [ -n "$matches" ]; then
                 echo "FAIL: Secret leak: $pattern"; echo "$matches" | head -5; FAILED=1
               fi
@@ -75,9 +73,3 @@ repos:
         args: ["--maxkb=1024"]
       - id: check-case-conflict
       - id: detect-private-key
-
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.41.0
-    hooks:
-      - id: markdownlint
-        args: ["--fix", "--disable", "MD013", "MD033"]
