@@ -99,8 +99,7 @@ class AuditLogger:
         key = secret_key or os.getenv("SKILLOS_AUDIT_SECRET")
         if not key:
             logger.warning(
-                "SKILLOS_AUDIT_SECRET not set. Generating random key. "
-                "This will prevent verification across restarts."
+                "SKILLOS_AUDIT_SECRET not set. Generating random key. This will prevent verification across restarts."
             )
             key = secrets.token_hex(32)
         return key.encode("utf-8")

@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import argparse
-import gzip
 import logging
 import os
 import shutil
@@ -84,7 +83,7 @@ def backup_postgres(backup_dir: Path) -> Path | None:
 
     db_url = os.getenv("SKILLOS_DATABASE_URL", "")
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["pg_dump", db_url, "-f", str(backup_file)],
             capture_output=True,
             text=True,
@@ -171,7 +170,9 @@ def restore_db(backup_path: Path) -> bool:
     try:
         # 先备份当前数据库
         if db_file.exists():
-            current_backup = db_file.with_suffix(f".db.pre_restore_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}")
+            current_backup = db_file.with_suffix(
+                f".db.pre_restore_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+            )
             shutil.copy2(db_file, current_backup)
             logger.info("Current database backed up to: %s", current_backup)
 

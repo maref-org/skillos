@@ -22,6 +22,7 @@ _DEFAULT_DB_PATH = "data/negmarket.db"
 
 def _aes_encrypt(plaintext: str, key: bytes) -> str:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     nonce = os.urandom(12)
     aesgcm = AESGCM(key)
     ciphertext = aesgcm.encrypt(nonce, plaintext.encode(), None)
@@ -30,6 +31,7 @@ def _aes_encrypt(plaintext: str, key: bytes) -> str:
 
 def _aes_decrypt(encrypted: str, key: bytes) -> str:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     raw = b64decode(encrypted)
     nonce, ciphertext = raw[:12], raw[12:]
     aesgcm = AESGCM(key)
@@ -39,6 +41,7 @@ def _aes_decrypt(encrypted: str, key: bytes) -> str:
 def _derive_key(contributor_secret: str, sample_id: str) -> bytes:
     from cryptography.hazmat.primitives.hashes import SHA256
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
     hkdf = HKDF(
         algorithm=SHA256(),
         length=32,
@@ -150,19 +153,22 @@ class SQLiteNegMarketStorage(StorageBackend):
                     verification_status, price_per_call, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    sample.id, sample.contributor_id, sample.original_hash,
-                    sample.encrypted_blob, json.dumps(sample.desensitized_pattern),
-                    sample.category, sample.risk_level,
-                    sample.verification_status, sample.price_per_call,
+                    sample.id,
+                    sample.contributor_id,
+                    sample.original_hash,
+                    sample.encrypted_blob,
+                    json.dumps(sample.desensitized_pattern),
+                    sample.category,
+                    sample.risk_level,
+                    sample.verification_status,
+                    sample.price_per_call,
                     sample.created_at,
                 ),
             )
 
     def get_sample(self, sample_id: str) -> NegativeSample | None:
         with self._get_conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM negative_samples WHERE id = ?", (sample_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM negative_samples WHERE id = ?", (sample_id,)).fetchone()
             return self._row_to_sample(row) if row else None
 
     def list_samples(self, category: str | None = None, risk_level: str | None = None) -> list[NegativeSample]:
@@ -187,17 +193,19 @@ class SQLiteNegMarketStorage(StorageBackend):
                     call_count, revenue, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    skill.id, skill.sample_id, json.dumps(skill.skill_manifest),
-                    skill.generated_by, skill.call_count, skill.revenue,
+                    skill.id,
+                    skill.sample_id,
+                    json.dumps(skill.skill_manifest),
+                    skill.generated_by,
+                    skill.call_count,
+                    skill.revenue,
                     skill.created_at,
                 ),
             )
 
     def get_anti_pattern(self, skill_id: str) -> AntiPatternSkill | None:
         with self._get_conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM anti_pattern_skills WHERE id = ?", (skill_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM anti_pattern_skills WHERE id = ?", (skill_id,)).fetchone()
             return self._row_to_skill(row) if row else None
 
     def discover_anti_patterns(

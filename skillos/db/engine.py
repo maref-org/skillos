@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Generator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from skillos.db.models import Base
@@ -47,6 +47,7 @@ def get_engine():
             pool_pre_ping=True,
         )
         logger.info("Database engine created: %s", url.split("://")[0])
+        Base.metadata.create_all(bind=_engine)
     return _engine
 
 

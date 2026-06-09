@@ -4,7 +4,6 @@
 为各核心模块提供类型安全的 CRUD 接口，屏蔽 ORM 细节。
 """
 
-from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -131,6 +130,7 @@ class DistributionRepository:
     def get_period_revenue(self, period_key: str) -> float:
         """period_key 格式: YYYY-MM-DD 或 YYYY-MM。"""
         from sqlalchemy import func
+
         result = (
             self._db.query(func.sum(DistributionRecordModel.total_amount))
             .where(DistributionRecordModel.timestamp.startswith(period_key))  # type: ignore[attr-defined]

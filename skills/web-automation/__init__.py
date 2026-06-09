@@ -18,9 +18,16 @@ from .executor import (
 
 __all__ = [
     "WebAutomationExecutor",
-    "browser_navigate", "browser_snapshot", "browser_click",
-    "browser_fill", "browser_submit", "browser_screenshot",
-    "browser_extract", "browser_close", "browser_doctor",
+    "browser_navigate",
+    "browser_snapshot",
+    "browser_click",
+    "browser_fill",
+    "browser_submit",
+    "browser_screenshot",
+    "browser_extract",
+    "browser_close",
+    "browser_doctor",
     "browser_run_batch",
-    "is_agent_browser_installed", "get_install_hint",
+    "is_agent_browser_installed",
+    "get_install_hint",
 ]

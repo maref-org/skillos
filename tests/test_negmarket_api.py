@@ -10,17 +10,17 @@ from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import negmarket.api as _api_mod
-from negmarket.api import (
+import skillos.negmarket.api as _api_mod
+from skillos.negmarket.api import (
     get_generator as _orig_get_generator,
 )
-from negmarket.api import (
+from skillos.negmarket.api import (
     get_pipeline as _orig_get_pipeline,
 )
-from negmarket.api import (
+from skillos.negmarket.api import (
     get_storage as _orig_get_storage,
 )
-from negmarket.api import (
+from skillos.negmarket.api import (
     router,
 )
 from skillos.negmarket.models import AntiPatternSkill, NegativeSample
@@ -248,7 +248,7 @@ def client(tmp_path, db_path=None):
     _db_path = db_path or str(tmp_path / "test_negmarket.db")
 
     def get_test_storage():
-        from negmarket.storage import SQLiteNegMarketStorage
+        from skillos.negmarket.storage import SQLiteNegMarketStorage
 
         return SQLiteNegMarketStorage(_db_path)
 
@@ -290,7 +290,9 @@ class TestUploadEndpointIntegration:
         resp = client.post(
             "/negmarket/upload",
             json={
-                "raw_text": "Security breach: API key exposed in git commit containing sk-placeholder-value",
+                "raw_text": (
+                    "Security breach: API key exposed in git commit containing sk-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+                ),
                 "category": "security",
                 "contributor_id": "user-2",
                 "contributor_secret": "secret-2",
@@ -414,7 +416,7 @@ class TestDiscoverEndpointIntegration:
         client.post(
             "/negmarket/upload",
             json={
-                "raw_text": "Critical: API key sk-placeholder-value leaked in transaction log",
+                "raw_text": "Critical: API key sk-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6 leaked in transaction log",
                 "category": "security",
                 "contributor_id": "user-3",
                 "contributor_secret": "secret-3",

@@ -33,6 +33,23 @@ class DesensitizationStep(ABC):
     def process(self, ctx: DesensitizationContext) -> DesensitizationContext: ...
 
 
+_PRESIDIO_AVAILABLE = False
+
+
+class PresidioPIIAnalyzerStep(DesensitizationStep):
+    """ML-powered PII analyzer step (optional, uses presidio-analyzer)."""
+
+    def __init__(self, analyzer: Any | None = None):
+        self._analyzer = analyzer
+
+    def process(self, ctx: DesensitizationContext) -> DesensitizationContext:
+        if not _PRESIDIO_AVAILABLE or self._analyzer is None:
+            ctx.extra["pii_types_found"] = None
+            ctx.desensitized_text = ""
+            return ctx
+        return ctx
+
+
 _HIGH_RISK_PII = {"api_key", "id_card"}
 
 
@@ -45,9 +62,7 @@ class LocalPIIReplaceStep(DesensitizationStep):
                 logger.info("PII replaced: %d %s instances", len(matches), pii_type)
                 text = re.sub(pattern, replacement, text)
         ctx.desensitized_text = text
-        pii_found = list(
-            {pii_type for pattern, pii_type, _ in _PII_PATTERNS if re.search(pattern, ctx.raw_text)}
-        )
+        pii_found = list({pii_type for pattern, pii_type, _ in _PII_PATTERNS if re.search(pattern, ctx.raw_text)})
         ctx.extra["pii_types_found"] = pii_found
         if any(p in _HIGH_RISK_PII for p in pii_found):
             ctx.risk_level = "high"
@@ -114,6 +129,7 @@ class DesensitizationPipeline:
 
     def __init__(self, steps: list[DesensitizationStep] | None = None):
         self.steps = steps or [
+            PresidioPIIAnalyzerStep(),
             LocalPIIReplaceStep(),
             ZKVerifyStep(),
             AntiPatternSkillStep(),

@@ -67,5 +67,5 @@ lint.ignore = []
 exclude_dirs = ["tests", ".venv", ".git"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["kernel", "distribution", "protocol", "skills", "negmarket"]
-include = ["_types.py", "__init__.py"]
+packages = ["skillos"]
+include = []

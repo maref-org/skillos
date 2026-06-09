@@ -9,7 +9,10 @@ class TestPlatformCapabilities:
         from references.platform_capabilities import PLATFORM_CAPABILITIES
 
         required = (
-            "name", "package", "free_quota", "video_format",
+            "name",
+            "package",
+            "free_quota",
+            "video_format",
             "verified",
         )
         for platform, caps in PLATFORM_CAPABILITIES.items():
@@ -68,9 +71,7 @@ class TestJimengPlatform:
     def test_build_jimeng_i2v_task_with_ref(self):
         from platforms.jimeng import build_jimeng_task
 
-        task = build_jimeng_task(
-            mode="i2v", prompt="测试提示词", has_ref_image=True
-        )
+        task = build_jimeng_task(mode="i2v", prompt="测试提示词", has_ref_image=True)
         assert "即梦" in task
         assert "图生视频" in task
         assert "测试提示词" in task
@@ -79,9 +80,7 @@ class TestJimengPlatform:
     def test_build_jimeng_t2v_task(self):
         from platforms.jimeng import build_jimeng_task
 
-        task = build_jimeng_task(
-            mode="t2v", prompt="科幻场景", has_ref_image=False
-        )
+        task = build_jimeng_task(mode="t2v", prompt="科幻场景", has_ref_image=False)
         assert "即梦" in task
         assert "文生视频" in task
         assert "科幻场景" in task
@@ -124,9 +123,7 @@ class TestDoubaoPlatform:
     def test_build_doubao_i2v_task(self):
         from platforms.doubao import build_doubao_task
 
-        task = build_doubao_task(
-            mode="i2v", prompt="AI角色特写", has_ref_image=True
-        )
+        task = build_doubao_task(mode="i2v", prompt="AI角色特写", has_ref_image=True)
         assert "豆包" in task
         assert "AI创作" in task
         assert "AI角色特写" in task
@@ -135,9 +132,7 @@ class TestDoubaoPlatform:
     def test_build_doubao_t2v_task(self):
         from platforms.doubao import build_doubao_task
 
-        task = build_doubao_task(
-            mode="t2v", prompt="自然风景", has_ref_image=False
-        )
+        task = build_doubao_task(mode="t2v", prompt="自然风景", has_ref_image=False)
         assert "豆包" in task
         assert "AI视频" in task
         assert "自然风景" in task

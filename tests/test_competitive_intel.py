@@ -1,4 +1,5 @@
 """Tests for scripts.competitive_intel — competitive intelligence pipeline"""
+
 from skillos.scripts.competitive_intel import (
     CompetitiveAnalysisReport,
     CompetitiveIntelPipeline,
@@ -72,7 +73,10 @@ class TestCompetitiveIntelPipeline:
     def test_to_json_output(self, monkeypatch):
         competitors = [
             CompetitorProfile(
-                name="C1", category=CompetitorCategory.AGENT_PLATFORM, urls=["https://example.com"], tags=["test"],
+                name="C1",
+                category=CompetitorCategory.AGENT_PLATFORM,
+                urls=["https://example.com"],
+                tags=["test"],
             ),
         ]
         pipeline = CompetitiveIntelPipeline(competitors=competitors)
@@ -80,6 +84,7 @@ class TestCompetitiveIntelPipeline:
         report = pipeline.run()
         json_str = pipeline.to_json(report)
         import json as j
+
         parsed = j.loads(json_str)
         assert "competitors_analyzed" in parsed
         assert parsed["competitors_analyzed"] == 1
@@ -99,7 +104,10 @@ class TestCompetitiveIntelPipeline:
     def test_save_report_creates_files(self, tmp_path, monkeypatch):
         competitors = [
             CompetitorProfile(
-                name="C1", category=CompetitorCategory.AGENT_PLATFORM, urls=["https://example.com"], tags=["test"],
+                name="C1",
+                category=CompetitorCategory.AGENT_PLATFORM,
+                urls=["https://example.com"],
+                tags=["test"],
             ),
         ]
         pipeline = CompetitiveIntelPipeline(competitors=competitors)
@@ -107,18 +115,23 @@ class TestCompetitiveIntelPipeline:
         report = pipeline.run()
         json_path, md_path = pipeline.save_report(report, output_dir=str(tmp_path))
         import os
+
         assert os.path.exists(json_path)
         assert os.path.exists(md_path)
 
     def test_default_competitors_have_categories(self):
         from skillos.scripts.competitive_intel import _DEFAULT_COMPETITORS
+
         for c in _DEFAULT_COMPETITORS:
             assert c.category in CompetitorCategory
 
     def test_pipeline_no_fetch_on_scraper_failure(self, monkeypatch):
         competitors = [
             CompetitorProfile(
-                name="C1", category=CompetitorCategory.AGENT_PLATFORM, urls=["https://fail.example"], tags=["test"],
+                name="C1",
+                category=CompetitorCategory.AGENT_PLATFORM,
+                urls=["https://fail.example"],
+                tags=["test"],
             ),
         ]
         pipeline = CompetitiveIntelPipeline(competitors=competitors)

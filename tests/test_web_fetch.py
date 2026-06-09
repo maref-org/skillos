@@ -1,15 +1,16 @@
 """Tests for kernel.web_fetch — Web Fetch Tool"""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
-from kernel.web_fetch import WebFetchResult, WebFetcher
+from skillos.kernel.web_fetch import WebFetcher, WebFetchResult
 
 
 @pytest.fixture
 def mock_client():
-    with patch("kernel.web_fetch.httpx.AsyncClient") as mock:
+    with patch("skillos.kernel.web_fetch.httpx.AsyncClient") as mock:
         client_instance = AsyncMock()
         mock.return_value = client_instance
         yield client_instance
@@ -61,7 +62,12 @@ class TestWebFetcher:
 
     async def test_fetch_article_mode(self, mock_client):
         fetcher = WebFetcher()
-        resp = _make_response(text="<html><head><title>Article</title></head><body><article><h1>Article</h1><p>Body text here</p></article></body></html>")
+        resp = _make_response(
+            text=(
+                "<html><head><title>Article</title></head>"
+                "<body><article><h1>Article</h1><p>Body text here</p></article></body></html>"
+            )
+        )
 
         get_mock = AsyncMock(return_value=resp)
         mock_client.get = get_mock
@@ -184,7 +190,7 @@ class TestWebFetcher:
     async def test_client_lazy_initialization(self):
         fetcher = WebFetcher()
         assert fetcher._client is None
-        with patch("kernel.web_fetch.httpx.AsyncClient") as httpx_mock:
+        with patch("skillos.kernel.web_fetch.httpx.AsyncClient") as httpx_mock:
             client = await fetcher._get_client()
             httpx_mock.assert_called_once()
             assert client is not None
@@ -214,8 +220,8 @@ class TestWebFetcher:
         assert "hidden" not in result.content or ".hidden" not in result.content
 
     async def test_extract_links_deduplicates(self):
-        soup_mock = MagicMock()
         from bs4 import BeautifulSoup
+
         html = '<html><body><a href="/a">A</a><a href="/a">A dup</a></body></html>'
         soup = BeautifulSoup(html, "html.parser")
         links = WebFetcher._extract_links(soup, "https://example.com")
@@ -223,6 +229,7 @@ class TestWebFetcher:
 
     async def test_extract_metadata_with_charset(self):
         from bs4 import BeautifulSoup
+
         html = '<html><head><meta charset="utf-8"><meta name="author" content="Test"></head></html>'
         soup = BeautifulSoup(html, "html.parser")
         meta = WebFetcher._extract_metadata(soup, {"content-type": "text/html"})

@@ -11,7 +11,6 @@ Phase 4.3: E2E 测试
 
 import asyncio
 import tempfile
-from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -20,7 +19,7 @@ from sqlalchemy.orm import sessionmaker
 from skillos.audit import AuditEventType, AuditLogger
 from skillos.db.engine import Base
 from skillos.db.models import SessionModel, SkillModel
-from skillos.distribution.engine import DistributionEngine, SettlementPeriod
+from skillos.distribution.engine import DistributionEngine
 from skillos.kernel.session_manager import SessionManager
 from skillos.kernel.skill_kernel import SkillKernel
 from skillos.protocol.identity_client import IdentityClient
@@ -48,6 +47,7 @@ def audit_logger():
 # =============================================================================
 # E2E Scenario 1: 开发者发布 Skill 全流程
 # =============================================================================
+
 
 class TestDeveloperPublishSkill:
     def test_full_publish_flow(self, db_session, audit_logger):
@@ -90,6 +90,7 @@ class TestDeveloperPublishSkill:
 # =============================================================================
 # E2E Scenario 2: 用户调用 Skill 全流程
 # =============================================================================
+
 
 class TestUserCallSkill:
     def test_full_call_flow(self, db_session, audit_logger):
@@ -145,6 +146,7 @@ class TestUserCallSkill:
 # =============================================================================
 # E2E Scenario 3: 多用户并发会话场景
 # =============================================================================
+
 
 class TestMultiUserSessions:
     def test_multiple_users_parallel_sessions(self, db_session):
@@ -202,6 +204,7 @@ class TestMultiUserSessions:
 # =============================================================================
 # E2E Scenario 4: 贡献者注册与收益结算
 # =============================================================================
+
 
 class TestContributorSettlement:
     def test_contributor_earns_from_skill_calls(self, db_session):
@@ -277,6 +280,7 @@ class TestContributorSettlement:
 # E2E Scenario 5: 系统故障恢复
 # =============================================================================
 
+
 class TestSystemRecovery:
     def test_skill_cache_rebuild_from_db(self, db_session):
         """缓存丢失后从 DB 重建"""
@@ -314,7 +318,9 @@ class TestSystemRecovery:
     def test_distribution_cache_rebuild_from_db(self, db_session):
         """分配记录缓存丢失后从 DB 重建"""
         engine1 = DistributionEngine(db_session=db_session)
-        call = SkillCall(call_id="call-recovery", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=50.0)
+        call = SkillCall(
+            call_id="call-recovery", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=50.0
+        )
         engine1.distribute(call)
 
         # 模拟新实例
@@ -353,7 +359,9 @@ class TestSystemRecovery:
         session = mgr1.create_session("user-001")
         mgr1.add_item(session.session_id, {"role": "user", "content": "test"})
 
-        call = SkillCall(call_id="call-resilient", skill_id=manifest.id, caller_id="user-001", input_data={}, revenue_usd=25.0)
+        call = SkillCall(
+            call_id="call-resilient", skill_id=manifest.id, caller_id="user-001", input_data={}, revenue_usd=25.0
+        )
         engine1.distribute(call)
 
         # Phase 2: 模拟重启（新实例，空缓存）

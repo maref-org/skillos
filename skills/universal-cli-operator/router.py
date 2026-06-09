@@ -37,46 +37,84 @@ class RouteDecision:
 # Keyword → Platform mapping for routing decisions
 KEYWORD_PLATFORM_MAP = {
     # Web keywords
-    "http:": Platform.WEB, "https:": Platform.WEB,
-    "url": Platform.WEB, "website": Platform.WEB, "page": Platform.WEB,
-    "browser": Platform.WEB, "chrome": Platform.WEB, "login": Platform.WEB,
-    "form": Platform.WEB, "download": Platform.WEB, "web": Platform.WEB,
-    ".com": Platform.WEB, ".org": Platform.WEB, ".io": Platform.WEB,
-    ".cn": Platform.WEB, ".net": Platform.WEB,
-
+    "http:": Platform.WEB,
+    "https:": Platform.WEB,
+    "url": Platform.WEB,
+    "website": Platform.WEB,
+    "page": Platform.WEB,
+    "browser": Platform.WEB,
+    "chrome": Platform.WEB,
+    "login": Platform.WEB,
+    "form": Platform.WEB,
+    "download": Platform.WEB,
+    "web": Platform.WEB,
+    ".com": Platform.WEB,
+    ".org": Platform.WEB,
+    ".io": Platform.WEB,
+    ".cn": Platform.WEB,
+    ".net": Platform.WEB,
     # Social keywords
-    "twitter": Platform.SOCIAL, "x.com": Platform.SOCIAL,
-    "linkedin": Platform.SOCIAL, "instagram": Platform.SOCIAL,
-    "facebook": Platform.SOCIAL, "discord": Platform.SOCIAL,
-    "tiktok": Platform.SOCIAL, "youtube": Platform.SOCIAL,
-    "bilibili": Platform.SOCIAL, "b站": Platform.SOCIAL,
-    "小红书": Platform.SOCIAL, "微博": Platform.SOCIAL, "抖音": Platform.SOCIAL,
-    "threads": Platform.SOCIAL, "即刻": Platform.SOCIAL,
-    "post": Platform.SOCIAL, "tweet": Platform.SOCIAL,
-    "publish": Platform.SOCIAL, "share": Platform.SOCIAL,
-    "social": Platform.SOCIAL, "发布": Platform.SOCIAL,
-
+    "twitter": Platform.SOCIAL,
+    "x.com": Platform.SOCIAL,
+    "linkedin": Platform.SOCIAL,
+    "instagram": Platform.SOCIAL,
+    "facebook": Platform.SOCIAL,
+    "discord": Platform.SOCIAL,
+    "tiktok": Platform.SOCIAL,
+    "youtube": Platform.SOCIAL,
+    "bilibili": Platform.SOCIAL,
+    "b站": Platform.SOCIAL,
+    "小红书": Platform.SOCIAL,
+    "微博": Platform.SOCIAL,
+    "抖音": Platform.SOCIAL,
+    "threads": Platform.SOCIAL,
+    "即刻": Platform.SOCIAL,
+    "post": Platform.SOCIAL,
+    "tweet": Platform.SOCIAL,
+    "publish": Platform.SOCIAL,
+    "share": Platform.SOCIAL,
+    "social": Platform.SOCIAL,
+    "发布": Platform.SOCIAL,
     # Desktop keywords
-    "file": Platform.DESKTOP, "folder": Platform.DESKTOP,
-    "window": Platform.DESKTOP, "application": Platform.DESKTOP,
-    "desktop": Platform.DESKTOP, "app": Platform.DESKTOP,
-    "open file": Platform.DESKTOP, "save as": Platform.DESKTOP,
-    "export": Platform.DESKTOP, "import": Platform.DESKTOP,
-
+    "file": Platform.DESKTOP,
+    "folder": Platform.DESKTOP,
+    "window": Platform.DESKTOP,
+    "application": Platform.DESKTOP,
+    "desktop": Platform.DESKTOP,
+    "app": Platform.DESKTOP,
+    "open file": Platform.DESKTOP,
+    "save as": Platform.DESKTOP,
+    "export": Platform.DESKTOP,
+    "import": Platform.DESKTOP,
     # Mobile keywords
-    "phone": Platform.MOBILE, "device": Platform.MOBILE,
-    "mobile": Platform.MOBILE, "android": Platform.MOBILE,
-    "z flip": Platform.MOBILE, "zflip": Platform.MOBILE,
-    "samsung": Platform.MOBILE, "手机": Platform.MOBILE,
-    "移动端": Platform.MOBILE, "mobile app": Platform.MOBILE,
+    "phone": Platform.MOBILE,
+    "device": Platform.MOBILE,
+    "mobile": Platform.MOBILE,
+    "android": Platform.MOBILE,
+    "z flip": Platform.MOBILE,
+    "zflip": Platform.MOBILE,
+    "samsung": Platform.MOBILE,
+    "手机": Platform.MOBILE,
+    "移动端": Platform.MOBILE,
+    "mobile app": Platform.MOBILE,
 }
 
 # Domain whitelist for production mode
 PRODUCTION_ALLOWED_DOMAINS = {
-    "github.com", "x.com", "twitter.com", "linkedin.com",
-    "youtube.com", "bilibili.com", "discord.com",
-    "threads.net", "instagram.com", "xiaohongshu.com",
-    "weibo.com", "douyin.com", "tiktok.com", "jike.com",
+    "github.com",
+    "x.com",
+    "twitter.com",
+    "linkedin.com",
+    "youtube.com",
+    "bilibili.com",
+    "discord.com",
+    "threads.net",
+    "instagram.com",
+    "xiaohongshu.com",
+    "weibo.com",
+    "douyin.com",
+    "tiktok.com",
+    "jike.com",
 }
 
 # Operations requiring HumanGate approval
@@ -84,13 +122,11 @@ SENSITIVE_OPERATIONS = {"eval", "download", "file_upload", "payment", "delete"}
 
 
 class CLIOperatorRouter:
-    def __init__(self, production_mode: bool = False,
-                 allowed_domains: set | None = None):
+    def __init__(self, production_mode: bool = False, allowed_domains: set | None = None):
         self.production_mode = production_mode
         self.allowed_domains = allowed_domains or PRODUCTION_ALLOWED_DOMAINS
 
-    def route(self, target: str, action: str = "",
-             platform_hint: str | None = None) -> RouteDecision:
+    def route(self, target: str, action: str = "", platform_hint: str | None = None) -> RouteDecision:
         target_lower = target.lower()
 
         # If explicit platform hint given, use it
@@ -98,7 +134,8 @@ class CLIOperatorRouter:
             try:
                 platform = Platform(platform_hint.lower())
                 return RouteDecision(
-                    platform=platform, confidence=1.0,
+                    platform=platform,
+                    confidence=1.0,
                     tool=self._tool_for_platform(platform),
                     reason=f"Explicit platform hint: {platform_hint}",
                 )
@@ -112,13 +149,26 @@ class CLIOperatorRouter:
                 scores[platform] += 1.0
 
         # Boost: URL pattern detection
-        if re.search(r'https?://', target_lower):
+        if re.search(r"https?://", target_lower):
             scores[Platform.WEB] += 3.0
 
         # Boost: social platform name exact match
-        social_names = ["twitter", "x.com", "linkedin", "instagram", "facebook",
-                       "discord", "tiktok", "youtube", "bilibili", "threads",
-                       "小红书", "微博", "抖音", "即刻"]
+        social_names = [
+            "twitter",
+            "x.com",
+            "linkedin",
+            "instagram",
+            "facebook",
+            "discord",
+            "tiktok",
+            "youtube",
+            "bilibili",
+            "threads",
+            "小红书",
+            "微博",
+            "抖音",
+            "即刻",
+        ]
         for name in social_names:
             if name.lower() in target_lower:
                 scores[Platform.SOCIAL] += 2.0
@@ -127,7 +177,8 @@ class CLIOperatorRouter:
         if max(scores.values()) == 0:
             # Default to SmartOrchestrator routing
             return RouteDecision(
-                platform=Platform.WEB, confidence=0.3,
+                platform=Platform.WEB,
+                confidence=0.3,
                 tool="smart_orchestrator",
                 reason="No keyword match; defaulting to SmartOrchestrator routing",
             )
@@ -143,7 +194,8 @@ class CLIOperatorRouter:
             runner_up = sorted_platforms[1]
 
         decision = RouteDecision(
-            platform=winner, confidence=round(confidence, 2),
+            platform=winner,
+            confidence=round(confidence, 2),
             tool=self._tool_for_platform(winner),
             reason=f"Keyword match: {winner.value} (score={scores[winner]})",
             fallback_platform=runner_up,
@@ -151,10 +203,7 @@ class CLIOperatorRouter:
 
         # Security checks
         decision.security_flags = self._security_check(target, action, winner)
-        decision.requires_approval = any(
-            op in target_lower or op in action.lower()
-            for op in SENSITIVE_OPERATIONS
-        )
+        decision.requires_approval = any(op in target_lower or op in action.lower() for op in SENSITIVE_OPERATIONS)
 
         return decision
 
@@ -166,8 +215,7 @@ class CLIOperatorRouter:
             Platform.MOBILE: "Z Flip3 Agent (ADB)",
         }[platform]
 
-    def _security_check(self, target: str, action: str,
-                       platform: Platform) -> list[str]:
+    def _security_check(self, target: str, action: str, platform: Platform) -> list[str]:
         flags = []
 
         # Domain check for web operations
@@ -193,9 +241,9 @@ class CLIOperatorRouter:
         return match.group(1).lower() if match else None
 
 
-def route_task(target: str, action: str = "",
-              platform_hint: str | None = None,
-              production_mode: bool = False) -> RouteDecision:
+def route_task(
+    target: str, action: str = "", platform_hint: str | None = None, production_mode: bool = False
+) -> RouteDecision:
     router = CLIOperatorRouter(production_mode=production_mode)
     return router.route(target, action, platform_hint)
 

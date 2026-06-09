@@ -61,9 +61,9 @@ class AgentScheduler:
 
     MODEL_MAP = {
         ModelTier.FREE: ("gemma-4", "local", 0.0, 200.0),
-        ModelTier.LOW: ("deepseek-chat", "primary", 0.0, 800.0),  # cost from env
-        ModelTier.MEDIUM: ("moonshot-v1-8k", "secondary", 0.0, 1200.0),  # cost from env
-        ModelTier.HIGH: ("moonshot-v1-32k", "secondary", 0.0, 2000.0),  # cost from env
+        ModelTier.LOW: ("deepseek-chat", "primary", 0.003, 800.0),
+        ModelTier.MEDIUM: ("moonshot-v1-8k", "secondary", 0.005, 1200.0),
+        ModelTier.HIGH: ("moonshot-v1-32k", "secondary", 0.010, 2000.0),
     }
 
     BYZANTINE_FAULT_TOLERANCE = 1

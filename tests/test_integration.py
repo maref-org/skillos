@@ -19,12 +19,18 @@ from sqlalchemy.orm import sessionmaker
 
 from skillos.audit import AuditEventType, AuditLogger
 from skillos.db.engine import Base
-from skillos.db.models import ContributorModel, DistributionRecordModel, SessionModel, SkillModel, SkillNFTModel
-from skillos.db.repository import ContributorRepository, DistributionRepository, SessionRepository, SkillNFTRepository, SkillRepository
+from skillos.db.models import DistributionRecordModel, SessionModel, SkillModel
+from skillos.db.repository import (
+    ContributorRepository,
+    DistributionRepository,
+    SessionRepository,
+    SkillNFTRepository,
+    SkillRepository,
+)
 from skillos.distribution.engine import DistributionEngine, SettlementPeriod
 from skillos.kernel.session_manager import SessionManager
 from skillos.kernel.skill_kernel import SkillKernel
-from skillos.types import Contributor, SessionStatus, SkillCall, SkillManifest, SkillStatus
+from skillos.types import Contributor, SessionStatus, SkillCall, SkillStatus
 
 
 @pytest.fixture
@@ -50,6 +56,7 @@ def audit_logger():
 # =============================================================================
 # Test 1: Skill 完整生命周期
 # =============================================================================
+
 
 class TestSkillLifecycle:
     def test_distill_persists_to_db(self, db_session):
@@ -96,6 +103,7 @@ class TestSkillLifecycle:
     def test_assemble_tools_missing_skill_raises(self, db_session):
         kernel = SkillKernel(db_session=db_session)
         from skillos.kernel.skill_kernel import SkillNFT
+
         nft = SkillNFT(skill_id="nonexistent", token_id="nft-1", owner="x", metadata_hash="hash")
 
         with pytest.raises(ValueError, match="not found"):
@@ -162,6 +170,7 @@ class TestSkillLifecycle:
 # =============================================================================
 # Test 2: Session 完整生命周期
 # =============================================================================
+
 
 class TestSessionLifecycle:
     def test_create_session_persists_to_db(self, db_session):
@@ -297,6 +306,7 @@ class TestSessionLifecycle:
 # Test 3: Distribution 端到端
 # =============================================================================
 
+
 class TestDistributionEndToEnd:
     def test_distribute_persists_to_db(self, db_session):
         engine = DistributionEngine(db_session=db_session)
@@ -323,7 +333,9 @@ class TestDistributionEndToEnd:
 
     def test_ecosystem_breakdown_sums_correctly(self, db_session):
         engine = DistributionEngine(db_session=db_session)
-        call = SkillCall(call_id="call-002", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=100.0)
+        call = SkillCall(
+            call_id="call-002", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=100.0
+        )
         record = engine.distribute(call)
 
         total_ecosystem = sum(record.ecosystem_breakdown.values())
@@ -332,7 +344,9 @@ class TestDistributionEndToEnd:
 
     def test_secondary_distribution_sums_correctly(self, db_session):
         engine = DistributionEngine(db_session=db_session)
-        call = SkillCall(call_id="call-003", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=100.0)
+        call = SkillCall(
+            call_id="call-003", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=100.0
+        )
         record = engine.distribute(call)
 
         total_secondary = sum(record.secondary_distribution.values())
@@ -413,7 +427,9 @@ class TestDistributionEndToEnd:
 
     def test_distribution_log_persists_and_loads(self, db_session):
         engine = DistributionEngine(db_session=db_session)
-        call = SkillCall(call_id="call-log", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=50.0)
+        call = SkillCall(
+            call_id="call-log", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=50.0
+        )
         engine.distribute(call)
 
         # 清除内存日志，从 DB 重新加载
@@ -426,6 +442,7 @@ class TestDistributionEndToEnd:
 # =============================================================================
 # Test 4: Audit 链式验证
 # =============================================================================
+
 
 class TestAuditChain:
     def test_log_creates_signed_record(self, audit_logger):
@@ -493,6 +510,7 @@ class TestAuditChain:
 # Test 5: DB 持久化验证
 # =============================================================================
 
+
 class TestDbPersistence:
     def test_skill_survives_session_recreate(self, db_session):
         kernel = SkillKernel(db_session=db_session)
@@ -518,7 +536,9 @@ class TestDbPersistence:
 
     def test_distribution_survives_session_recreate(self, db_session):
         engine = DistributionEngine(db_session=db_session)
-        call = SkillCall(call_id="call-persist", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=25.0)
+        call = SkillCall(
+            call_id="call-persist", skill_id="skill-001", caller_id="user-001", input_data={}, revenue_usd=25.0
+        )
         engine.distribute(call)
 
         # 模拟新 session（清除缓存）
@@ -543,8 +563,10 @@ class TestDbPersistence:
         engine = DistributionEngine(db_session=db_session)
 
         manifest = kernel.distill("https://github.com/alice/multi-skill")
-        session = manager.create_session("user-001")
-        call = SkillCall(call_id="call-multi", skill_id=manifest.id, caller_id="user-001", input_data={}, revenue_usd=10.0)
+        manager.create_session("user-001")
+        call = SkillCall(
+            call_id="call-multi", skill_id=manifest.id, caller_id="user-001", input_data={}, revenue_usd=10.0
+        )
         engine.distribute(call)
 
         # 验证所有模型都在同一个 DB 中

@@ -62,15 +62,12 @@ class WebAutomationExecutor:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=self.timeout
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self.timeout)
             stdout_text = stdout.decode("utf-8", errors="replace").strip()
             stderr_text = stderr.decode("utf-8", errors="replace").strip()
 
             if proc.returncode != 0:
-                return BrowserResult(success=False, action=args[0],
-                                    error=stderr_text or f"exit code {proc.returncode}")
+                return BrowserResult(success=False, action=args[0], error=stderr_text or f"exit code {proc.returncode}")
 
             data = {}
             try:
@@ -83,8 +80,7 @@ class WebAutomationExecutor:
         except TimeoutError:
             return BrowserResult(success=False, action=args[0], error="Command timed out")
         except FileNotFoundError:
-            return BrowserResult(success=False, action=args[0],
-                               error=f"agent-browser not found. {get_install_hint()}")
+            return BrowserResult(success=False, action=args[0], error=f"agent-browser not found. {get_install_hint()}")
         except Exception as e:
             return BrowserResult(success=False, action=args[0], error=str(e))
 
@@ -120,8 +116,9 @@ class WebAutomationExecutor:
     async def submit(self) -> BrowserResult:
         return await self._run("submit")
 
-    async def screenshot(self, output_path: str | None = None,
-                        full_page: bool = False, annotate: bool = False) -> BrowserResult:
+    async def screenshot(
+        self, output_path: str | None = None, full_page: bool = False, annotate: bool = False
+    ) -> BrowserResult:
         args = ["screenshot"]
         if full_page:
             args.append("--full")
@@ -198,9 +195,9 @@ async def browser_submit() -> BrowserResult:
     return await _get_executor().submit()
 
 
-async def browser_screenshot(output_path: str | None = None,
-                            full_page: bool = False,
-                            annotate: bool = False) -> BrowserResult:
+async def browser_screenshot(
+    output_path: str | None = None, full_page: bool = False, annotate: bool = False
+) -> BrowserResult:
     return await _get_executor().screenshot(output_path, full_page, annotate)
 
 

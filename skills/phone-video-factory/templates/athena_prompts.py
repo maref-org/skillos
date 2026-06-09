@@ -9,10 +9,7 @@ PENTA 五层提示词模板，适配各平台 AI 视频生成。
 import os as _os
 
 _DEFAULT_WORKSPACE = _os.environ.get("COMFYUI_WORKSPACE", _os.path.expanduser("~/comfyui_workspace"))
-ATHENA_REF_IMAGE = _os.environ.get(
-    "ATHENA_REF_IMAGE",
-    f"{_DEFAULT_WORKSPACE}/Athena 定妆照片/athena_ref.jpg"
-)
+ATHENA_REF_IMAGE = _os.environ.get("ATHENA_REF_IMAGE", f"{_DEFAULT_WORKSPACE}/Athena 定妆照片/athena_ref.jpg")
 
 # ============ 文生视频 (T2V) 模板 ============
 

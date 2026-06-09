@@ -217,6 +217,7 @@ class CompetitiveIntelPipeline:
 
     def save_report(self, report: CompetitiveAnalysisReport, output_dir: str = "reports") -> tuple[str, str]:
         from pathlib import Path
+
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")

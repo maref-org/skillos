@@ -24,12 +24,12 @@ def parse_svg(svg_content: str) -> dict[str, Any]:
     result["paths"] = paths
 
     # 提取颜色
-    color_pattern = r'#(?:[0-9a-fA-F]{3}){1,2}'
+    color_pattern = r"#(?:[0-9a-fA-F]{3}){1,2}"
     colors = re.findall(color_pattern, svg_content)
     result["colors"] = list(set(colors))
 
     # 提取元素类型
-    elements = re.findall(r'<(\w+)', svg_content)
+    elements = re.findall(r"<(\w+)", svg_content)
     result["elements"] = list(set(elements))
 
     # 提取 viewBox
@@ -48,10 +48,10 @@ def optimize_svg(svg_content: str) -> str:
     - 合并重复样式
     """
     # 移除注释
-    svg = re.sub(r'<!--.*?-->', '', svg_content, flags=re.DOTALL)
+    svg = re.sub(r"<!--.*?-->", "", svg_content, flags=re.DOTALL)
 
     # 移除多余空白
-    svg = re.sub(r'\s+', ' ', svg).strip()
+    svg = re.sub(r"\s+", " ", svg).strip()
 
     return svg
 
@@ -68,20 +68,24 @@ def extract_animation_paths(svg_content: str) -> list[dict[str, Any]]:
     for path_data in paths:
         # 计算路径长度（近似）
         length = len(path_data)
-        animatable.append({
-            "path_data": path_data,
-            "length": length,
-            "type": "path",
-        })
+        animatable.append(
+            {
+                "path_data": path_data,
+                "length": length,
+                "type": "path",
+            }
+        )
 
     # 也检查 circle/rect 等可动画元素
     circles = re.findall(r'<circle[^>]*cx="([^"]*)"[^>]*cy="([^"]*)"[^>]*r="([^"]*)"', svg_content)
     for cx, cy, r in circles:
-        animatable.append({
-            "path_data": f"circle cx={cx} cy={cy} r={r}",
-            "length": float(r) * 6.28,  # 2πr 近似周长
-            "type": "circle",
-        })
+        animatable.append(
+            {
+                "path_data": f"circle cx={cx} cy={cy} r={r}",
+                "length": float(r) * 6.28,  # 2πr 近似周长
+                "type": "circle",
+            }
+        )
 
     return animatable
 
@@ -94,6 +98,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     from pathlib import Path
+
     content = Path(sys.argv[1]).read_text()
     result = parse_svg(content)
     print(f"Paths: {len(result['paths'])}")

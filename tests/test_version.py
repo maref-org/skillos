@@ -1,12 +1,8 @@
 """Tests for version manager and rollback (Phase 5.2)."""
 
-import json
 import tempfile
-from pathlib import Path
 
-import pytest
-
-from skillos.version import DeploymentState, VersionManager, get_version
+from skillos.version import VersionManager, get_version
 
 
 class TestVersionManager:
@@ -94,4 +90,4 @@ class TestVersionManager:
             assert mgr2.get_current_version() == "0.3.0"
 
     def test_get_version(self):
-        assert get_version() == "0.3.0"
+        assert get_version() == "0.5.0-beta"

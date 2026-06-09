@@ -91,7 +91,7 @@ class SVGAnimator:
             icons = search_icons(icon_query, limit=1, source=self.context.get("icon_source", "all"))
             if icons:
                 icon = icons[0]
-                source = icon["source"]
+                icon["source"]
                 # 从 svg_url 获取 SVG 内容
                 try:
                     svg_url = icon.get("svg_url")

@@ -69,8 +69,7 @@ class IdentityClient:
                 logger.warning("Insecure HTTP enabled via SKILLOS_INSECURE=1")
                 return url
             raise ValueError(
-                "HTTP is not allowed in production. "
-                "Use HTTPS or set SKILLOS_INSECURE=1 for development only."
+                "HTTP is not allowed in production. Use HTTPS or set SKILLOS_INSECURE=1 for development only."
             )
         if not url.startswith("https://"):
             return f"https://{url}"
@@ -181,8 +180,7 @@ class IdentityClient:
         private_key = self._private_keys.get(identity_id)
         if private_key is None:
             logger.error(
-                "No private key available for identity: %s. "
-                "Only identities created by this client can sign.",
+                "No private key available for identity: %s. Only identities created by this client can sign.",
                 identity_id,
             )
             return None
@@ -224,9 +222,7 @@ class IdentityClient:
             # 同时验证数据哈希一致性
             expected_hash = hashlib.sha256(original_data.encode("utf-8")).hexdigest()
             if signature.data_hash != expected_hash:
-                logger.warning(
-                    "Data hash mismatch for signature by identity: %s", signature.signer_id
-                )
+                logger.warning("Data hash mismatch for signature by identity: %s", signature.signer_id)
                 return False
 
             logger.info("Signature verified for identity: %s", signature.signer_id)

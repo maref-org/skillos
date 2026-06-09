@@ -52,14 +52,17 @@ class CalendarDB:
                      published_ids, metrics, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
-                        entry.id, entry.content_type, entry.source_content_id,
+                        entry.id,
+                        entry.content_type,
+                        entry.source_content_id,
                         entry.title,
                         json.dumps(entry.platform_variants, ensure_ascii=False),
                         json.dumps(entry.scheduled_at, ensure_ascii=False),
                         entry.status,
                         json.dumps(entry.published_ids, ensure_ascii=False),
                         json.dumps(entry.metrics, ensure_ascii=False),
-                        entry.created_at, entry.updated_at,
+                        entry.created_at,
+                        entry.updated_at,
                     ),
                 )
             return True
@@ -70,9 +73,7 @@ class CalendarDB:
     def get(self, entry_id: str) -> dict[str, Any] | None:
         try:
             with sqlite3.connect(self.db_path) as conn:
-                row = conn.execute(
-                    "SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)
-                ).fetchone()
+                row = conn.execute("SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
             if row:
                 return self._row_to_dict(row)
         except Exception:
@@ -83,16 +84,14 @@ class CalendarDB:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 rows = conn.execute(
-                    "SELECT * FROM calendar_entries WHERE status = ? "
-                    "ORDER BY created_at DESC LIMIT ?",
+                    "SELECT * FROM calendar_entries WHERE status = ? ORDER BY created_at DESC LIMIT ?",
                     (status, limit),
                 ).fetchall()
             return [self._row_to_dict(r) for r in rows]
         except Exception:
             return []
 
-    def update_status(self, entry_id: str, status: str,
-                     published_ids: dict | None = None) -> bool:
+    def update_status(self, entry_id: str, status: str, published_ids: dict | None = None) -> bool:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 if published_ids:
@@ -127,9 +126,19 @@ class CalendarDB:
 
     @staticmethod
     def _row_to_dict(row) -> dict[str, Any]:
-        cols = ["id", "content_type", "source_content_id", "title",
-                "platform_variants", "scheduled_at", "status",
-                "published_ids", "metrics", "created_at", "updated_at"]
+        cols = [
+            "id",
+            "content_type",
+            "source_content_id",
+            "title",
+            "platform_variants",
+            "scheduled_at",
+            "status",
+            "published_ids",
+            "metrics",
+            "created_at",
+            "updated_at",
+        ]
         d = dict(zip(cols, row))
         for key in ("platform_variants", "scheduled_at", "published_ids", "metrics"):
             try:

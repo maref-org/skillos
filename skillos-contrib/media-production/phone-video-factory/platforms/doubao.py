@@ -28,9 +28,7 @@ logger = logging.getLogger(__name__)
 
 # 豆包自动保存路径 (2026-05-10 实测确认)
 # 视频生成后自动存入此目录, 无需手动点击"保存"按钮
-DOUBAO_AUTO_SAVE = (
-    "/sdcard/Android/data/com.larus.nova/files/DCIM/nova_video/"
-)
+DOUBAO_AUTO_SAVE = "/sdcard/Android/data/com.larus.nova/files/DCIM/nova_video/"
 
 # ⚠️ 以下坐标均为 VL 模型早期估计值
 # 已知 VL 模型坐标偏差 600-835px (参考 SKILL.md Compose 交互协议)
@@ -61,16 +59,10 @@ def build_doubao_task(
         任务描述字符串
     """
     if mode == "i2v":
-        base = (
-            "打开豆包应用，点击底部AI创作标签，"
-            "选择AI视频功能，"
-        )
+        base = "打开豆包应用，点击底部AI创作标签，选择AI视频功能，"
         if has_ref_image:
             base += "点击上传图片按钮，从相册选择最新的图片，"
-        base += (
-            f"在提示词输入框中输入: {prompt}，"
-            "点击生成按钮，等待视频生成完成"
-        )
+        base += f"在提示词输入框中输入: {prompt}，点击生成按钮，等待视频生成完成"
         return base
     else:
         return (

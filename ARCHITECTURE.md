@@ -1,6 +1,6 @@
 # SkillOS Architecture
 
-**版本**: v0.4.0-alpha | **最后更新**: 2026-06-05
+**版本**: v0.5.0-beta | **最后更新**: 2026-06-09
 **层数**: 4（实际实现）— 替代历史文档中的 8 层架构声明
 
 ---
@@ -55,7 +55,7 @@ SkillOS 与外部系统的通信协议适配。
 ### 规划中 / 存根
 | 功能 | 状态 | 说明 |
 |------|------|------|
-| 真实 MCP 连接器 | **存根** | `skill_kernel.py:104` 中 URI 字符串 `mcp://{skill_id}`，无实际协议连接 |
+| 真实 MCP 连接器 | **存根** | `skill_kernel.py:184` 中 URI 字符串 `mcp://{skill_id}`，无实际协议连接 |
 | 真实 A2A 适配器 | **存根** | 同上 `a2a://{skill_id}` |
 
 ---
@@ -66,14 +66,14 @@ SkillOS 的核心逻辑——Agent 路由、调度、会话管理、隔离执行
 
 | 模块 | 文件 | 行数 | 实现状态 |
 |------|------|:----:|---------|
-| EntryKernel | `kernel/entry_kernel.py` | 209 | **[生产级]** 20/80 人类-AI 分流, 关键词 + LLM 意图分类 |
-| AgentScheduler | `kernel/agent_scheduler.py` | 255 | **[生产级]** 4 级模型路由 + 级联策略 + 拜占庭共识 |
-| SkillKernel | `kernel/skill_kernel.py` | 171 | **[生产级]** 蒸馏/NFT/工具链组装 |
-| SessionManager | `kernel/session_manager.py` | 255 | **[生产级]** 会话 CRUD + 状态机 (4 态) |
+| EntryKernel | `kernel/entry_kernel.py` | 198 | **[生产级]** 20/80 人类-AI 分流, 关键词 + LLM 意图分类 |
+| AgentScheduler | `kernel/agent_scheduler.py` | 253 | **[生产级]** 4 级模型路由 + 级联策略 + 拜占庭共识 |
+| SkillKernel | `kernel/skill_kernel.py` | 414 | **[生产级]** 蒸馏/NFT/工具链组装 |
+| SessionManager | `kernel/session_manager.py` | 359 | **[生产级]** 会话 CRUD + 状态机 (4 态) |
 | SessionIsolator | `kernel/session_isolator.py` | 176 | **[生产级]** git worktree 隔离 + 资源限制 + 超时 |
 | StatePersistor | `kernel/state_persistor.py` | 270 | **[生产级]** SQLite 持久化 + TTL 过期 |
-| TaskScheduler | `kernel/task_scheduler.py` | 232 | **[生产级]** cron 表达式调度 + 异步执行 |
-| WebFetcher | `kernel/web_fetch.py` | 155 | **[生产级]** 4 种提取模式 (全文/文章/链接/元数据) |
+| TaskScheduler | `kernel/task_scheduler.py` | 233 | **[生产级]** cron 表达式调度 + 异步执行 |
+| WebFetcher | `kernel/web_fetch.py` | 154 | **[生产级]** 4 种提取模式 (全文/文章/链接/元数据) |
 
 ### 规划中 / 存根
 | 功能 | 状态 | 说明 |

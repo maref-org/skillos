@@ -9,6 +9,7 @@ from typing import Any
 
 def _utc_now() -> str:
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).isoformat()
 
 

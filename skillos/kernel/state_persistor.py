@@ -260,9 +260,7 @@ class StatePersistor:
         with self._get_conn() as conn:
             state_count = conn.execute("SELECT COUNT(*) FROM session_states").fetchone()[0]
             task_count = conn.execute("SELECT COUNT(*) FROM task_memory").fetchone()[0]
-            session_count = conn.execute(
-                "SELECT COUNT(DISTINCT session_id) FROM session_states"
-            ).fetchone()[0]
+            session_count = conn.execute("SELECT COUNT(DISTINCT session_id) FROM session_states").fetchone()[0]
             return {
                 "total_states": state_count,
                 "total_tasks": task_count,

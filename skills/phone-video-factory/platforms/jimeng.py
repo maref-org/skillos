@@ -62,24 +62,25 @@ TAB_BAR_BOUNDS = (0, 2219, 1080, 2640)
 # ❌ 所有 ADB 方法均无效 (input tap / motionevent / long-press)
 # 需要: Quartz CGEvent (macOS) / scrcpy HID / 真手指触摸
 CONTENT_BUTTONS = {
-    "图片生成": (275, 1568),     # VL 多次确认, 实际位置因页面变化
-    "添加参考图": (98, 1568),    # +号按钮
-    "提示词输入": (397, 1568),   # 提示区域
-    "生成": (615, 1521),          # Seedance 2.0 生成按钮
+    "图片生成": (275, 1568),  # VL 多次确认, 实际位置因页面变化
+    "添加参考图": (98, 1568),  # +号按钮
+    "提示词输入": (397, 1568),  # 提示区域
+    "生成": (615, 1521),  # Seedance 2.0 生成按钮
 }
 
 
 def tap_compose(x: int, y: int, device: str = "R3CR80FKA0V") -> bool:
     """
     Compose 兼容点击 — 使用 motionevent 而非 input tap
-    
+
     适用: Compose NavigationBar (tab bar)
     不适用: Compose Button / FloatingActionButton (内容区按钮)
     """
     for action in ("DOWN", "UP"):
         r = subprocess.run(
             ["adb", "-s", device, "shell", "input", "motionevent", action, str(x), str(y)],
-            capture_output=True, timeout=5
+            capture_output=True,
+            timeout=5,
         )
         if r.returncode != 0:
             return False
@@ -101,10 +102,7 @@ def input_text_adbkeyboard(text: str, device: str = "R3CR80FKA0V") -> bool:
     ⚠️ 必须用单引号包裹整个 am broadcast 命令, 防止 shell 解析空格/逗号
     """
     cmd = f"am broadcast -a ADB_INPUT_TEXT --es msg '{text}'"
-    r = subprocess.run(
-        ["adb", "-s", device, "shell", cmd],
-        capture_output=True, timeout=5
-    )
+    r = subprocess.run(["adb", "-s", device, "shell", cmd], capture_output=True, timeout=5)
     return r.returncode == 0
 
 

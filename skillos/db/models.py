@@ -13,12 +13,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import JSON, Float, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
     """SQLAlchemy 2.0 声明式基类。"""
+
     pass
 
 
@@ -28,6 +29,7 @@ def _utc_now() -> datetime:
 
 class SkillModel(Base):
     """Skill 持久化模型（替代 _skill_cache）。"""
+
     __tablename__ = "skills"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -44,13 +46,12 @@ class SkillModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, onupdate=_utc_now)
 
-    nfts: Mapped[list["SkillNFTModel"]] = relationship(
-        back_populates="skill", cascade="all, delete-orphan"
-    )
+    nfts: Mapped[list["SkillNFTModel"]] = relationship(back_populates="skill", cascade="all, delete-orphan")
 
 
 class SkillNFTModel(Base):
     """Skill NFT 持久化模型。"""
+
     __tablename__ = "skill_nfts"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: f"nft-{uuid.uuid4().hex[:12]}")
@@ -65,6 +66,7 @@ class SkillNFTModel(Base):
 
 class SessionModel(Base):
     """Session 持久化模型（替代 _sessions）。"""
+
     __tablename__ = "sessions"
 
     session_id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -79,6 +81,7 @@ class SessionModel(Base):
 
 class DistributionRecordModel(Base):
     """DistributionRecord 持久化模型（替代 _distribution_log）。"""
+
     __tablename__ = "distribution_records"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -95,6 +98,7 @@ class DistributionRecordModel(Base):
 
 class ContributorModel(Base):
     """Contributor 持久化模型（替代 _contributor_registry）。"""
+
     __tablename__ = "contributors"
 
     contributor_id: Mapped[str] = mapped_column(String(128), primary_key=True)
@@ -108,6 +112,7 @@ class ContributorModel(Base):
 
 class IdentityModel(Base):
     """Identity 持久化模型。"""
+
     __tablename__ = "identities"
 
     identity_id: Mapped[str] = mapped_column(String(128), primary_key=True)
@@ -119,6 +124,7 @@ class IdentityModel(Base):
 
 class AuditLogModel(Base):
     """AuditLog 持久化模型（可选，与文件审计日志并存）。"""
+
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -136,6 +142,7 @@ class AuditLogModel(Base):
 
 class FeatureFlagModel(Base):
     """Feature Flag 持久化模型（灰度发布）。"""
+
     __tablename__ = "feature_flags"
 
     name: Mapped[str] = mapped_column(String(128), primary_key=True)

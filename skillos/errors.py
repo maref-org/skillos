@@ -293,7 +293,9 @@ class RetryExhaustedError(ExternalServiceError):
 class InternalError(SkillOSError):
     """内部错误"""
 
-    def __init__(self, message: str = "Internal server error", code: str = "IN-01-001", details: dict[str, Any] | None = None):
+    def __init__(
+        self, message: str = "Internal server error", code: str = "IN-01-001", details: dict[str, Any] | None = None
+    ):
         super().__init__(code=code, message=message, status_code=500, details=details)
 
 

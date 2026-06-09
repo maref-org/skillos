@@ -55,11 +55,14 @@ class Span:
 
     def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> None:
         import time
-        self.events.append({
-            "name": name,
-            "timestamp": time.time(),
-            "attributes": attributes or {},
-        })
+
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": time.time(),
+                "attributes": attributes or {},
+            }
+        )
 
     def set_status(self, status: str, description: str = "") -> None:
         self.status = status
@@ -97,10 +100,10 @@ class Tracer:
     def _setup(self) -> None:
         try:
             from opentelemetry import trace
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+            from opentelemetry.sdk.resources import SERVICE_NAME, Resource
             from opentelemetry.sdk.trace import TracerProvider
             from opentelemetry.sdk.trace.export import BatchSpanProcessor
-            from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 
             resource = Resource.create({SERVICE_NAME: self._service_name})
             provider = TracerProvider(resource=resource)
@@ -188,6 +191,7 @@ class Tracer:
 
     def trace(self, name: str, attributes: dict[str, Any] | None = None) -> Callable[[_F], _F]:
         """装饰器：自动包裹函数调用为 Span"""
+
         def decorator(func: _F) -> _F:
             @wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -200,7 +204,9 @@ class Tracer:
                     except Exception as exc:
                         span.set_status("error", str(exc))
                         raise
+
             return wrapper  # type: ignore[return-value]
+
         return decorator
 
     def extract_trace_context(self, headers: dict[str, str]) -> dict[str, str] | None:

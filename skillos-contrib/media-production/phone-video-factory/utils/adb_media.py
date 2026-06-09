@@ -14,17 +14,15 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # 默认 Mac 端输出目录
-DEFAULT_OUTPUT_DIR = Path(
-    os.environ.get("PHONE_VIDEO_OUTPUT_DIR", "./output/phone_gen")
-)
+DEFAULT_OUTPUT_DIR = Path(os.environ.get("PHONE_VIDEO_OUTPUT_DIR", "./output/phone_gen"))
 
 # 手机端已知视频路径 (按优先级排序)
 PHONE_VIDEO_PATHS = [
-    "/sdcard/Movies/dreamina_*.mp4",     # 即梦
+    "/sdcard/Movies/dreamina_*.mp4",  # 即梦
     "/sdcard/Android/data/com.larus.nova/files/DCIM/nova_video/*.mp4",  # 豆包自动保存
-    "/sdcard/Movies/*.mp4",              # 其他 App (Movies)
-    "/sdcard/DCIM/Camera/*.mp4",         # 相机
-    "/sdcard/Download/*.mp4",            # 下载
+    "/sdcard/Movies/*.mp4",  # 其他 App (Movies)
+    "/sdcard/DCIM/Camera/*.mp4",  # 相机
+    "/sdcard/Download/*.mp4",  # 下载
 ]
 
 
@@ -55,7 +53,9 @@ def pull_latest_videos(
             # 列出手机上的文件
             result = subprocess.run(
                 ["adb", "-s", device, "shell", "ls", "-t", glob_pattern],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 continue
@@ -73,12 +73,12 @@ def pull_latest_videos(
 
                 pull_result = subprocess.run(
                     ["adb", "-s", device, "pull", f, str(dest_file)],
-                    capture_output=True, text=True, timeout=60,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
                 )
                 if pull_result.returncode == 0 and dest_file.exists():
-                    logger.info(
-                        f"Pulled: {filename} ({dest_file.stat().st_size:,} bytes)"
-                    )
+                    logger.info(f"Pulled: {filename} ({dest_file.stat().st_size:,} bytes)")
                     pulled.append(dest_file)
 
         except subprocess.TimeoutExpired:
@@ -110,17 +110,29 @@ def push_reference_image(device: str, image_path: str) -> bool:
     try:
         result = subprocess.run(
             ["adb", "-s", device, "push", str(src), dest_phone],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode != 0:
             return False
 
         # 触发媒体扫描让相册识别新文件
         subprocess.run(
-            ["adb", "-s", device, "shell", "am", "broadcast", "-a",
-             "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
-             "-d", f"file://{dest_phone}"],
-            capture_output=True, timeout=10,
+            [
+                "adb",
+                "-s",
+                device,
+                "shell",
+                "am",
+                "broadcast",
+                "-a",
+                "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+                "-d",
+                f"file://{dest_phone}",
+            ],
+            capture_output=True,
+            timeout=10,
         )
         logger.info(f"Pushed reference image: {src.name}")
         return True
@@ -147,7 +159,9 @@ def cleanup_phone_videos(device: str, pattern: str = None) -> int:
         try:
             result = subprocess.run(
                 ["adb", "-s", device, "shell", f"rm {p}"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0:
                 deleted += 1

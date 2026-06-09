@@ -81,8 +81,7 @@ class MatcherClient:
                 logger.warning("Insecure HTTP enabled via SKILLOS_INSECURE=1")
                 return url
             raise ValueError(
-                "HTTP is not allowed in production. "
-                "Use HTTPS or set SKILLOS_INSECURE=1 for development only."
+                "HTTP is not allowed in production. Use HTTPS or set SKILLOS_INSECURE=1 for development only."
             )
         if not url.startswith("https://"):
             return f"https://{url}"
@@ -126,7 +125,7 @@ class MatcherClient:
             except requests.RequestException as exc:
                 last_exception = exc
                 self._record_failure()
-                wait = self.retry_backoff * (2 ** attempt)
+                wait = self.retry_backoff * (2**attempt)
                 logger.warning(
                     "Request failed (attempt %d/%d), retrying in %.1fs: %s",
                     attempt + 1,

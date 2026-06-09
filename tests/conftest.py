@@ -1,5 +1,6 @@
 """Shared fixtures for skillos tests"""
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,8 +20,10 @@ from skillos._types import (
 
 @pytest.fixture
 def mock_intent_classifier():
-    """Mock athena.core.intent_classifier.classify_intent"""
-    with patch("skillos.kernel.entry_kernel.classify_intent") as mock:
+    """Mock EntryKernel._classify_intent"""
+    from skillos.kernel.entry_kernel import EntryKernel
+
+    with patch.object(EntryKernel, "_classify_intent") as mock:
         mock.return_value = {"intent": "chat", "confidence": 0.85}
         yield mock
 
@@ -162,3 +165,24 @@ def mock_consensus_engine():
 def mock_registry():
     """Mock registry for SkillKernel"""
     return MagicMock()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _test_db_env():
+    """使用内存 SQLite 运行测试，避免状态污染。"""
+    os.environ["SKILLOS_DATABASE_URL"] = "sqlite:///:memory:"
+    # 在测试 session 开始时重新创建引擎，确保使用内存 DB
+    from skillos.db import engine as db_engine
+
+    db_engine._engine = None
+    db_engine._SessionLocal = None
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_db():
+    """每个测试前重置数据库。"""
+    from skillos.db.engine import reset_db
+
+    reset_db()
+    yield

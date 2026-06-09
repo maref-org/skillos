@@ -8,13 +8,13 @@
 from skillos.db.engine import get_engine, get_session, init_db
 from skillos.db.models import (
     AuditLogModel,
+    Base,
     ContributorModel,
     DistributionRecordModel,
     IdentityModel,
     SessionModel,
     SkillModel,
     SkillNFTModel,
-    Base,
 )
 
 __all__ = [

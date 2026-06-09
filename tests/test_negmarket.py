@@ -1,4 +1,5 @@
 """Tests for skillos.negmarket — Negative Sample Market"""
+
 import tempfile
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from skillos.negmarket.desensitizer import (
 # ---------------------------------------------------------------------------
 # Models tests
 # ---------------------------------------------------------------------------
+
 
 class TestNegativeSample:
     def test_default_fields(self):
@@ -92,65 +94,96 @@ class TestAntiPatternResult:
 # Desensitizer tests
 # ---------------------------------------------------------------------------
 
+
 class TestLocalPIIReplaceStep:
     def test_replaces_email(self):
         step = LocalPIIReplaceStep()
-        ctx = step.process(type("ctx", (), {
-            "raw_text": "contact me at test@example.com",
-            "desensitized_text": "",
-            "contributor_id": "u1",
-            "category": "general",
-            "risk_level": "medium",
-            "extra": {},
-        })())
+        ctx = step.process(
+            type(
+                "ctx",
+                (),
+                {
+                    "raw_text": "contact me at test@example.com",
+                    "desensitized_text": "",
+                    "contributor_id": "u1",
+                    "category": "general",
+                    "risk_level": "medium",
+                    "extra": {},
+                },
+            )()
+        )
         assert "<REDACTED:EMAIL>" in ctx.desensitized_text
 
     def test_replaces_phone(self):
         step = LocalPIIReplaceStep()
-        ctx = step.process(type("ctx", (), {
-            "raw_text": "call 13800138000 for help",
-            "desensitized_text": "",
-            "contributor_id": "u1",
-            "category": "general",
-            "risk_level": "medium",
-            "extra": {},
-        })())
+        ctx = step.process(
+            type(
+                "ctx",
+                (),
+                {
+                    "raw_text": "call 13800138000 for help",
+                    "desensitized_text": "",
+                    "contributor_id": "u1",
+                    "category": "general",
+                    "risk_level": "medium",
+                    "extra": {},
+                },
+            )()
+        )
         assert "<REDACTED:PHONE>" in ctx.desensitized_text
 
     def test_replaces_ip(self):
         step = LocalPIIReplaceStep()
-        ctx = step.process(type("ctx", (), {
-            "raw_text": "server at 192.168.1.1 is down",
-            "desensitized_text": "",
-            "contributor_id": "u1",
-            "category": "general",
-            "risk_level": "medium",
-            "extra": {},
-        })())
+        ctx = step.process(
+            type(
+                "ctx",
+                (),
+                {
+                    "raw_text": "server at 192.168.1.1 is down",
+                    "desensitized_text": "",
+                    "contributor_id": "u1",
+                    "category": "general",
+                    "risk_level": "medium",
+                    "extra": {},
+                },
+            )()
+        )
         assert "<REDACTED:IP>" in ctx.desensitized_text
 
     def test_no_pii_unchanged(self):
         step = LocalPIIReplaceStep()
-        ctx = step.process(type("ctx", (), {
-            "raw_text": "this is a normal error message",
-            "desensitized_text": "",
-            "contributor_id": "u1",
-            "category": "general",
-            "risk_level": "medium",
-            "extra": {},
-        })())
+        ctx = step.process(
+            type(
+                "ctx",
+                (),
+                {
+                    "raw_text": "this is a normal error message",
+                    "desensitized_text": "",
+                    "contributor_id": "u1",
+                    "category": "general",
+                    "risk_level": "medium",
+                    "extra": {},
+                },
+            )()
+        )
         assert ctx.desensitized_text == "this is a normal error message"
 
     def test_tracks_pii_types(self):
         step = LocalPIIReplaceStep()
-        ctx = step.process(type("ctx", (), {
-            "raw_text": "email: a@b.com, phone: 13800138000",
-            "desensitized_text": "",
-            "contributor_id": "u1",
-            "category": "general",
-            "risk_level": "medium",
-            "extra": {},
-        })())
+        ctx = step.process(
+            type(
+                "ctx",
+                (),
+                {
+                    "raw_text": "email: a@b.com, phone: 13800138000",
+                    "desensitized_text": "",
+                    "contributor_id": "u1",
+                    "category": "general",
+                    "risk_level": "medium",
+                    "extra": {},
+                },
+            )()
+        )
         assert "email" in ctx.extra.get("pii_types_found", [])
         assert "phone" in ctx.extra.get("pii_types_found", [])
 
@@ -158,14 +191,20 @@ class TestLocalPIIReplaceStep:
 class TestDynamicMaskStep:
     def test_masks_pii_in_output(self):
         step = DynamicMaskStep()
-        ctx = step.process(type("ctx", (), {
-            "raw_text": "email a@b.com was used",
-            "desensitized_text": "email a@b.com was used",
-            "contributor_id": "u1",
-            "category": "general",
-            "risk_level": "medium",
-            "extra": {},
-        })())
+        ctx = step.process(
+            type(
+                "ctx",
+                (),
+                {
+                    "raw_text": "email a@b.com was used",
+                    "desensitized_text": "email a@b.com was used",
+                    "contributor_id": "u1",
+                    "category": "general",
+                    "risk_level": "medium",
+                    "extra": {},
+                },
+            )()
+        )
         assert "<REDACTED:EMAIL>" in ctx.desensitized_text
         assert "a@b.com" not in ctx.desensitized_text
 
@@ -209,9 +248,7 @@ class TestDesensitizationPipeline:
     def test_custom_steps(self):
         step = LocalPIIReplaceStep()
         pipeline = DesensitizationPipeline(steps=[step])
-        sample = pipeline.process(
-            raw_text="email a@b.com", contributor_id="u1"
-        )
+        sample = pipeline.process(raw_text="email a@b.com", contributor_id="u1")
         assert isinstance(sample, NegativeSample)
 
     def test_default_risk_level(self, pipeline):
@@ -222,6 +259,7 @@ class TestDesensitizationPipeline:
 # ---------------------------------------------------------------------------
 # ZK Verifier tests
 # ---------------------------------------------------------------------------
+
 
 class TestZKVerifier:
     @pytest.fixture
@@ -238,24 +276,28 @@ class TestZKVerifier:
         proof = verifier.prove("sensitive data", "user-001")
         data_hash = "sensitive data"
         import hashlib
+
         digest = hashlib.sha256(data_hash.encode()).hexdigest()
         assert verifier.verify(proof, "user-001", digest)
 
     def test_verify_wrong_contributor(self, verifier):
         proof = verifier.prove("sensitive data", "user-001")
         import hashlib
+
         digest = hashlib.sha256("sensitive data".encode()).hexdigest()
         assert not verifier.verify(proof, "user-002", digest)
 
     def test_verify_wrong_data(self, verifier):
         proof = verifier.prove("sensitive data", "user-001")
         import hashlib
+
         digest = hashlib.sha256("wrong data".encode()).hexdigest()
         assert not verifier.verify(proof, "user-001", digest)
 
     def test_verify_sets_flag(self, verifier):
         proof = verifier.prove("data", "u1")
         import hashlib
+
         digest = hashlib.sha256("data".encode()).hexdigest()
         verifier.verify(proof, "u1", digest)
         assert proof.verified
@@ -264,6 +306,7 @@ class TestZKVerifier:
 # ---------------------------------------------------------------------------
 # Anti-Pattern Generator tests
 # ---------------------------------------------------------------------------
+
 
 class TestAntiPatternGenerator:
     @pytest.fixture
@@ -313,7 +356,9 @@ class TestAntiPatternGenerator:
 
     def test_call_low_risk(self, generator):
         low_sample = NegativeSample(
-            id="low-001", category="info", risk_level="low",
+            id="low-001",
+            category="info",
+            risk_level="low",
             desensitized_pattern={"triggers": ["unknown"]},
         )
         skill = generator.generate(low_sample, "agent-001")
@@ -322,7 +367,9 @@ class TestAntiPatternGenerator:
 
     def test_call_medium_risk(self, generator):
         med_sample = NegativeSample(
-            id="med-001", category="warning", risk_level="medium",
+            id="med-001",
+            category="warning",
+            risk_level="medium",
             desensitized_pattern={"triggers": ["error"]},
         )
         skill = generator.generate(med_sample, "agent-001")
@@ -341,6 +388,7 @@ class TestAntiPatternGenerator:
 # Storage tests
 # ---------------------------------------------------------------------------
 
+
 class TestSQLiteNegMarketStorage:
     @pytest.fixture
     def storage(self):
@@ -351,8 +399,11 @@ class TestSQLiteNegMarketStorage:
 
     def test_save_and_get_sample(self, storage):
         sample = NegativeSample(
-            id="s1", contributor_id="u1", original_hash="abc",
-            encrypted_blob="encrypted", category="timeout",
+            id="s1",
+            contributor_id="u1",
+            original_hash="abc",
+            encrypted_blob="encrypted",
+            category="timeout",
             desensitized_pattern={"key": "value"},
         )
         storage.save_sample(sample)
@@ -387,7 +438,8 @@ class TestSQLiteNegMarketStorage:
 
     def test_save_and_get_anti_pattern(self, storage):
         skill = AntiPatternSkill(
-            id="ap1", sample_id="s1",
+            id="ap1",
+            sample_id="s1",
             skill_manifest={"name": "anti-test"},
             generated_by="agent-001",
         )
@@ -436,18 +488,24 @@ class TestSQLiteNegMarketStorage:
 # Distribution engine integration test
 # ---------------------------------------------------------------------------
 
+
 class TestDistributionEngineIntegration:
     def test_allocate_negmarket_revenue(self):
         from skillos._types import Contributor
         from skillos.distribution.engine import DistributionEngine
 
         engine = DistributionEngine()
-        engine.register_contributor(Contributor(
-            contributor_id="user-001", name="tester",
-        ))
+        engine.register_contributor(
+            Contributor(
+                contributor_id="user-001",
+                name="tester",
+            )
+        )
 
         record = engine.allocate_negmarket_revenue(
-            sample_id="sample-001", amount=100.0, contributor_id="user-001",
+            sample_id="sample-001",
+            amount=100.0,
+            contributor_id="user-001",
         )
         assert record.total_amount == 100.0
         assert record.platform_fee == 5.0

@@ -1,12 +1,14 @@
 """Tests for protocol.skill_importer — cross-platform skill import"""
-import json
-import pytest
-import yaml
-from skillos.protocol.skill_importer import (
-    AnthropicSkillConverter, YAMLSkillConverter, SkillImporter,
-    OpenSkillManifest, ImportResult, ImportSource,
-)
 
+import json
+
+from skillos.protocol.skill_importer import (
+    AnthropicSkillConverter,
+    ImportSource,
+    OpenSkillManifest,
+    SkillImporter,
+    YAMLSkillConverter,
+)
 
 ANTHROPIC_SAMPLE = {
     "skill_id": "sk_123",

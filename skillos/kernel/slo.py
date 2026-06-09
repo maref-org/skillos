@@ -43,12 +43,20 @@ class SLOConfig:
     target_availability_pct: float
     window_hours: int = 720  # 30 days
 
-    sli_latency: SLIDefinition = field(default_factory=lambda: SLIDefinition(
-        name="p99_latency", description="P99 响应延迟", measurement_unit="ms",
-    ))
-    sli_availability: SLIDefinition = field(default_factory=lambda: SLIDefinition(
-        name="availability", description="请求成功率", measurement_unit="%",
-    ))
+    sli_latency: SLIDefinition = field(
+        default_factory=lambda: SLIDefinition(
+            name="p99_latency",
+            description="P99 响应延迟",
+            measurement_unit="ms",
+        )
+    )
+    sli_availability: SLIDefinition = field(
+        default_factory=lambda: SLIDefinition(
+            name="availability",
+            description="请求成功率",
+            measurement_unit="%",
+        )
+    )
 
 
 @dataclass

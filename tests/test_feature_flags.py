@@ -11,14 +11,13 @@
 """
 
 import threading
-import time
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from skillos.db.engine import Base
-from skillos.db.models import FeatureFlagModel
 from skillos.feature_flags import (
     FeatureFlagManager,
     FlagState,
@@ -29,10 +28,12 @@ from skillos.feature_flags import (
 
 @pytest.fixture
 def db_session():
-    engine = create_engine("sqlite:///:memory:", echo=False)
+    engine = create_engine(
+        "sqlite:///:memory:", echo=False, poolclass=StaticPool, connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)  # noqa: N806
+    session = SessionLocal()
     yield session
     session.close()
     engine.dispose()
@@ -51,10 +52,11 @@ def manager(db_session):
     """提供已初始化的 FeatureFlagManager（使用内存 DB）。"""
     # 由于 FeatureFlagManager 使用 SessionLocal，我们需要 patch
     from skillos.db import engine as db_engine_module
+
     original_session_local = db_engine_module.SessionLocal
 
-    Session = sessionmaker(bind=db_session.bind)
-    db_engine_module.SessionLocal = Session
+    SessionLocal = sessionmaker(bind=db_session.bind, expire_on_commit=False)  # noqa: N806
+    db_engine_module.SessionLocal = SessionLocal
 
     mgr = FeatureFlagManager(refresh_interval=3600.0)
     yield mgr
@@ -65,6 +67,7 @@ def manager(db_session):
 # =============================================================================
 # Boolean flag tests
 # =============================================================================
+
 
 class TestBooleanFlag:
     def test_disabled_returns_false(self, manager):
@@ -91,6 +94,7 @@ class TestBooleanFlag:
 # Percentage flag tests
 # =============================================================================
 
+
 class TestPercentageFlag:
     def test_zero_percent_no_users(self, manager):
         manager.create_flag("rollout", FlagType.PERCENTAGE, FlagState.ROLLOUT, value=0)
@@ -102,10 +106,7 @@ class TestPercentageFlag:
 
     def test_fifty_percent_distribution(self, manager):
         manager.create_flag("rollout", FlagType.PERCENTAGE, FlagState.ROLLOUT, value=50)
-        enabled_count = sum(
-            1 for i in range(1000)
-            if manager.is_enabled("rollout", user_id=f"user-{i}")
-        )
+        enabled_count = sum(1 for i in range(1000) if manager.is_enabled("rollout", user_id=f"user-{i}"))
         # 50% 灰度，1000 用户应该在 400-600 之间
         assert 400 <= enabled_count <= 600
 
@@ -118,27 +119,19 @@ class TestPercentageFlag:
 # User list flag tests
 # =============================================================================
 
+
 class TestUserListFlag:
     def test_user_in_list(self, manager):
-        manager.create_flag(
-            "beta-feature", FlagType.USER_LIST, FlagState.ROLLOUT,
-            value=["alice", "bob"]
-        )
+        manager.create_flag("beta-feature", FlagType.USER_LIST, FlagState.ROLLOUT, value=["alice", "bob"])
         assert manager.is_enabled("beta-feature", user_id="alice") is True
         assert manager.is_enabled("beta-feature", user_id="bob") is True
 
     def test_user_not_in_list(self, manager):
-        manager.create_flag(
-            "beta-feature", FlagType.USER_LIST, FlagState.ROLLOUT,
-            value=["alice"]
-        )
+        manager.create_flag("beta-feature", FlagType.USER_LIST, FlagState.ROLLOUT, value=["alice"])
         assert manager.is_enabled("beta-feature", user_id="charlie") is False
 
     def test_user_list_requires_user_id(self, manager):
-        manager.create_flag(
-            "beta-feature", FlagType.USER_LIST, FlagState.ROLLOUT,
-            value=["alice"]
-        )
+        manager.create_flag("beta-feature", FlagType.USER_LIST, FlagState.ROLLOUT, value=["alice"])
         assert manager.is_enabled("beta-feature") is False
 
 
@@ -146,13 +139,11 @@ class TestUserListFlag:
 # Canary flag tests
 # =============================================================================
 
+
 class TestCanaryFlag:
     def test_canary_distribution(self, manager):
         manager.create_flag("canary-v2", FlagType.CANARY, FlagState.ROLLOUT, value=10)
-        enabled_count = sum(
-            1 for i in range(1000)
-            if manager.is_enabled("canary-v2", user_id=f"user-{i}")
-        )
+        enabled_count = sum(1 for i in range(1000) if manager.is_enabled("canary-v2", user_id=f"user-{i}"))
         # 10% 金丝雀，1000 用户应该在 50-150 之间
         assert 50 <= enabled_count <= 150
 
@@ -165,6 +156,7 @@ class TestCanaryFlag:
 # =============================================================================
 # CRUD tests
 # =============================================================================
+
 
 class TestFlagCrud:
     def test_create_and_get(self, manager):
@@ -216,6 +208,7 @@ class TestFlagCrud:
 # Dynamic update tests
 # =============================================================================
 
+
 class TestDynamicUpdate:
     def test_update_without_restart(self, manager):
         manager.create_flag("dynamic", FlagType.BOOLEAN, FlagState.DISABLED)
@@ -236,6 +229,7 @@ class TestDynamicUpdate:
 # Convenience function tests
 # =============================================================================
 
+
 class TestConvenienceFunctions:
     def test_is_enabled_function(self, manager):
         manager.create_flag("conv-flag", FlagType.BOOLEAN, FlagState.ENABLED)
@@ -245,6 +239,7 @@ class TestConvenienceFunctions:
 # =============================================================================
 # Thread safety tests
 # =============================================================================
+
 
 class TestThreadSafety:
     def test_concurrent_reads(self, manager):
@@ -295,6 +290,7 @@ class TestThreadSafety:
 # Hash consistency tests
 # =============================================================================
 
+
 class TestHashConsistency:
     def test_same_user_same_result(self, manager):
         manager.create_flag("consistent", FlagType.PERCENTAGE, FlagState.ROLLOUT, value=50)
@@ -305,9 +301,6 @@ class TestHashConsistency:
 
     def test_different_users_different_results(self, manager):
         manager.create_flag("consistent", FlagType.PERCENTAGE, FlagState.ROLLOUT, value=50)
-        results = {
-            manager.is_enabled("consistent", user_id=f"user-{i}")
-            for i in range(100)
-        }
+        results = {manager.is_enabled("consistent", user_id=f"user-{i}") for i in range(100)}
         # 应该同时有 True 和 False
         assert len(results) == 2

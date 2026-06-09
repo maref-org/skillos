@@ -19,10 +19,10 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from skillos.types import Session, SessionStatus
 from skillos.db.engine import get_sessionmaker
 from skillos.db.models import SessionModel
 from skillos.db.repository import SessionRepository
+from skillos.types import Session, SessionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +343,8 @@ class SessionManager:
     def _cleanup_expired_sessions(self, user_id: str) -> None:
         user_sessions = self._user_sessions.get(user_id, [])
         expired = [
-            sid for sid in user_sessions
+            sid
+            for sid in user_sessions
             if (session := self._sessions.get(sid))
             and session.status in (SessionStatus.COMPLETED, SessionStatus.ABORTED)
         ]

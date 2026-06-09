@@ -1,7 +1,8 @@
 """Tests for protocol.mcp_client — MCP protocol connector"""
+
 import pytest
 
-from skillos.protocol.mcp_client import MCPClient, MCPError, MCPTool, MCPCallResult
+from skillos.protocol.mcp_client import MCPCallResult, MCPClient, MCPError, MCPTool
 
 
 class TestMCPClientBuildRequest:

@@ -2,24 +2,23 @@
 
 import json
 import logging
-import os
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from skillos.observability.logging_config import (
-    JSONFormatter,
     ConsoleFormatter,
+    JSONFormatter,
     configure_logging,
-    get_logger,
     ensure_configured,
+    get_logger,
 )
-from skillos.observability.tracing import Tracer, Span, get_tracer, get_current_trace_id
 from skillos.observability.metrics import MetricsCollector, get_metrics
-
+from skillos.observability.tracing import Tracer, get_current_trace_id, get_tracer
 
 # === Metrics Tests ===
+
 
 class TestMetricsCollector:
     def test_metrics_no_op_without_prometheus(self):
@@ -68,6 +67,7 @@ class TestMetricsCollector:
 
 # === Tracing Tests ===
 
+
 class TestTracer:
     def test_tracer_no_op_without_opentelemetry(self):
         tracer = Tracer()
@@ -92,7 +92,7 @@ class TestTracer:
     def test_span_exception_handling(self):
         tracer = Tracer()
         with pytest.raises(RuntimeError, match="test error"):
-            with tracer.span("failing_op") as span:
+            with tracer.span("failing_op"):
                 raise RuntimeError("test error")
 
         spans = tracer.get_spans()
@@ -157,6 +157,7 @@ class TestTracer:
 
 
 # === Logging Tests ===
+
 
 class TestStructuredLogging:
     def test_json_formatter(self):
@@ -228,6 +229,7 @@ class TestStructuredLogging:
 
 
 # === Integration Tests ===
+
 
 class TestObservabilityIntegration:
     def test_metrics_tracing_logging_together(self):

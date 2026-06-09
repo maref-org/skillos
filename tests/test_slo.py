@@ -1,8 +1,13 @@
 """Tests for kernel.slo — SLO/SLI definition and error budget"""
+
 import time
-import pytest
+
 from skillos.kernel.slo import (
-    SLOConfig, SLOStatus, SLOManager, ErrorBudget, SLIMeasurement,
+    ErrorBudget,
+    SLIMeasurement,
+    SLOConfig,
+    SLOManager,
+    SLOStatus,
 )
 
 
@@ -76,6 +81,7 @@ class TestSLIManager:
 
     def test_get_slo_manager_singleton(self):
         from skillos.kernel.slo import get_slo_manager
+
         m1 = get_slo_manager()
         m2 = get_slo_manager()
         assert m1 is m2
@@ -84,8 +90,13 @@ class TestSLIManager:
 class TestErrorBudget:
     def test_healthy_status_high_remaining(self):
         budget = ErrorBudget(
-            total_budget_seconds=1000.0, consumed_seconds=10.0, remaining_seconds=990.0,
-            remaining_pct=99.0, burn_rate=0.01, status=SLOStatus.HEALTHY, window_hours=720,
+            total_budget_seconds=1000.0,
+            consumed_seconds=10.0,
+            remaining_seconds=990.0,
+            remaining_pct=99.0,
+            burn_rate=0.01,
+            status=SLOStatus.HEALTHY,
+            window_hours=720,
         )
         assert budget.remaining_pct == 99.0
         assert budget.status == SLOStatus.HEALTHY

@@ -12,7 +12,7 @@ undocumented = []
 for d in SCAN_DIRS:
     for py_file in Path(d).rglob("*.py"):
         text = py_file.read_text()
-        codes = re.findall(r'(?:Error|error_code|ErrorCode)\s*[\"\'=:]\s*[\"\']?(\w+)[\"\']?', text)
+        codes = re.findall(r"(?:Error|error_code|ErrorCode)\s*[\"\'=:]\s*[\"\']?(\w+)[\"\']?", text)
         error_codes.update(codes)
         if not codes:
             continue

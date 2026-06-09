@@ -11,7 +11,6 @@ import re
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 VERSION_PATTERN = re.compile(r"v?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9._-]+)?)")
@@ -22,7 +21,7 @@ def get_code_version() -> str:
     for line in pyproject.read_text().splitlines():
         line = line.strip()
         if line.startswith("version ="):
-            return line.split("=", 1)[1].strip().strip("\"")
+            return line.split("=", 1)[1].strip().strip('"')
     raise ValueError("Version not found in pyproject.toml")
 
 

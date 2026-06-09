@@ -9,15 +9,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests as req_lib
 
-from skillos.protocol.registry_client import RegistryClient, RegistryConfig
-from skillos.protocol.matcher_client import MatcherClient, MatchRequest
-from skillos.protocol.settlement_client import SettlementClient, SettlementRecord
 from skillos.protocol.identity_client import IdentityClient
-
+from skillos.protocol.matcher_client import MatcherClient, MatchRequest
+from skillos.protocol.registry_client import RegistryClient, RegistryConfig
+from skillos.protocol.settlement_client import SettlementClient, SettlementRecord
 
 # =============================================================================
 # RegistryClient Resilience Tests
 # =============================================================================
+
 
 class TestRegistryCircuitBreaker:
     @patch("skillos.protocol.registry_client.requests.request")
@@ -141,12 +141,14 @@ class TestRegistryHttpsEnforcement:
 class TestRegistryInputValidation:
     def test_register_empty_id_raises(self):
         from skillos.types import SkillManifest
+
         client = RegistryClient()
         with pytest.raises(ValueError, match="manifest.id"):
             client.register(SkillManifest(id="", name="Test", version="1.0.0", author="a", description="d"))
 
     def test_register_empty_name_raises(self):
         from skillos.types import SkillManifest
+
         client = RegistryClient()
         with pytest.raises(ValueError, match="manifest.name"):
             client.register(SkillManifest(id="id", name="", version="1.0.0", author="a", description="d"))
@@ -221,6 +223,7 @@ class TestRegistryHttpStatusHandling:
 # =============================================================================
 # MatcherClient Resilience Tests
 # =============================================================================
+
 
 class TestMatcherCircuitBreaker:
     @patch("skillos.protocol.matcher_client.requests.request")
@@ -373,6 +376,7 @@ class TestMatcherHttpStatusHandling:
 # SettlementClient Resilience Tests
 # =============================================================================
 
+
 class TestSettlementCircuitBreaker:
     @patch("skillos.protocol.settlement_client.requests.request")
     def test_circuit_opens_after_threshold(self, mock_request):
@@ -465,23 +469,25 @@ class TestSettlementInputValidation:
     def test_submit_record_empty_call_id_raises(self):
         client = SettlementClient()
         with pytest.raises(ValueError, match="skill_call_id"):
-            client.submit_record(SettlementRecord(
-                skill_call_id="", skill_id="skill-001", caller_id="caller-001", amount_usd=1.0
-            ))
+            client.submit_record(
+                SettlementRecord(skill_call_id="", skill_id="skill-001", caller_id="caller-001", amount_usd=1.0)
+            )
 
     def test_submit_record_empty_skill_id_raises(self):
         client = SettlementClient()
         with pytest.raises(ValueError, match="skill_id"):
-            client.submit_record(SettlementRecord(
-                skill_call_id="call-001", skill_id="", caller_id="caller-001", amount_usd=1.0
-            ))
+            client.submit_record(
+                SettlementRecord(skill_call_id="call-001", skill_id="", caller_id="caller-001", amount_usd=1.0)
+            )
 
     def test_submit_record_negative_amount_raises(self):
         client = SettlementClient()
         with pytest.raises(ValueError, match="amount_usd"):
-            client.submit_record(SettlementRecord(
-                skill_call_id="call-001", skill_id="skill-001", caller_id="caller-001", amount_usd=-0.01
-            ))
+            client.submit_record(
+                SettlementRecord(
+                    skill_call_id="call-001", skill_id="skill-001", caller_id="caller-001", amount_usd=-0.01
+                )
+            )
 
     def test_compute_split_negative_amount_raises(self):
         client = SettlementClient()
@@ -562,6 +568,7 @@ class TestSettlementHttpStatusHandling:
 # =============================================================================
 # IdentityClient Resilience Tests
 # =============================================================================
+
 
 class TestIdentityHttpsEnforcement:
     def test_enforce_https_adds_prefix(self):

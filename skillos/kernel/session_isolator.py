@@ -70,6 +70,7 @@ class SessionIsolator:
         }
 
         import time
+
         ctx = IsolationContext(
             worktree_path=str(worktree_path),
             sandbox_id=sandbox_id,
@@ -100,6 +101,7 @@ class SessionIsolator:
             cmd_parts = command
 
         import time
+
         start = time.time()
         proc = await asyncio.create_subprocess_exec(
             *cmd_parts,
@@ -153,7 +155,12 @@ class SessionIsolator:
         """创建 git worktree 隔离副本"""
         branch_name = f"skillos-iso-{worktree_path.name}"
         proc = await asyncio.create_subprocess_exec(
-            "git", "worktree", "add", str(worktree_path), "-b", branch_name,
+            "git",
+            "worktree",
+            "add",
+            str(worktree_path),
+            "-b",
+            branch_name,
             cwd=repo_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

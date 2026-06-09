@@ -11,7 +11,7 @@ class TestGatewayLoggingIntegration:
     def test_gateway_route_logs_consistent_trace_id(self, capsys):
         setup_logging(logging.INFO)
         gateway = ProtocolGateway()
-        logger = get_logger("test.integration")
+        get_logger("test.integration")
 
         resp = gateway.route("agent-001", ProtocolType.A2A, {"action": "test"})
 

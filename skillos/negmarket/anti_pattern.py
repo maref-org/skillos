@@ -45,7 +45,9 @@ class AntiPatternGenerator:
         )
         logger.info(
             "Anti-pattern skill %s generated from sample %s (risk=%s)",
-            skill.id, sample.id, sample.risk_level,
+            skill.id,
+            sample.id,
+            sample.risk_level,
         )
         return skill
 

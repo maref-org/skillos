@@ -137,6 +137,7 @@ class TestStatePersistor:
         assert persistor.load_state("sess-003", "expiring") == "data"
 
         import time
+
         time.sleep(1.1)
         assert persistor.load_state("sess-003", "expiring") is None
 
@@ -149,12 +150,15 @@ class TestStatePersistor:
         assert keys == {"key1", "key2"}
 
     def test_save_task_result(self, persistor):
-        assert persistor.save_task_result(
-            task_id="task-001",
-            session_id="sess-005",
-            result={"output": "done"},
-            context={"input": "test"},
-        ) is True
+        assert (
+            persistor.save_task_result(
+                task_id="task-001",
+                session_id="sess-005",
+                result={"output": "done"},
+                context={"input": "test"},
+            )
+            is True
+        )
 
         history = persistor.get_task_history("sess-005")
         assert len(history) == 1
@@ -180,6 +184,7 @@ class TestStatePersistor:
         persistor.save_state(PersistentState("sess-007", "permanent", "val", ttl_seconds=0))
 
         import time
+
         time.sleep(1.1)
         count = persistor.cleanup_expired()
         assert count == 1

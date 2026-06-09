@@ -11,9 +11,7 @@
 try:
     from fastapi import APIRouter, Body, Depends, HTTPException
 except ImportError:
-    raise ImportError(
-        "FastAPI is not installed. Install with: pip install skillos[web]"
-    )
+    raise ImportError("FastAPI is not installed. Install with: pip install skillos[web]")
 
 import logging
 
@@ -28,6 +26,7 @@ router = APIRouter(prefix="/negmarket", tags=["negmarket"])
 
 def get_storage() -> StorageBackend:
     from skillos.negmarket.storage import SQLiteNegMarketStorage
+
     return SQLiteNegMarketStorage()
 
 
@@ -99,13 +98,15 @@ async def discover_anti_patterns(
     results = []
     for s in skills:
         manifest = s.skill_manifest
-        results.append({
-            "id": s.id,
-            "name": manifest.get("name", ""),
-            "description": manifest.get("description", ""),
-            "risk_level": manifest.get("metadata", {}).get("risk_level", "medium"),
-            "category": manifest.get("metadata", {}).get("category", "general"),
-            "price_per_call": manifest.get("price_per_call", 0.1),
-            "call_count": s.call_count,
-        })
+        results.append(
+            {
+                "id": s.id,
+                "name": manifest.get("name", ""),
+                "description": manifest.get("description", ""),
+                "risk_level": manifest.get("metadata", {}).get("risk_level", "medium"),
+                "category": manifest.get("metadata", {}).get("category", "general"),
+                "price_per_call": manifest.get("price_per_call", 0.1),
+                "call_count": s.call_count,
+            }
+        )
     return {"skills": results, "total": len(results)}

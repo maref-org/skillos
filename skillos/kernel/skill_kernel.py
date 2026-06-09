@@ -18,10 +18,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from skillos.types import SkillCall, SkillManifest, SkillStatus
 from skillos.db.engine import get_sessionmaker
 from skillos.db.models import SkillModel, SkillNFTModel
 from skillos.db.repository import SkillNFTRepository, SkillRepository
+from skillos.types import SkillCall, SkillManifest, SkillStatus
 
 logger = logging.getLogger(__name__)
 
@@ -210,12 +210,14 @@ class SkillKernel:
             elapsed_ms = (time.monotonic() - start) * 1000
 
             with self._log_lock:
-                self._execution_log.append({
-                    "skill_id": tool_chain.skill_id,
-                    "timestamp": time.time(),
-                    "latency_ms": round(elapsed_ms, 2),
-                    "status": result["status"],
-                })
+                self._execution_log.append(
+                    {
+                        "skill_id": tool_chain.skill_id,
+                        "timestamp": time.time(),
+                        "latency_ms": round(elapsed_ms, 2),
+                        "status": result["status"],
+                    }
+                )
 
         return result
 
@@ -223,6 +225,7 @@ class SkillKernel:
         """WASM 沙箱执行（当前为进程级隔离模拟，生产环境应接入 wasmtime/wasmer）"""
         # 安全策略 1：输入大小限制
         import json
+
         payload = json.dumps(input_data)
         if len(payload) > 1024 * 1024:  # 1MB 限制
             return {
@@ -327,6 +330,7 @@ print(json.dumps(result))
             }
         finally:
             import os
+
             try:
                 os.unlink(script_path)
             except OSError:
@@ -405,10 +409,12 @@ print(json.dumps(result))
         """记录 Skill 调用"""
         call.status = "completed"
         with self._log_lock:
-            self._execution_log.append({
-                "call_id": call.call_id,
-                "skill_id": call.skill_id,
-                "caller_id": call.caller_id,
-                "revenue_usd": call.revenue_usd,
-                "timestamp": call.timestamp,
-            })
+            self._execution_log.append(
+                {
+                    "call_id": call.call_id,
+                    "skill_id": call.skill_id,
+                    "caller_id": call.caller_id,
+                    "revenue_usd": call.revenue_usd,
+                    "timestamp": call.timestamp,
+                }
+            )

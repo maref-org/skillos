@@ -55,6 +55,7 @@ class RemoteBridge:
     ) -> dict:
         """连接远程桥接"""
         import time
+
         bridge = BridgeSession(
             session_id=session_id,
             remote_url=remote_url,
@@ -206,6 +207,7 @@ class RemoteBridge:
     async def update_heartbeat(self, session_id: str) -> bool:
         """更新桥接心跳"""
         import time
+
         bridge = self.active_bridges.get(session_id)
         if bridge:
             bridge.last_heartbeat = time.time()

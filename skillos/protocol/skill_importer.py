@@ -95,11 +95,13 @@ class AnthropicSkillConverter:
         if isinstance(raw_steps, list):
             for s in raw_steps:
                 if isinstance(s, dict):
-                    steps.append({
-                        "type": s.get("type", s.get("action", "unknown")),
-                        "name": s.get("name", ""),
-                        "params": s.get("params", s.get("parameters", s.get("args", {}))),
-                    })
+                    steps.append(
+                        {
+                            "type": s.get("type", s.get("action", "unknown")),
+                            "name": s.get("name", ""),
+                            "params": s.get("params", s.get("parameters", s.get("args", {}))),
+                        }
+                    )
         return steps
 
     @staticmethod
@@ -155,7 +157,9 @@ class YAMLSkillConverter:
     def _convert_steps(data: dict[str, Any]) -> list[dict[str, Any]]:
         raw = data.get("steps", data.get("pipeline", []))
         if isinstance(raw, list):
-            return [{"type": s.get("type", "action"), "name": s.get("name", ""), "params": s.get("params", {})} for s in raw]
+            return [
+                {"type": s.get("type", "action"), "name": s.get("name", ""), "params": s.get("params", {})} for s in raw
+            ]
         return []
 
 
@@ -203,7 +207,9 @@ class SkillImporter:
                     errors=["JSON root must be an object"],
                     success=False,
                 )
-            source = ImportSource.ANTHROPIC_JSON if {"skill_id", "functions"}.intersection(data) else ImportSource.RAW_JSON
+            source = (
+                ImportSource.ANTHROPIC_JSON if {"skill_id", "functions"}.intersection(data) else ImportSource.RAW_JSON
+            )
             return self.import_from_dict(data, source=source)
         except json.JSONDecodeError as e:
             return ImportResult(
@@ -225,16 +231,20 @@ class SkillImporter:
             )
 
     def to_manifest_json(self, manifest: OpenSkillManifest) -> str:
-        return json.dumps({
-            "name": manifest.name,
-            "version": manifest.version,
-            "description": manifest.description,
-            "author": manifest.author,
-            "tags": manifest.tags,
-            "category": manifest.category,
-            "triggers": manifest.trigger_patterns,
-            "steps": manifest.steps,
-            "input_schema": manifest.input_schema,
-            "output_schema": manifest.output_schema,
-            "source": manifest.source.value,
-        }, indent=2, ensure_ascii=False)
+        return json.dumps(
+            {
+                "name": manifest.name,
+                "version": manifest.version,
+                "description": manifest.description,
+                "author": manifest.author,
+                "tags": manifest.tags,
+                "category": manifest.category,
+                "triggers": manifest.trigger_patterns,
+                "steps": manifest.steps,
+                "input_schema": manifest.input_schema,
+                "output_schema": manifest.output_schema,
+                "source": manifest.source.value,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )

@@ -104,7 +104,8 @@ class ProtocolGateway:
     def _handle_a2a(self, target_id: str, req: GatewayRequest) -> dict[str, Any]:
         logger.info(
             "A2A route: %s action=%s",
-            target_id, req.action,
+            target_id,
+            req.action,
         )
         return {
             "protocol": "a2a",
@@ -118,6 +119,7 @@ class ProtocolGateway:
         logger.info("MCP route: %s action=%s", target_id, req.action)
         try:
             import asyncio
+
             client = MCPClient()
             tool_name = req.payload.get("tool", "execute")
             result = asyncio.run(

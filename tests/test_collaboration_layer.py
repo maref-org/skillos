@@ -24,6 +24,7 @@ from skillos.collaboration.reputation import (
 # ByzantineConsensus tests
 # ---------------------------------------------------------------------------
 
+
 class TestByzantineConsensus:
     @pytest.fixture
     def consensus(self):
@@ -95,6 +96,7 @@ class TestByzantineConsensus:
 # ---------------------------------------------------------------------------
 # TrustReputationEngine tests
 # ---------------------------------------------------------------------------
+
 
 class TestTrustReputationEngine:
     @pytest.fixture

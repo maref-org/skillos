@@ -12,3 +12,6 @@ task_plan.md
 
 # Trae AI config (local only)
 .trae/
+
+# Legacy rename (old root __init__.py, kept for reference)
+__init__.py.legacy

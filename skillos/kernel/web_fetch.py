@@ -128,6 +128,7 @@ class WebFetcher:
     @staticmethod
     def _extract_links(soup: BeautifulSoup, base_url: str) -> list[str]:
         from urllib.parse import urljoin
+
         links = []
         for a_tag in soup.find_all("a", href=True):
             href = a_tag["href"].strip()

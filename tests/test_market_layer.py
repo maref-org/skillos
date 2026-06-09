@@ -10,7 +10,6 @@ import pytest
 
 market = pytest.importorskip("skillos.market")
 
-from skillos._types import SkillManifest
 from skillos.market.pricing import PricePoint, PricingEngine
 from skillos.market.registry import (
     MarketStatus,
@@ -26,9 +25,12 @@ from skillos.market.settlement import (
     TokenType,
 )
 
+from skillos._types import SkillManifest
+
 # ---------------------------------------------------------------------------
 # SkillRegistry tests
 # ---------------------------------------------------------------------------
+
 
 class TestSkillRegistry:
     @pytest.fixture
@@ -131,6 +133,7 @@ class TestSkillRegistry:
 # PricingEngine tests
 # ---------------------------------------------------------------------------
 
+
 class TestPricingEngine:
     @pytest.fixture
     def engine(self):
@@ -182,6 +185,7 @@ class TestPricingEngine:
 # ---------------------------------------------------------------------------
 # SettlementEngine tests
 # ---------------------------------------------------------------------------
+
 
 class TestSettlementEngine:
     @pytest.fixture

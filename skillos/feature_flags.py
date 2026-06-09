@@ -21,12 +21,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from skillos.db.engine import SessionLocal
+import skillos.db.engine as _db_engine
 from skillos.db.models import FeatureFlagModel
 
 
 class FlagType(str, Enum):
     """功能开关类型。"""
+
     BOOLEAN = "boolean"
     PERCENTAGE = "percentage"
     USER_LIST = "user_list"
@@ -35,6 +36,7 @@ class FlagType(str, Enum):
 
 class FlagState(str, Enum):
     """功能开关状态。"""
+
     ENABLED = "enabled"
     DISABLED = "disabled"
     ROLLOUT = "rollout"  # 灰度中
@@ -43,6 +45,7 @@ class FlagState(str, Enum):
 @dataclass
 class FeatureFlag:
     """功能开关值对象。"""
+
     name: str
     flag_type: FlagType
     state: FlagState
@@ -145,7 +148,7 @@ class FeatureFlagManager:
         if not name or not isinstance(name, str):
             raise ValueError("flag name must be a non-empty string")
 
-        session = SessionLocal()
+        session = _db_engine.SessionLocal()
         try:
             existing = session.query(FeatureFlagModel).filter_by(name=name).first()
             if existing is not None:
@@ -176,7 +179,7 @@ class FeatureFlagManager:
         description: str | None = None,
     ) -> FeatureFlag | None:
         """更新开关状态（动态生效，无需重启）。"""
-        session = SessionLocal()
+        session = _db_engine.SessionLocal()
         try:
             model = session.query(FeatureFlagModel).filter_by(name=name).first()
             if model is None:
@@ -200,7 +203,7 @@ class FeatureFlagManager:
 
     def delete_flag(self, name: str) -> bool:
         """删除开关。"""
-        session = SessionLocal()
+        session = _db_engine.SessionLocal()
         try:
             model = session.query(FeatureFlagModel).filter_by(name=name).first()
             if model is None:
@@ -233,7 +236,7 @@ class FeatureFlagManager:
             self._load_from_db()
 
     def _load_from_db(self) -> None:
-        session = SessionLocal()
+        session = _db_engine.SessionLocal()
         try:
             models = session.query(FeatureFlagModel).all()
             new_cache: dict[str, FeatureFlag] = {}

@@ -51,10 +51,10 @@ class MetricsCollector:
     def _setup(self) -> None:
         try:
             from prometheus_client import (
-                Counter,
-                Histogram,
-                Gauge,
                 CollectorRegistry,
+                Counter,
+                Gauge,
+                Histogram,
                 start_http_server,
             )
 
@@ -181,6 +181,7 @@ class MetricsCollector:
             def handle_request():
                 ...
         """
+
         def decorator(func: _F) -> _F:
             @wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -196,7 +197,9 @@ class MetricsCollector:
                 finally:
                     duration = time.monotonic() - start
                     self.record_request(endpoint, status, duration)
+
             return wrapper  # type: ignore[return-value]
+
         return decorator
 
     def get_metrics_text(self) -> str:
@@ -205,6 +208,7 @@ class MetricsCollector:
             return "# metrics disabled\n"
         try:
             from prometheus_client import generate_latest
+
             return generate_latest(self._registry).decode("utf-8")
         except ImportError:
             return "# prometheus-client not installed\n"

@@ -39,6 +39,7 @@ def db_session():
 # SkillKernel Performance
 # =============================================================================
 
+
 class TestSkillKernelPerformance:
     def test_distill_benchmark(self, db_session):
         """蒸馏 100 个 Skill 的耗时基准"""
@@ -83,6 +84,7 @@ class TestSkillKernelPerformance:
 # =============================================================================
 # SessionManager Performance
 # =============================================================================
+
 
 class TestSessionManagerPerformance:
     def test_create_session_benchmark(self, db_session):
@@ -130,6 +132,7 @@ class TestSessionManagerPerformance:
 # DistributionEngine Performance
 # =============================================================================
 
+
 class TestDistributionPerformance:
     def test_distribute_benchmark(self, db_session):
         """1000 次收入分配的耗时"""
@@ -153,10 +156,7 @@ class TestDistributionPerformance:
     def test_compute_payouts_benchmark(self, db_session):
         """计算 100 个贡献者的 payout 耗时"""
         engine = DistributionEngine(db_session=db_session)
-        contributors = [
-            Contributor(f"c-{i}", f"Name-{i}", 0.5, 0.5, 0.8, 0.3)
-            for i in range(100)
-        ]
+        contributors = [Contributor(f"c-{i}", f"Name-{i}", 0.5, 0.5, 0.8, 0.3) for i in range(100)]
 
         start = time.perf_counter()
         payouts = engine.compute_payouts(contributors, 10000.0)
@@ -183,6 +183,7 @@ class TestDistributionPerformance:
 # =============================================================================
 # AuditLogger Performance
 # =============================================================================
+
 
 class TestAuditPerformance:
     def test_log_benchmark(self):
@@ -239,6 +240,7 @@ class TestAuditPerformance:
 # =============================================================================
 # DB Bulk Operations
 # =============================================================================
+
 
 class TestDbBulkPerformance:
     def test_bulk_skill_insert(self, db_session):

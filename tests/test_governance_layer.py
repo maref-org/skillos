@@ -35,6 +35,7 @@ from skillos.governance.dao import (
 # DAOGovernance tests
 # ---------------------------------------------------------------------------
 
+
 class TestDAOGovernance:
     @pytest.fixture
     def dao(self, db_session):
@@ -158,6 +159,7 @@ class TestDAOGovernance:
 # SmartContractEngine tests
 # ---------------------------------------------------------------------------
 
+
 class TestSmartContractEngine:
     @pytest.fixture
     def engine(self, db_session):
@@ -233,6 +235,7 @@ class TestSmartContractEngine:
 # ---------------------------------------------------------------------------
 # ComplianceAuditor tests
 # ---------------------------------------------------------------------------
+
 
 class TestComplianceAuditor:
     @pytest.fixture

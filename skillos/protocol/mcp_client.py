@@ -73,10 +73,13 @@ class MCPClient:
         arguments: dict[str, Any] | None = None,
     ) -> MCPCallResult:
         start = time.monotonic()
-        payload = self._build_request("tools/call", {
-            "name": tool_name,
-            "arguments": arguments or {},
-        })
+        payload = self._build_request(
+            "tools/call",
+            {
+                "name": tool_name,
+                "arguments": arguments or {},
+            },
+        )
         last_error = None
         for attempt in range(_MAX_RETRIES):
             try:
@@ -92,10 +95,12 @@ class MCPClient:
             except (httpx.TimeoutException, httpx.ConnectError) as e:
                 last_error = e
                 if attempt < _MAX_RETRIES - 1:
-                    wait = _RETRY_BACKOFF * (2 ** attempt)
+                    wait = _RETRY_BACKOFF * (2**attempt)
                     logger.warning(
                         "MCP call attempt %d failed, retrying in %.1fs: %s",
-                        attempt + 1, wait, e,
+                        attempt + 1,
+                        wait,
+                        e,
                     )
                     time.sleep(wait)
         raise MCPError(f"MCP call failed after {_MAX_RETRIES} retries: {last_error}")

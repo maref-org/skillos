@@ -66,8 +66,7 @@ class JSONFormatter(logging.Formatter):
         import time
 
         log_obj: dict[str, Any] = {
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(record.created))
-            + f".{int(record.msecs):03d}Z",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(record.created)) + f".{int(record.msecs):03d}Z",
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -75,7 +74,7 @@ class JSONFormatter(logging.Formatter):
         }
 
         # 注入 trace 上下文
-        from skillos.observability.tracing import get_current_trace_id, get_current_span_id
+        from skillos.observability.tracing import get_current_span_id, get_current_trace_id
 
         trace_id = get_current_trace_id()
         span_id = get_current_span_id()
@@ -102,6 +101,7 @@ class ConsoleFormatter(logging.Formatter):
         base = f"[{record.levelname}] {record.name}: {record.getMessage()}"
         if hasattr(record, "structured"):
             import json
+
             base += f" | {json.dumps(record.structured, ensure_ascii=False, default=str)}"
         return base
 
@@ -136,9 +136,7 @@ def configure_logging() -> None:
     logging.getLogger("requests").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
-    logging.getLogger("skillos").info(
-        "Logging configured: level=%s format=%s", level_str, log_format
-    )
+    logging.getLogger("skillos").info("Logging configured: level=%s format=%s", level_str, log_format)
 
 
 def get_logger(name: str) -> _StructuredLogAdapter:

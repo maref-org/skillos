@@ -7,23 +7,30 @@
   - 动态权重计算
   - 周期结算（日/周/月）
 
-数据持久化：
-  - _distribution_log / _contributor_registry 保留为内存缓存
-  - DB 为唯一真相源，所有写操作同步到数据库
-  - 读操作优先查缓存，miss 时查 DB 并回填
+分配流程：
+  总收入 $1.00
+  ├── 5% → 平台协议维护费
+  ├── 25% → OpenClaw 生态基金
+  │         ├─ 10% Skill 孵化悬赏
+  │         ├─ 5%  基础设施维护
+  │         ├─ 5%  负样本收购
+  │         ├─ 3%  教育与新用户获取
+  │         └─ 2%  风险储备金
+  └── 70% → 贡献者池
+            按动态权重分配
+            ├── 40% → creator
+            ├── 20% → worker
+            ├── 10% → referrer
+            ├── 15% → platform
+            └── 15% → community
 """
 
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
 
-from skillos.types import Contributor, SkillCall
-from skillos.db.engine import get_sessionmaker
-from skillos.db.models import ContributorModel, DistributionRecordModel
-from skillos.db.repository import ContributorRepository, DistributionRepository
+from skillos._types import Contributor, SkillCall
 
 logger = logging.getLogger(__name__)
 
@@ -95,77 +102,16 @@ class SettlementReport:
 
 
 class DistributionEngine:
-    """5/25/70 分配引擎
-
-    数据持久化：
-      - 保留内存缓存加速读取
-      - DB 为唯一真相源，所有变更同步持久化
-    """
+    """5/25/70 分配引擎"""
 
     PLATFORM_RATIO = 0.05
     ECOSYSTEM_RATIO = 0.25
     CONTRIBUTOR_RATIO = 0.70
 
-    def __init__(self, db_session: Any | None = None) -> None:
+    def __init__(self) -> None:
         self._distribution_log: list[DistributionRecord] = []
         self._contributor_registry: dict[str, Contributor] = {}
         self._period_revenue: dict[str, float] = {}
-        self._db_session = db_session
-
-    def _get_db(self):
-        if self._db_session is not None:
-            return self._db_session
-        return get_sessionmaker()()
-
-    @staticmethod
-    def _record_to_model(record: DistributionRecord) -> DistributionRecordModel:
-        return DistributionRecordModel(
-            call_id=record.call_id,
-            skill_id=record.skill_id,
-            total_amount=record.total_amount,
-            platform_fee=record.platform_fee,
-            ecosystem_fee=record.ecosystem_fee,
-            contributor_pool=record.contributor_pool,
-            ecosystem_breakdown=record.ecosystem_breakdown,
-            secondary_distribution=record.secondary_distribution,
-            timestamp=datetime.fromtimestamp(record.timestamp, tz=timezone.utc),
-        )
-
-    @staticmethod
-    def _model_to_record(model: DistributionRecordModel) -> DistributionRecord:
-        return DistributionRecord(
-            call_id=model.call_id,
-            skill_id=model.skill_id,
-            total_amount=model.total_amount,
-            platform_fee=model.platform_fee,
-            ecosystem_fee=model.ecosystem_fee,
-            contributor_pool=model.contributor_pool,
-            ecosystem_breakdown=model.ecosystem_breakdown,
-            secondary_distribution=model.secondary_distribution,
-            timestamp=model.timestamp.timestamp(),
-        )
-
-    @staticmethod
-    def _contributor_to_model(contributor: Contributor) -> ContributorModel:
-        return ContributorModel(
-            contributor_id=contributor.contributor_id,
-            name=contributor.name,
-            historical_contribution=contributor.historical_contribution,
-            current_period_attribution=contributor.current_period_attribution,
-            success_rate=contributor.success_rate,
-            governance_participation=contributor.governance_participation,
-        )
-
-    @staticmethod
-    def _model_to_contributor(model: ContributorModel) -> Contributor:
-        return Contributor(
-            contributor_id=model.contributor_id,
-            name=model.name,
-            historical_contribution=model.historical_contribution,
-            current_period_attribution=model.current_period_attribution,
-            success_rate=model.success_rate,
-            governance_participation=model.governance_participation,
-        )
 
     def distribute(self, call: SkillCall) -> DistributionRecord:
         """单笔调用的 5/25/70 分配"""
@@ -175,10 +121,7 @@ class DistributionEngine:
         ecosystem_fee = amount * self.ECOSYSTEM_RATIO
         contributor_pool = amount * self.CONTRIBUTOR_RATIO
 
-        ecosystem_breakdown = {
-            key: ecosystem_fee * ratio
-            for key, ratio in ECOSYSTEM_FUND_ALLOCATION.items()
-        }
+        ecosystem_breakdown = {key: ecosystem_fee * ratio for key, ratio in ECOSYSTEM_FUND_ALLOCATION.items()}
 
         secondary_distribution = self._compute_secondary_distribution(contributor_pool)
 
@@ -193,21 +136,10 @@ class DistributionEngine:
             secondary_distribution=secondary_distribution,
         )
 
-        # 持久化到 DB
-        db = self._get_db()
-        try:
-            repo = DistributionRepository(db)
-            repo.save(self._record_to_model(record))
-        finally:
-            if self._db_session is None:
-                db.close()
-
         self._distribution_log.append(record)
 
         period_key = self._get_current_period_key(SettlementPeriod.DAILY)
-        self._period_revenue[period_key] = (
-            self._period_revenue.get(period_key, 0.0) + amount
-        )
+        self._period_revenue[period_key] = self._period_revenue.get(period_key, 0.0) + amount
 
         logger.info(
             "Distributed $%.4f: platform=$%.4f ecosystem=$%.4f contributors=$%.4f",
@@ -259,36 +191,23 @@ class DistributionEngine:
             w = weights[c.contributor_id]
             share = (w / total_weight) * total_pool
 
-            roles = {
-                role: share * ratio
-                for role, ratio in CONTRIBUTOR_SECONDARY_SPLIT.items()
-            }
+            roles = {role: share * ratio for role, ratio in CONTRIBUTOR_SECONDARY_SPLIT.items()}
 
-            payouts.append(ContributorPayout(
-                contributor_id=c.contributor_id,
-                amount=round(share, 6),
-                weight=w,
-                roles=roles,
-            ))
+            payouts.append(
+                ContributorPayout(
+                    contributor_id=c.contributor_id,
+                    amount=round(share, 6),
+                    weight=w,
+                    roles=roles,
+                )
+            )
 
         return sorted(payouts, key=lambda p: p.amount, reverse=True)
 
     def settle(self, period: SettlementPeriod) -> SettlementReport | None:
         """周期结算（日/周/月）"""
         period_key = self._get_current_period_key(period)
-
-        # 优先从 DB 聚合当期收入
-        db = self._get_db()
-        try:
-            repo = DistributionRepository(db)
-            total_revenue = repo.get_period_revenue(period_key)
-        finally:
-            if self._db_session is None:
-                db.close()
-
-        # 回退到内存缓存
-        if total_revenue == 0:
-            total_revenue = self._period_revenue.get(period_key, 0.0)
+        total_revenue = self._period_revenue.get(period_key, 0.0)
 
         if total_revenue == 0:
             logger.info("No revenue to settle for period %s", period_key)
@@ -325,70 +244,49 @@ class DistributionEngine:
 
         return report
 
-    def register_contributor(self, contributor: Contributor) -> None:
-        """注册贡献者（同步到 DB）"""
-        db = self._get_db()
-        try:
-            repo = ContributorRepository(db)
-            repo.save(self._contributor_to_model(contributor))
-        finally:
-            if self._db_session is None:
-                db.close()
+    def allocate_negmarket_revenue(self, sample_id: str, amount: float, contributor_id: str) -> DistributionRecord:
+        """将 NegMarket 反模式 Skill 调用收入纳入 5/25/70 分配"""
+        from skillos._types import SkillCall
 
+        call = SkillCall(
+            skill_id=f"negmarket:{sample_id}",
+            caller_id=contributor_id,
+            input_data={},
+            revenue_usd=amount,
+            status="completed",
+        )
+        record = self.distribute(call)
+        ecosystem_fee = amount * self.ECOSYSTEM_RATIO
+        ecosystem_negmarket = ecosystem_fee * ECOSYSTEM_FUND_ALLOCATION["neg_market_acquisition"]
+        logger.info(
+            "NegMarket revenue $%.4f: ecosystem=$%.4f negmarket_share=$%.4f",
+            amount,
+            ecosystem_fee,
+            ecosystem_negmarket,
+        )
+        return record
+
+    def register_contributor(self, contributor: Contributor) -> None:
         self._contributor_registry[contributor.contributor_id] = contributor
 
     def get_contributor(self, contributor_id: str) -> Contributor | None:
-        """获取贡献者（缓存优先，DB 回填）"""
-        if contributor_id in self._contributor_registry:
-            return self._contributor_registry[contributor_id]
-
-        db = self._get_db()
-        try:
-            repo = ContributorRepository(db)
-            model = repo.get(contributor_id)
-            if model is None:
-                return None
-            contributor = self._model_to_contributor(model)
-            self._contributor_registry[contributor_id] = contributor
-            return contributor
-        finally:
-            if self._db_session is None:
-                db.close()
+        return self._contributor_registry.get(contributor_id)
 
     def get_distribution_log(self) -> list[DistributionRecord]:
-        """获取分配记录（优先从 DB 加载并刷新缓存）"""
-        db = self._get_db()
-        try:
-            repo = DistributionRepository(db)
-            models = repo.list_all(limit=10000)
-            records = [self._model_to_record(m) for m in models]
-            self._distribution_log = records
-            return records
-        finally:
-            if self._db_session is None:
-                db.close()
+        return list(self._distribution_log)
 
     def get_period_revenue(self, period: SettlementPeriod) -> float:
         period_key = self._get_current_period_key(period)
-        db = self._get_db()
-        try:
-            repo = DistributionRepository(db)
-            db_revenue = repo.get_period_revenue(period_key)
-        finally:
-            if self._db_session is None:
-                db.close()
-        return db_revenue if db_revenue else self._period_revenue.get(period_key, 0.0)
+        return self._period_revenue.get(period_key, 0.0)
 
     @staticmethod
     def _compute_secondary_distribution(contributor_pool: float) -> dict[str, float]:
-        return {
-            role: round(contributor_pool * ratio, 6)
-            for role, ratio in CONTRIBUTOR_SECONDARY_SPLIT.items()
-        }
+        return {role: round(contributor_pool * ratio, 6) for role, ratio in CONTRIBUTOR_SECONDARY_SPLIT.items()}
 
     @staticmethod
     def _get_current_period_key(period: SettlementPeriod) -> str:
         import datetime
+
         now = datetime.datetime.now(datetime.UTC)
         if period == SettlementPeriod.DAILY:
             return now.strftime("%Y-%m-%d")
@@ -400,6 +298,7 @@ class DistributionEngine:
     @staticmethod
     def _get_period_start(period: SettlementPeriod) -> float:
         import datetime
+
         now = datetime.datetime.now(datetime.UTC)
         if period == SettlementPeriod.DAILY:
             start = now.replace(hour=0, minute=0, second=0, microsecond=0)

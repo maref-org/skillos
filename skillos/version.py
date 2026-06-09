@@ -6,14 +6,13 @@ Phase 5.2: 回滚机制支持
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 # 当前版本号（与 pyproject.toml 保持一致）
-__version__ = "0.3.0"
+__version__ = "0.5.0-beta"
 
 _DEFAULT_STATE_DIR = Path("./.skillos/state")
 
@@ -21,6 +20,7 @@ _DEFAULT_STATE_DIR = Path("./.skillos/state")
 @dataclass
 class DeploymentState:
     """部署状态快照。"""
+
     version: str
     deployed_at: str
     alembic_revision: str
