@@ -9,3 +9,6 @@ findings.md
 progress.md
 task_plan.md
 .coverage
+
+# Trae AI config (local only)
+.trae/
