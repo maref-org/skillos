@@ -11,6 +11,7 @@ from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from skillos.db.models import Base
 
@@ -40,12 +41,21 @@ def get_engine():
         connect_args = {}
         if url.startswith("sqlite"):
             connect_args["check_same_thread"] = False
-        _engine = create_engine(
-            url,
-            echo=os.getenv("SKILLOS_DB_ECHO", "0") == "1",
-            connect_args=connect_args,
-            pool_pre_ping=True,
-        )
+        # 内存 SQLite 需 StaticPool：否则每个连接独立数据库，跨请求/连接丢失表
+        if url in ("sqlite://", "sqlite:///:memory:"):
+            _engine = create_engine(
+                url,
+                echo=os.getenv("SKILLOS_DB_ECHO", "0") == "1",
+                connect_args=connect_args,
+                poolclass=StaticPool,
+            )
+        else:
+            _engine = create_engine(
+                url,
+                echo=os.getenv("SKILLOS_DB_ECHO", "0") == "1",
+                connect_args=connect_args,
+                pool_pre_ping=True,
+            )
         logger.info("Database engine created: %s", url.split("://")[0])
         Base.metadata.create_all(bind=_engine)
     return _engine

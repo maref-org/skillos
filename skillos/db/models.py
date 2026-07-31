@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -140,6 +140,58 @@ class AuditLogModel(Base):
     record_hash: Mapped[str] = mapped_column(String(128), default="")
 
 
+class SkillListingModel(Base):
+    """技能市场挂牌持久化模型。"""
+
+    __tablename__ = "skill_listings"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    skill_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    author: Mapped[str] = mapped_column(String(256), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    category: Mapped[str] = mapped_column(String(64), default="general")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    price_per_call: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    quality_score: Mapped[float] = mapped_column(Float, default=0.5)
+    total_calls: Mapped[int] = mapped_column(Integer, default=0)
+    total_revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, onupdate=_utc_now)
+
+
+class SkillReviewModel(Base):
+    """技能评价持久化模型。"""
+
+    __tablename__ = "skill_reviews"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    listing_id: Mapped[str] = mapped_column(ForeignKey("skill_listings.id"), nullable=False, index=True)
+    reviewer_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    review_text: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+
+
+class SettlementModel(Base):
+    """市场结算持久化模型。"""
+
+    __tablename__ = "settlements"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    listing_id: Mapped[str] = mapped_column(ForeignKey("skill_listings.id"), nullable=False, index=True)
+    period: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    total_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    platform_fee: Mapped[float] = mapped_column(Float, nullable=False)
+    ecosystem_fee: Mapped[float] = mapped_column(Float, nullable=False)
+    contributor_payout: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+
+
 class FeatureFlagModel(Base):
     """Feature Flag 持久化模型（灰度发布）。"""
 
@@ -152,3 +204,85 @@ class FeatureFlagModel(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now, onupdate=_utc_now)
+
+
+class ProviderProfileModel(Base):
+    """供应方画像 — 可被 AI 雇佣的实体（人/Agent）。
+
+    provider_id 复用 identities 表主键，绑定 Ed25519 身份。
+    完整度（is_profile_complete）达标后进入可搜索市场列表。
+    """
+
+    __tablename__ = "provider_profiles"
+
+    provider_id: Mapped[str] = mapped_column(ForeignKey("identities.identity_id"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="provider")
+    headline: Mapped[str] = mapped_column(String(256), nullable=False, server_default="")
+    bio: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    skills: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, server_default="[]")
+    categories: Mapped[list[str]] = mapped_column(JSON, nullable=False, server_default="[]")
+    city: Mapped[str] = mapped_column(String(128), nullable=False, server_default="")
+    country: Mapped[str] = mapped_column(String(8), nullable=False, server_default="")
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default="")
+    is_remote_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    hourly_rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False, server_default="CNY")
+    availability: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, server_default="{}")
+    gender: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    profile_complete_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    is_profile_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    total_bookings: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rating: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    activity_freshness: Mapped[str] = mapped_column(String(32), nullable=False, server_default="new")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, onupdate=_utc_now)
+
+
+class BountyModel(Base):
+    """Bounty — AI 雇主发布的物理/数字任务。
+
+    状态机: draft → open → assigned → submitted → work_completed → paid，
+    以及 cancelled / disputed（争议冻结）。
+    """
+
+    __tablename__ = "bounties"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    poster_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    completion_criteria: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    evidence_types: Mapped[list[str]] = mapped_column(JSON, nullable=False, server_default="[]")
+    price_type: Mapped[str] = mapped_column(String(16), nullable=False, server_default="fixed")
+    price: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False, server_default="CNY")
+    category: Mapped[str] = mapped_column(String(64), nullable=False, server_default="general")
+    skill_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, server_default="[]")
+    city: Mapped[str] = mapped_column(String(128), nullable=False, server_default="")
+    country: Mapped[str] = mapped_column(String(8), nullable=False, server_default="")
+    is_remote_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    spots_available: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    spots_filled: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    identity_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="draft", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, onupdate=_utc_now)
+
+
+class BountyApplicationModel(Base):
+    """Bounty 申请记录。"""
+
+    __tablename__ = "bounty_applications"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    bounty_id: Mapped[str] = mapped_column(ForeignKey("bounties.id"), nullable=False, index=True)
+    applicant_id: Mapped[str] = mapped_column(
+        ForeignKey("provider_profiles.provider_id"), nullable=False, index=True
+    )
+    message: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    applied_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)

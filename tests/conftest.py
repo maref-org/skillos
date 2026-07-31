@@ -186,3 +186,60 @@ def _reset_db():
 
     reset_db()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _isolate_audit_logger(tmp_path, monkeypatch):
+    """每个测试使用独立的审计日志目录与密钥，避免链式哈希状态污染。
+
+    - SKILLOS_AUDIT_DIR 指向 pytest 提供的 tmp_path（测试结束自动清理）
+    - SKILLOS_AUDIT_SECRET 固定为测试密钥，确保签名可重现
+    - 每个测试前 reset_audit_logger() 强制下次调用重新初始化单例
+    """
+    audit_dir = tmp_path / "audit_logs"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("SKILLOS_AUDIT_DIR", str(audit_dir))
+    monkeypatch.setenv("SKILLOS_AUDIT_SECRET", "test-audit-secret-deterministic")
+    from skillos.audit import reset_audit_logger
+
+    reset_audit_logger()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _isolate_message_signer(monkeypatch):
+    """默认禁用消息签名，避免现有测试意外触发签名逻辑。
+
+    需要测试签名的用例应显式设置 SKILLOS_SIGNER_ID 并调用
+    reset_default_signer()（见 tests/test_message_signer.py）。
+    """
+    monkeypatch.delenv("SKILLOS_SIGNER_ID", raising=False)
+    monkeypatch.delenv("SKILLOS_SIGNER_PRIVATE_KEY", raising=False)
+    from skillos.security.message_signer import reset_default_signer
+
+    reset_default_signer()
+    yield
+
+
+@pytest.fixture
+def db_session():
+    """提供 SQLAlchemy 会话，在每个测试前自动重置数据库。"""
+    from skillos.db.engine import get_engine, get_sessionmaker
+
+    Session = get_sessionmaker()
+    session = Session()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_observability():
+    """每个测试前重置 MetricsCollector 和 SLOManager 单例，避免测量数据污染。"""
+    from skillos.kernel.slo import reset_slo_manager
+    from skillos.observability.metrics import reset_metrics
+
+    reset_metrics()
+    reset_slo_manager()
+    yield

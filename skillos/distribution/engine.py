@@ -29,8 +29,10 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
 
 from skillos._types import Contributor, SkillCall
+from skillos.audit import AuditEventType, log_audit
 
 logger = logging.getLogger(__name__)
 
@@ -108,10 +110,11 @@ class DistributionEngine:
     ECOSYSTEM_RATIO = 0.25
     CONTRIBUTOR_RATIO = 0.70
 
-    def __init__(self) -> None:
+    def __init__(self, db_session: Any | None = None) -> None:
         self._distribution_log: list[DistributionRecord] = []
         self._contributor_registry: dict[str, Contributor] = {}
         self._period_revenue: dict[str, float] = {}
+        self._db_session = db_session
 
     def distribute(self, call: SkillCall) -> DistributionRecord:
         """单笔调用的 5/25/70 分配"""
@@ -138,6 +141,22 @@ class DistributionEngine:
 
         self._distribution_log.append(record)
 
+        if self._db_session is not None:
+            from skillos.db.models import DistributionRecordModel
+
+            model = DistributionRecordModel(
+                call_id=record.call_id,
+                skill_id=record.skill_id,
+                total_amount=record.total_amount,
+                platform_fee=record.platform_fee,
+                ecosystem_fee=record.ecosystem_fee,
+                contributor_pool=record.contributor_pool,
+                ecosystem_breakdown=record.ecosystem_breakdown,
+                secondary_distribution=record.secondary_distribution,
+            )
+            self._db_session.add(model)
+            self._db_session.commit()
+
         period_key = self._get_current_period_key(SettlementPeriod.DAILY)
         self._period_revenue[period_key] = self._period_revenue.get(period_key, 0.0) + amount
 
@@ -147,6 +166,20 @@ class DistributionEngine:
             platform_fee,
             ecosystem_fee,
             contributor_pool,
+        )
+
+        log_audit(
+            AuditEventType.SETTLEMENT_AUTO,
+            call.caller_id,
+            call.skill_id,
+            "Auto-distribute skill call revenue (5/25/70)",
+            {
+                "call_id": call.call_id,
+                "total_amount": round(amount, 6),
+                "platform_fee": round(platform_fee, 6),
+                "ecosystem_fee": round(ecosystem_fee, 6),
+                "contributor_pool": round(contributor_pool, 6),
+            },
         )
 
         return record
@@ -242,6 +275,19 @@ class DistributionEngine:
             len(self._distribution_log),
         )
 
+        log_audit(
+            AuditEventType.SETTLEMENT_TRIGGERED,
+            "system",
+            period.value,
+            f"Trigger {period.value} settlement",
+            {
+                "period_key": period_key,
+                "total_revenue": round(total_revenue, 6),
+                "total_distributions": len(self._distribution_log),
+                "contributor_payouts": len(payouts),
+            },
+        )
+
         return report
 
     def allocate_negmarket_revenue(self, sample_id: str, amount: float, contributor_id: str) -> DistributionRecord:
@@ -268,11 +314,76 @@ class DistributionEngine:
 
     def register_contributor(self, contributor: Contributor) -> None:
         self._contributor_registry[contributor.contributor_id] = contributor
+        if self._db_session is not None:
+            from skillos.db.models import ContributorModel
+
+            model = self._db_session.get(ContributorModel, contributor.contributor_id)
+            if model is None:
+                model = ContributorModel(
+                    contributor_id=contributor.contributor_id,
+                    name=contributor.name,
+                    historical_contribution=contributor.historical_contribution,
+                    current_period_attribution=contributor.current_period_attribution,
+                    success_rate=contributor.success_rate,
+                    governance_participation=contributor.governance_participation,
+                )
+                self._db_session.add(model)
+            else:
+                model.name = contributor.name
+                model.historical_contribution = contributor.historical_contribution
+                model.current_period_attribution = contributor.current_period_attribution
+                model.success_rate = contributor.success_rate
+                model.governance_participation = contributor.governance_participation
+            self._db_session.commit()
 
     def get_contributor(self, contributor_id: str) -> Contributor | None:
-        return self._contributor_registry.get(contributor_id)
+        cached = self._contributor_registry.get(contributor_id)
+        if cached is not None:
+            return cached
+        if self._db_session is not None:
+            from skillos.db.models import ContributorModel
+
+            model = self._db_session.get(ContributorModel, contributor_id)
+            if model is not None:
+                contributor = Contributor(
+                    contributor_id=model.contributor_id,
+                    name=model.name,
+                    historical_contribution=model.historical_contribution,
+                    current_period_attribution=model.current_period_attribution,
+                    success_rate=model.success_rate,
+                    governance_participation=model.governance_participation,
+                )
+                self._contributor_registry[contributor_id] = contributor
+                return contributor
+        return None
 
     def get_distribution_log(self) -> list[DistributionRecord]:
+        if self._distribution_log:
+            return list(self._distribution_log)
+        if self._db_session is not None:
+            from skillos.db.models import DistributionRecordModel
+
+            models = (
+                self._db_session.query(DistributionRecordModel)
+                .order_by(DistributionRecordModel.timestamp.desc())
+                .all()
+            )
+            records = []
+            for m in models:
+                records.append(
+                    DistributionRecord(
+                        call_id=m.call_id,
+                        skill_id=m.skill_id,
+                        total_amount=m.total_amount,
+                        platform_fee=m.platform_fee,
+                        ecosystem_fee=m.ecosystem_fee,
+                        contributor_pool=m.contributor_pool,
+                        ecosystem_breakdown=m.ecosystem_breakdown,
+                        secondary_distribution=m.secondary_distribution,
+                        timestamp=m.timestamp.timestamp(),
+                    )
+                )
+            return records
         return list(self._distribution_log)
 
     def get_period_revenue(self, period: SettlementPeriod) -> float:

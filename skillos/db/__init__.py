@@ -9,12 +9,18 @@ from skillos.db.engine import get_engine, get_session, init_db
 from skillos.db.models import (
     AuditLogModel,
     Base,
+    BountyApplicationModel,
+    BountyModel,
     ContributorModel,
     DistributionRecordModel,
     IdentityModel,
+    ProviderProfileModel,
     SessionModel,
+    SettlementModel,
+    SkillListingModel,
     SkillModel,
     SkillNFTModel,
+    SkillReviewModel,
 )
 
 __all__ = [
@@ -29,4 +35,10 @@ __all__ = [
     "ContributorModel",
     "IdentityModel",
     "AuditLogModel",
+    "SkillListingModel",
+    "SkillReviewModel",
+    "SettlementModel",
+    "ProviderProfileModel",
+    "BountyModel",
+    "BountyApplicationModel",
 ]

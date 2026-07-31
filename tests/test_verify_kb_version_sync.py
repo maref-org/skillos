@@ -15,7 +15,7 @@ class TestGetCodeVersion:
         from scripts.verify_kb_version_sync import get_code_version
 
         version = get_code_version()
-        assert version.startswith("0.5")
+        assert version.startswith("0.6")
 
     def test_scan_docs_returns_list(self):
         from scripts.verify_kb_version_sync import scan_docs
