@@ -137,7 +137,7 @@ async def create_bounty(
     dry_run = bool(payload.pop("dry_run", False))
     try:
         result = service.create(poster_id=_agent_id, dry_run=dry_run, **payload)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         return {"error": str(exc)}
     if dry_run:
         return result

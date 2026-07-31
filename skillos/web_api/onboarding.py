@@ -153,6 +153,16 @@ def update_profile(
     if not registry.get_profile(provider_id):
         raise HTTPException(status_code=404, detail=f"Provider not found: {provider_id}")
 
+    try:
+        _apply_profile_update(registry, provider_id, profile)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return {"success": True, "profile": _serialize_profile(registry.get_profile(provider_id))}
+
+
+def _apply_profile_update(registry: ProviderRegistry, provider_id: str, profile: dict) -> None:
+    """将画像更新字段应用到 ProviderRegistry（供端点复用，内部做字段分发）。"""
     basic = {
         k: profile[k]
         for k in ("headline", "bio", "categories", "gender", "phone")
@@ -187,8 +197,6 @@ def update_profile(
 
     if "availability" in profile:
         registry.set_availability(provider_id, profile.get("availability", {}))
-
-    return {"success": True, "profile": _serialize_profile(registry.get_profile(provider_id))}
 
 
 @router.get("/profile/{provider_id}/completeness")

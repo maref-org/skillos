@@ -281,7 +281,7 @@ class ProviderRegistry:
         if max_rate is not None:
             q = q.filter(ProviderProfileModel.hourly_rate <= max_rate)
         if category:
-            q = q.filter(ProviderProfileModel.categories.any(category))
+            q = q.filter(ProviderProfileModel.categories.cast(Text).ilike(f"%{category}%"))
         if skill:
             q = q.filter(ProviderProfileModel.skills.cast(Text).ilike(f"%{skill}%"))
 

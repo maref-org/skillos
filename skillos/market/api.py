@@ -212,8 +212,7 @@ def create_bounty(
     dry_run = bool(payload.get("dry_run", False))
     try:
         result = service.create(
-            poster_id=payload["poster_id"],
-            title=payload["title"],
+            poster_id=payload["poster_id"],            title=payload["title"],
             description=payload.get("description", ""),
             completion_criteria=payload.get("completion_criteria", ""),
             evidence_types=payload.get("evidence_types"),
@@ -230,7 +229,7 @@ def create_bounty(
             identity_required=bool(payload.get("identity_required", False)),
             dry_run=dry_run,
         )
-    except ValueError as e:
+    except (ValueError, KeyError, TypeError) as e:
         return {"error": str(e)}
     if dry_run:
         return result

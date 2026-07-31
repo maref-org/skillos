@@ -218,6 +218,37 @@ class TestMarketProviders:
         assert r.json()["total"] == 1
         assert r.json()["providers"][0]["provider_id"] == "prov-a"
 
+    def test_search_filters_by_category(self, client):
+        client.post("/onboarding/register", json={"identity_id": "prov-c1", "role": "provider"})
+        client.post(
+            "/onboarding/profile",
+            json={
+                "provider_id": "prov-c1",
+                "profile": {
+                    "headline": "Photographer",
+                    "bio": "Event photography",
+                    "skills": [{"skill_id": "photo", "proficiency": 0.9}],
+                    "categories": ["photography"],
+                    "city": "Shanghai",
+                    "hourly_rate": 80.0,
+                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
+                },
+            },
+        )
+        r = client.get("/market/providers/search?category=photography")
+        assert r.status_code == 200
+        assert r.json()["total"] == 1
+        r = client.get("/market/providers/search?category=delivery")
+        assert r.json()["total"] == 0
+
+    def test_profile_invalid_fields_rejected(self, client):
+        client.post("/onboarding/register", json={"identity_id": "prov-z", "role": "provider"})
+        r = client.post(
+            "/onboarding/profile",
+            json={"provider_id": "prov-z", "profile": {"hourly_rate": "not-a-number"}},
+        )
+        assert r.status_code == 422
+
     def test_public_profile_omits_sensitive_fields(self, client):
         client.post("/onboarding/register", json={"identity_id": "prov-1", "role": "provider"})
         client.post(
@@ -264,6 +295,18 @@ class TestMarketBounties:
         }
         r = client.post("/market/bounties", json=payload)
         assert r.json()["error"]
+
+    def test_create_missing_poster_id_returns_error(self, client):
+        payload = {
+            "title": "Valid task",
+            "description": "dddddddddd",
+            "completion_criteria": "x",
+            "evidence_types": ["text"],
+            "price": 10.0,
+        }
+        r = client.post("/market/bounties", json=payload)
+        assert r.status_code == 200
+        assert "error" in r.json()
 
     def test_full_bounty_lifecycle(self, client, db_session):
         for pid, role in [("poster", "consumer"), ("worker", "provider")]:

@@ -162,6 +162,20 @@ class TestAgentCreateBounty:
         r = _signed_post(client, signer, "/agent/create_bounty", payload)
         assert r.json()["error"]
 
+    def test_create_unknown_field_returns_error(self, client):
+        signer = _register_identity(client, "poster-1")
+        payload = {
+            "title": "Valid task title",
+            "description": "a" * 20,
+            "completion_criteria": "x",
+            "evidence_types": ["text"],
+            "price": 20.0,
+            "bogus_field": 1,
+        }
+        r = _signed_post(client, signer, "/agent/create_bounty", payload)
+        assert r.status_code == 200
+        assert "error" in r.json()
+
 
 class TestAgentBountyLifecycle:
     def test_full_flow_with_signature(self, client):
