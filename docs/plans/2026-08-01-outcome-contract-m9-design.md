@@ -97,7 +97,23 @@ M9 目标：
 
 ## 9. 落地记录
 
-（待 M9 执行完成后补记。）
+### M9 全阶段落地（2026-08-01，Session 9）
+
+**P1 租户配额/计费隔离**（2 提交）：
+- P1.1：`TenantModel` 新增 `payout_limit`（月出款限额，默认 0=不限额）+ `payout_used`（已用出款额）；`TenantService` 新增 `set_payout_quota`（负数拒绝）/`add_payout_used`（累加，幂等导出不叠加）/`get_payout_usage`（limit/used/remaining，无 limit 时 remaining=None）；migration `010_add_tenant_payout_quota.py`（幂等，down=009）。
+- P1.2：`PayoutService.generate_for_contract` 首次生成分支校验租户限额：`used + price > limit` → 抛 `PayoutLimitExceededError`；生成成功后 `add_payout_used(tenant_id, price)` 累计。限额按契约价判断（非指令总额），语义 = 平台为租户代收代付的契约金额。
+- P1.3：`web_api/tenants.py` 新增 `PUT /tenants/{tenant_id}/quota`（签名鉴权，Body embed=True）；create/get/list 序列化返回 `payout_limit`/`payout_used`；`web_api/outcome.py` tenant-stats `stats[]` 新增 `payout_limit`/`payout_used`/`payout_remaining`（default 租户不限额）。
+- 踩坑：单 Body 参数必须 `embed=True`（否则 FastAPI 期望裸 float 而非 dict，422）；`_payout_usage` 键名需与 tenants API 序列化统一（limit/used/remaining → payout_limit/payout_used/payout_remaining）；`svc.get` 返回 from_orm 拷贝，测试中设 tenant_id 需直接查 ORM model 再赋值；tenant-stats 只聚合有契约的租户 → default 断言须放在有 default 契约的用例。
+
+**P2 运营面板实时指标**（随 P1.3 同提交）：
+- `outcome_contracts.settle()` 埋点 `_record_settle_metric`（record_availability，negmarket_api SLO）；懒加载 `get_slo_manager` 避免循环依赖。
+- tenant-stats 顶层新增只读 `slo` 段（`get_slo_manager().get_slo_summary()`，4 个 SLO 的 target + error_budget.status/remaining_pct）。
+
+**最终审计**：`make audit` 全绿 — **1469 passed, 0 failed**, 1 skipped，coverage 89.70%（≥80%），ruff + bandit 0 问题，3 verify scripts PASS。
+
+**真实服务冒烟**：租户配额 API 全链路（register→create draft→activate active→set quota 8888→usage 正确）+ 契约挂租户创建 OK + tenant-stats 返回 slo 段。
+
+**下一步候选（M10）**：支付宝/微信真实沙箱账号对接执行（需持牌方测试 key，人工步骤）；运营面板接入实时指标曲线（SLO 趋势图，当前只有快照）；平台级跨租户风控/共享额度池。核心代码层已无自动可落地方向，M10 起以人工对接 + 数据运营为主。
 
 ## 10. 新会话交接指引
 
