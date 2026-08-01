@@ -398,6 +398,16 @@ def get_tenant_stats(
     return {"stats": stats, "trend": trend, "contracts": details, "slo": slo}
 
 
+@router.get("/platform-risk")
+def get_platform_risk(db: Session = Depends(get_session)):
+    """平台级跨租户风控面板（M10-P2，只读）。
+
+    汇总所有有出款限额的租户：总额/已用/剩余/占用率；
+    识别超限租户（used >= limit）与高风险租户（占用率 >= 80%）。
+    """
+    return TenantService(db).get_platform_payout_risk()
+
+
 @router.get("/reputation/{entity_id}")
 def get_reputation(
     entity_id: str,

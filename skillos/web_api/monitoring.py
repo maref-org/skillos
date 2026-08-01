@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
+from skillos.db.engine import get_session
 from skillos.kernel.slo import get_slo_manager
 from skillos.observability.metrics import get_metrics
+from skillos.observability.slo_snapshots import SloSnapshotService
 
 router = APIRouter(tags=["监控中心"])
 
 
 @router.get("/monitoring/overview")
-async def overview():
+async def overview(db: Session = Depends(get_session)):
+    SloSnapshotService(db).capture()
     slo = get_slo_manager()
     slo_summary = slo.get_slo_summary()
     healthy_count = sum(
@@ -30,9 +34,26 @@ async def overview():
 
 
 @router.get("/monitoring/slo")
-async def slo_summary():
+async def slo_summary(db: Session = Depends(get_session)):
+    SloSnapshotService(db).capture()
     slo = get_slo_manager()
     return slo.get_slo_summary()
+
+
+@router.get("/monitoring/slo/trend")
+async def slo_trend(
+    slo_name: str | None = Query(None),
+    days: int = Query(7, ge=1, le=90),
+    db: Session = Depends(get_session),
+):
+    """SLO 趋势曲线（M10）：近 N 天按日聚合的错误预算剩余百分比。
+
+    slo_name 缺省返回全部 SLO：{slo_name: [{date, remaining_pct, status}]}。
+    查询前自动捕获当前快照，保证趋势包含最新状态。
+    """
+    service = SloSnapshotService(db)
+    service.capture([slo_name] if slo_name else None)
+    return service.get_trend(slo_name=slo_name, days=days)
 
 
 @router.get("/monitoring/metrics")

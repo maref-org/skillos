@@ -108,3 +108,45 @@ class TenantService:
             "used": round(used, 2),
             "remaining": round(max(0.0, limit - used), 2),
         }
+
+    def get_platform_payout_risk(self) -> dict[str, Any]:
+        """平台级跨租户风控总览（M10-P2）。
+
+        汇总所有有出款限额（limit>0）的租户：总额/已用/剩余/占用率；
+        识别超限租户（used >= limit）与高风险租户（占用率 >= 80%）。
+        """
+        rows = self._db.query(TenantModel).all()
+        limited = []
+        for m in rows:
+            limit = float(m.payout_limit or 0.0)
+            used = float(m.payout_used or 0.0)
+            if limit <= 0:
+                continue
+            limited.append((m.tenant_id, limit, used))
+
+        total_limit = round(sum(lim for _, lim, _ in limited), 2)
+        total_used = round(sum(usd for _, _, usd in limited), 2)
+        over_limit = [
+            {"tenant_id": tid, "limit": round(lim, 2), "used": round(usd, 2)}
+            for tid, lim, usd in limited
+            if usd >= lim
+        ]
+        at_risk = [
+            {
+                "tenant_id": tid,
+                "limit": round(lim, 2),
+                "used": round(usd, 2),
+                "utilization_pct": round(usd / lim * 100, 2),
+            }
+            for tid, lim, usd in limited
+            if usd >= 0.8 * lim and usd < lim
+        ]
+        return {
+            "tenant_count": len(limited),
+            "total_limit": total_limit,
+            "total_used": total_used,
+            "total_remaining": round(max(0.0, total_limit - total_used), 2),
+            "utilization_pct": round(total_used / total_limit * 100, 2) if total_limit > 0 else 0.0,
+            "over_limit": over_limit,
+            "at_risk": at_risk,
+        }

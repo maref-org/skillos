@@ -419,3 +419,20 @@ class PayoutInstructionModel(Base):
     external_ref: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, onupdate=_utc_now)
+
+
+class SloSnapshotModel(Base):
+    """SLO 快照 — 服务水平目标随时间的历史记录（M10）。
+
+    SLOManager 是内存单例，服务重启即丢历史。本模型按「端点被访问」时机
+    持久化每个 SLO 的错误预算状态（status + remaining_pct），支撑运营面板
+    的趋势曲线与变好/变差判断。
+    """
+
+    __tablename__ = "slo_snapshots"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    slo_name: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="healthy")
+    remaining_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    sampled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, index=True)
