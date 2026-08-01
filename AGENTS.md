@@ -196,3 +196,16 @@ make install-hooks
 - 全量测试 **1452 passed, 0 failed**, 1 skipped, coverage 89.66%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
 
 **下一步候选 (M9)**: 租户配额/计费隔离（每租户独立出款限额）；运营面板接入实时指标（SLOManager 集成）；支付宝/微信真实沙箱账号对接执行（需持牌方测试 key，人工步骤）。
+
+### What we did (2026-08-01) — Session 9
+
+**M9: 租户配额/计费隔离 + 运营面板实时指标** — 设计 `docs/plans/2026-08-01-outcome-contract-m9-design.md`。
+- **P1.1 数据层**: `TenantModel` 加 `payout_limit`（默认 0=不限额）/`payout_used`；`TenantService` 加 `set_payout_quota`（负数拒绝）/`add_payout_used`/`get_payout_usage`；migration 010（幂等，down=009）
+- **P1.2 服务层**: `PayoutService.generate_for_contract` 首次生成校验限额（used+price>limit → `PayoutLimitExceededError`），成功后累加 used（幂等导出不叠加）
+- **P1.3 API 层**: `PUT /tenants/{id}/quota`（签名鉴权）+ create/get/list 序列化配额字段 + tenant-stats stats[] 展示 payout_limit/used/remaining
+- **P2.1 SLO 埋点**: `settle()` 埋点 record_availability（negmarket_api SLO，懒加载防循环依赖）；tenant-stats 顶层新增 `slo` 段（get_slo_summary 实时错误预算快照）
+- **踩坑**: 单 Body 参数须 `embed=True`（否则 422）；`_payout_usage` 键名须与 tenants API 统一；`svc.get` 返回 from_orm 拷贝（设 tenant_id 需直接查 ORM）；tenant-stats 只聚合有契约的租户（default 断言须放有 default 契约的用例）
+- 真实服务冒烟: 配额 API 全链路（register→create→activate→set quota 8888→usage 正确）+ 契约挂租户 OK + tenant-stats 返回 slo 段
+- 全量测试 **1469 passed, 0 failed**, 1 skipped, coverage 89.70%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
+
+**下一步候选 (M10)**: 支付宝/微信真实沙箱账号对接执行（需持牌方测试 key，人工步骤）；运营面板 SLO 趋势曲线（当前仅快照）；平台级跨租户风控。核心代码层已无自动可落地方向，M10 起以人工对接 + 数据运营为主。
