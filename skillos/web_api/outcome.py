@@ -21,10 +21,10 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
@@ -302,11 +302,14 @@ def get_payout_manifest(
 
 @router.get("/tenant-stats")
 def get_tenant_stats(
+    days: int = Query(7, ge=1, le=90),
     db: Session = Depends(get_session),
 ):
-    """运营看板：按租户聚合契约数/成交额/完成率/平均交付周期（只读）。
+    """运营看板：按租户聚合契约数/成交额/完成率/平均交付周期 + 趋势 + 明细（只读）。
 
     租户为空归入 "default"。completion_rate = paid / (paid + cancelled)。
+    trend: 近 `days` 天按日聚合的契约数/成交额折线（看板趋势图）。
+    contracts: 各租户契约明细分页（id/状态/金额/创建时间）。
     """
     rows = db.query(OutcomeContractModel).all()
     buckets: dict[str, list[OutcomeContractModel]] = {}
@@ -314,6 +317,9 @@ def get_tenant_stats(
         key = r.tenant_id or "default"
         buckets.setdefault(key, []).append(r)
 
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    trend: dict[str, list[dict[str, Any]]] = {}
+    details: dict[str, dict[str, Any]] = {}
     stats = []
     for tenant_id, contracts in sorted(buckets.items()):
         paid = [c for c in contracts if c.status == OutcomeContractStatus.PAID]
@@ -336,7 +342,35 @@ def get_tenant_stats(
                 "avg_delivery_days": round(total_days / with_dates, 2) if with_dates else None,
             }
         )
-    return {"stats": stats}
+
+        # 趋势折线：近 N 天按日聚合契约数与成交额
+        buckets_by_day: dict[str, dict[str, Any]] = {}
+        for c in contracts:
+            day = c.created_at.strftime("%Y-%m-%d") if c.created_at else today.strftime("%Y-%m-%d")
+            b = buckets_by_day.setdefault(day, {"contracts": 0, "amount": 0.0})
+            b["contracts"] += 1
+            b["amount"] += c.price
+        points = []
+        for offset in range(days - 1, -1, -1):
+            day = (today - timedelta(days=offset)).strftime("%Y-%m-%d")
+            b = buckets_by_day.get(day, {"contracts": 0, "amount": 0.0})
+            points.append({"date": day, "contracts": b["contracts"], "amount": round(b["amount"], 2)})
+        trend[tenant_id] = points
+
+        # 契约明细（id/状态/金额/创建时间，按创建时间倒序）
+        items = [
+            {
+                "id": c.id,
+                "status": c.status,
+                "tier": c.tier,
+                "price": c.price,
+                "created_at": _iso(c.created_at),
+            }
+            for c in sorted(contracts, key=lambda x: x.created_at or today, reverse=True)
+        ]
+        details[tenant_id] = {"total": len(items), "items": items}
+
+    return {"stats": stats, "trend": trend, "contracts": details}
 
 
 @router.get("/reputation/{entity_id}")

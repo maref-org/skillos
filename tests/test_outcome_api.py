@@ -462,3 +462,63 @@ class TestTenantStats:
         r = client.get("/outcome/tenant-stats")
         assert r.status_code == 200
         assert r.json()["stats"] == []
+
+    def test_stats_include_trend(self, client, db_session):
+        """stats 含近 N 天趋势折线（向后兼容：stats 聚合保留）。"""
+        self._active_tenant(db_session, "tenant-trend")
+        from skillos.market.outcome_contracts import OutcomeContractService
+
+        svc = OutcomeContractService(db_session)
+        c = svc.create("req-trend", "做内容运营", base_price=3000.0, tenant_id="tenant-trend")
+        svc.select_tier(c.id, "balanced")
+        svc.sign(c.id, "ctr-trend")
+        svc.submit_delivery(c.id)
+        svc.confirm_delivery(c.id, True)
+        svc.settle(c.id)
+
+        r = client.get("/outcome/tenant-stats")
+        assert r.status_code == 200
+        body = r.json()
+        stats = {s["tenant_id"]: s for s in body["stats"]}
+        assert stats["tenant-trend"]["contracts"] == 1
+        # trend：近 7 天按日聚合
+        assert "trend" in body
+        assert "tenant-trend" in body["trend"]
+        trend = body["trend"]["tenant-trend"]
+        assert isinstance(trend, list)
+        assert len(trend) == 7
+        today = trend[-1]
+        assert today["contracts"] == 1
+        assert today["amount"] > 0
+        for point in trend[:-1]:
+            assert point["contracts"] == 0
+            assert point["amount"] == 0.0
+
+    def test_stats_include_contracts_detail(self, client, db_session):
+        """stats 含租户契约明细列表（分页）。"""
+        self._active_tenant(db_session, "tenant-detail")
+        from skillos.market.outcome_contracts import OutcomeContractService
+
+        svc = OutcomeContractService(db_session)
+        c = svc.create("req-detail", "做内容运营", base_price=2000.0, tenant_id="tenant-detail")
+        svc.select_tier(c.id, "stable")
+
+        r = client.get("/outcome/tenant-stats")
+        assert r.status_code == 200
+        body = r.json()
+        assert "contracts" in body
+        assert "tenant-detail" in body["contracts"]
+        detail = body["contracts"]["tenant-detail"]
+        assert isinstance(detail["items"], list)
+        assert len(detail["items"]) == 1
+        item = detail["items"][0]
+        assert item["id"] == c.id
+        assert item["status"] == "open"
+        assert item["price"] > 0
+
+    def test_trend_default_points_when_empty(self, client):
+        """空库时 trend 仍是近 N 天占位（契约数为 0）。"""
+        r = client.get("/outcome/tenant-stats")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["trend"] == {}
