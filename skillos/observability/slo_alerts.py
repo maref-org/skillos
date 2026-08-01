@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
@@ -137,6 +138,10 @@ class SloAlertService:
         if not url:
             logger.info("SLO alert %s for %s (no webhook URL, recorded only)", event, slo_name)
             return
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            logger.warning("SLO alert webhook URL rejected (scheme must be http/https): %s", parsed.scheme)
+            return
         payload = json.dumps(
             {
                 "event": event,
@@ -148,7 +153,8 @@ class SloAlertService:
         ).encode("utf-8")
         try:
             req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310 (出站通知 URL 来自配置)
+            # urlopen 受 scheme 白名单约束（仅 http/https），URL 来自环境变量
+            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
                 logger.info("SLO alert webhook sent: %s -> %s (%s)", event, slo_name, resp.status)
         except Exception as exc:  # noqa: BLE001 出站失败不影响主流程
             logger.warning("SLO alert webhook failed for %s: %s", slo_name, exc)
