@@ -9,6 +9,7 @@
   - SKILLOS_WECHAT_MCH_ID        商户号
   - SKILLOS_WECHAT_APIV3_KEY     商户 API v3 密钥
   - SKILLOS_WECHAT_MCH_CERT_SN   商户证书序列号（沙箱可空）
+  - SKILLOS_WECHAT_PRIVATE_KEY   商户证书 RSA 私钥 PEM（可选；配置后走真实 RSA-SHA256 签名）
 """
 
 from __future__ import annotations
@@ -36,10 +37,13 @@ class WeChatPayProvider:
 
     name = "wechat"
 
-    def __init__(self, mch_id: str = "", apiv3_key: str = "", mch_cert_sn: str = ""):
+    def __init__(self, mch_id: str = "", apiv3_key: str = "", mch_cert_sn: str = "", private_key_pem: str = ""):
         self.mch_id = mch_id or os.environ.get("SKILLOS_WECHAT_MCH_ID", "")
         self.apiv3_key = apiv3_key or os.environ.get("SKILLOS_WECHAT_APIV3_KEY", "")
         self.mch_cert_sn = mch_cert_sn or os.environ.get("SKILLOS_WECHAT_MCH_CERT_SN", "")
+        self.private_key_pem = (
+            private_key_pem or os.environ.get("SKILLOS_WECHAT_PRIVATE_KEY", "")
+        ).replace("\\n", "\n")
         if not self.mch_id or not self.apiv3_key:
             raise ProviderNotConfiguredError(
                 "WeChatPay provider needs SKILLOS_WECHAT_MCH_ID and SKILLOS_WECHAT_APIV3_KEY"
@@ -104,14 +108,17 @@ class WeChatPayProvider:
 
         真实微信支付 v3 用商户 API 证书的 RSA 私钥做 RSA-SHA256 签名
         （Authorization scheme = WECHATPAY2-SHA256-RSA2048，并带证书序列号）。
-        沙箱无真实商户证书私钥，故用 apiv3_key 做 HMAC-SHA256 模拟签名；
-        仅在 M7 持牌对接时替换为真实 RSA 签名。
+        配置了 SKILLOS_WECHAT_PRIVATE_KEY → 走真实 RSA 签名；
+        未配置（沙箱无真实商户证书私钥）→ 用 apiv3_key 做 HMAC-SHA256 模拟签名。
         """
         timestamp = str(int(time.time()))
         nonce = uuid.uuid4().hex[:16]
         body_str = json.dumps(body, ensure_ascii=False, separators=(",", ":")) if body else ""
         message = f"{method}\n{path}\n{timestamp}\n{nonce}\n{body_str}\n"
-        signature = hmac.new(self.apiv3_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+        if self.private_key_pem:
+            signature = self._rsa_sign(message)
+        else:
+            signature = hmac.new(self.apiv3_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
         authorization = (
             f'WECHATPAY2-SHA256-RSA2048 '
             f'mchid="{self.mch_id}",nonce_str="{nonce}",timestamp="{timestamp}",'
@@ -125,3 +132,17 @@ class WeChatPayProvider:
         if self.mch_cert_sn:
             headers["Wechatpay-Serial"] = self.mch_cert_sn
         return headers
+
+    def _rsa_sign(self, message: str) -> str:
+        """商户证书 RSA 私钥做 SHA256withRSA，返回 base64 签名。"""
+        import base64
+
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        private_key = serialization.load_pem_private_key(
+            self.private_key_pem.encode("utf-8"),
+            password=None,
+        )
+        signature = private_key.sign(message.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        return base64.b64encode(signature).decode("utf-8")

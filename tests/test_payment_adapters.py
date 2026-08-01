@@ -130,6 +130,63 @@ class TestAlipayPublicKeyVerification:
             provider.verify_webhook({}, tampered)
 
 
+class TestWechatRsaSignature:
+    """M7-P1.3 — 微信 v3 真实商户证书 RSA-SHA256 签名（可选配置，无私钥保留 HMAC）。"""
+
+    def _provider_with_private_key(self):
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pem = (
+            key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+            .decode("utf-8")
+        )
+        provider = WeChatPayProvider(
+            mch_id="mch-1",
+            apiv3_key="v3-key",
+            mch_cert_sn="sn-1",
+            private_key_pem=pem,
+        )
+        return key, provider
+
+    def test_signed_headers_use_rsa_sha256_when_private_key_set(self):
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        key, provider = self._provider_with_private_key()
+        headers = provider._signed_headers("POST", "/v3/x", {"a": 1})
+        auth = headers["Authorization"]
+        sig = auth.split('signature="')[1].split('"')[0]
+        assert "WECHATPAY2-SHA256-RSA2048" in auth
+        content = (
+            "POST\n/v3/x\n%s\n%s\n%s\n"
+            % (
+                auth.split('timestamp="')[1].split('"')[0],
+                auth.split('nonce_str="')[1].split('"')[0],
+                '{"a":1}',
+            )
+        )
+        key.public_key().verify(
+            __import__("base64").b64decode(sig),
+            content.encode("utf-8"),
+            padding.PKCS1v15(),
+            hashes.SHA256(),
+        )
+
+    def test_hmac_used_when_no_private_key(self):
+        provider = WeChatPayProvider(mch_id="mch-1", apiv3_key="v3-key")
+        headers = provider._signed_headers("POST", "/v3/x", {"a": 1})
+        sig = headers["Authorization"].split('signature="')[1].split('"')[0]
+        # HMAC-SHA256 输出为 64 位 hex，RSA 签名为 base64（含 + / = 字符）
+        assert len(sig) == 64
+        assert all(c in "0123456789abcdef" for c in sig)
+
+
 class TestWechatAdapter:
     def test_missing_key_raises(self):
         with pytest.raises(ProviderNotConfiguredError, match="SKILLOS_WECHAT"):
