@@ -68,6 +68,7 @@ def _serialize_contract(contract: OutcomeContract) -> dict[str, Any]:
         "id": contract.id,
         "requester_id": contract.requester_id,
         "contractor_id": contract.contractor_id,
+        "tenant_id": contract.tenant_id,
         "tier": contract.tier,
         "requirement_text": contract.requirement_text,
         "deliverables": [d.__dict__ for d in contract.deliverables],
@@ -119,12 +120,13 @@ async def create_contract(
     request: Request,
     requirement_text: str = Body(..., min_length=5, max_length=2000),
     base_price: float | None = Body(None, ge=0),
+    tenant_id: str | None = Body(None, max_length=128),
     db: Session = Depends(get_session),
 ):
-    """提需求 → 创建契约草稿并返回三方案报价（A/B/C）。"""
+    """提需求 → 创建契约草稿并返回三方案报价（A/B/C）。可选 tenant_id 归入租户。"""
     requester_id = await _require_actor(request, db)
     service = OutcomeContractService(db_session=db)
-    contract = service.create(requester_id, requirement_text, base_price)
+    contract = service.create(requester_id, requirement_text, base_price, tenant_id=tenant_id)
     plans = service.generate_plans(requirement_text, contract.base_price)
     return {
         "success": True,

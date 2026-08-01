@@ -9,8 +9,9 @@
     # 内置模式（内存 DB + TestClient）
     .venv/bin/python scripts/ip_operations_trial.py
 
-    # 指定场景模板 / 档位 / 小费
+    # 指定场景模板 / 档位 / 小费 / 租户
     .venv/bin/python scripts/ip_operations_trial.py --scenario 短视频矩阵 --tier sprint --tip 0.20
+    .venv/bin/python scripts/ip_operations_trial.py --tenant tenant-ops
 
     # 真实服务模式（先起服务）
     .venv/bin/python scripts/run_server.py --port 8080 &
@@ -29,6 +30,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from skillos.scenarios.ip_operations import TEMPLATES, IpTrialScenario
 
 
+def _ensure_tenant(tenant_id: str, scenario_name: str):
+    """确保租户存在（不存在则按场景模板创建），供 --tenant 使用。"""
+    from skillos.db.engine import get_sessionmaker
+    from skillos.market.tenants import TenantService
+
+    session = get_sessionmaker()()
+    try:
+        tsvc = TenantService(session)
+        try:
+            tsvc.get(tenant_id)
+        except ValueError:
+            tsvc.create(tenant_id, scenario_name, scene_config={"template": scenario_name})
+            session.commit()
+    finally:
+        session.close()
+
+
 def main() -> int:
     import os
 
@@ -36,11 +54,15 @@ def main() -> int:
     parser.add_argument("--scenario", default="内容代运营", choices=list(TEMPLATES), help="场景模板")
     parser.add_argument("--tier", default="balanced", choices=["stable", "balanced", "sprint"])
     parser.add_argument("--tip", type=float, default=0.15)
+    parser.add_argument("--tenant", default=None, help="租户 ID（P4.4，读取租户 scene_config 覆盖）")
     parser.add_argument("--real-server", action="store_true", help="走真实 HTTP 服务")
     parser.add_argument("--url", default=os.environ.get("SKILLOS_URL", "http://127.0.0.1:8080"))
     args = parser.parse_args()
 
-    scenario = IpTrialScenario.build(args.scenario, tier=args.tier, tip_ratio=args.tip)
+    tenant_id = args.tenant
+    if tenant_id:
+        _ensure_tenant(tenant_id, args.scenario)
+    scenario = IpTrialScenario.build(args.scenario, tier=args.tier, tip_ratio=args.tip, tenant_id=tenant_id)
 
     if args.real_server:
         import httpx
@@ -66,11 +88,32 @@ def main() -> int:
     print(f"内容 IP 代运营 · 垂直场景内测 —— 模板「{scenario.name}」")
     print(f"连接模式: {'真实 HTTP (' + args.url + ')' if args.real_server else '内置 TestClient'}")
     print(f"角色: 企业主 / 外部 Agent（项目长）/ 技能作者  档位: {scenario.tier}  小费: {int(scenario.tip_ratio*100)}%")
+    if tenant_id:
+        print(f"租户: {tenant_id}")
     print("=" * 66)
 
+    ok, cid = run_scenario(runner, prefix, scenario, business, agent, args.real_server, tenant_id=tenant_id)
+    return 0 if ok else 1
+
+
+def run_scenario(
+    runner,
+    prefix: str,
+    scenario: IpTrialScenario,
+    business,
+    agent,
+    real: bool,
+    tenant_id: str | None = None,
+) -> tuple[bool, str]:
+    """执行单个租户/场景的完整契约闭环，返回 (GO?, contract_id)。
+
+    供 ip_operations_trial.main 与 multi_tenant_trial 复用。
+    """
     # ── 1. 提需求 + 三方案报价 ───────────────────────────────────────────
-    req_payload = {"requirement_text": scenario.requirement}
-    r = _signed(runner, business, f"{prefix}/outcome/contracts", req_payload, real=args.real_server)
+    req_payload: dict = {"requirement_text": scenario.requirement}
+    if tenant_id:
+        req_payload["tenant_id"] = tenant_id
+    r = _signed(runner, business, f"{prefix}/outcome/contracts", req_payload, real=real)
     assert r.status_code == 200, r.text
     body = r.json()
     cid = body["contract"]["id"]
@@ -80,7 +123,7 @@ def main() -> int:
 
     # ── 2. 选档 ──────────────────────────────────────────────────────────
     tier_payload = {"tier": scenario.tier}
-    r = _signed(runner, business, f"{prefix}/outcome/contracts/{cid}/select-tier", tier_payload, real=args.real_server)
+    r = _signed(runner, business, f"{prefix}/outcome/contracts/{cid}/select-tier", tier_payload, real=real)
     assert r.status_code == 200, r.text
     print(f"[2/5] 企业主选档 {scenario.tier}（price ¥{r.json()['contract']['price']:.0f}）")
 
@@ -88,25 +131,25 @@ def main() -> int:
     r = runner.get(f"{prefix}/agent/list_open_contracts")
     assert any(c["id"] == cid for c in r.json()["contracts"])
     accept_payload = {"contract_id": cid}
-    r = _signed(runner, agent, f"{prefix}/agent/accept_contract", accept_payload, real=args.real_server)
+    r = _signed(runner, agent, f"{prefix}/agent/accept_contract", accept_payload, real=real)
     assert r.status_code == 200, r.text
     print("[3/5] 外部 Agent 浏览并承接契约，成为项目长（contractor = agent-trial）")
 
     # ── 4. 组队 + 交付 + 验收 + 小费 ─────────────────────────────────────
-    _seed_team(cid, args.real_server, scenario, runner=runner, agent=agent, prefix=prefix)
+    _seed_team(cid, real, scenario, runner=runner, agent=agent, prefix=prefix)
     evidence = f"已完成「{scenario.name}」场景交付物：内容策略/图文/分发/复盘，合规检查通过"
     del_payload = {"evidence_text": evidence}
-    r = _signed(runner, agent, f"{prefix}/outcome/contracts/{cid}/submit-delivery", del_payload, real=args.real_server)
+    r = _signed(runner, agent, f"{prefix}/outcome/contracts/{cid}/submit-delivery", del_payload, real=real)
     assert r.status_code == 200, r.text
     print(f"      交付成功（L3 合规存证 evidence_hash = {r.json()['contract']['evidence_hash']}）")
 
     confirm_payload = {"accepted": True, "tip_ratio": scenario.tip_ratio}
-    r = _signed(runner, business, f"{prefix}/outcome/contracts/{cid}/confirm", confirm_payload, real=args.real_server)
+    r = _signed(runner, business, f"{prefix}/outcome/contracts/{cid}/confirm", confirm_payload, real=real)
     assert r.status_code == 200, r.text
     print(f"[4/5] 企业主验收通过 + 超预期小费 ¥{r.json()['tip']['amount']:.0f}（{int(scenario.tip_ratio*100)}%）")
 
     # ── 5. 结算 + 出款提交（持牌桥 sandbox） ────────────────────────────
-    _settle(cid, args.real_server)
+    _settle(cid, real)
     r = runner.post(f"{prefix}/payments/contracts/{cid}/submit", json={"provider": "sandbox"})
     assert r.status_code == 200, r.text
     payout = r.json()
@@ -118,7 +161,7 @@ def main() -> int:
         print(f"      - {i['payee_id']:22s} {i['role']:12s} ¥{i['amount']:>8.2f}  {i['status']}  {i['external_ref']}")
 
     # ── GO / NO-GO ────────────────────────────────────────────────────────
-    status, deposit = _final_status(cid, args.real_server)
+    status, deposit = _final_status(cid, real)
     ok = all(
         [
             status == "paid",
@@ -131,7 +174,7 @@ def main() -> int:
     print("\n" + "=" * 66)
     print(f"内测验收: {verdict}  状态={status}  保证金={deposit}")
     print("=" * 66)
-    return 0 if ok else 1
+    return ok, cid
 
 
 # ── 客户端抽象 ────────────────────────────────────────────────────────────
