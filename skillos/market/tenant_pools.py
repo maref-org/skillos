@@ -164,6 +164,48 @@ class TenantPoolService:
         self._db.flush()
         return True
 
+    def release(self, pool_id: str, tenant_id: str, amount: float) -> float:
+        """归还此前从池借用的额度（M12-P2）：池 used 扣减 amount，clamp ≥0。
+
+        返回实际归还的额度。仅当租户当前属于该池且 amount 为正时生效。
+        """
+        if amount <= 0:
+            return 0.0
+        rel = self.pool_for_tenant(tenant_id)
+        if rel is None or rel[0].pool_id != pool_id:
+            return 0.0
+        pool, _member = rel
+        released = min(amount, pool.used)
+        pool.used = round(max(0.0, pool.used - released), 2)
+        pool.updated_at = datetime.now(timezone.utc)
+        self._db.flush()
+        return released
+
+    def transfer_member(self, tenant_id: str, to_pool_id: str, share_ratio: float | None = None) -> bool:
+        """跨池迁移（M12-P2）：把租户从当前池移入目标池，返回是否完成迁移。
+
+        迁移后租户仅属于目标池（原成员关系删除）；share_ratio 缺省沿用原值或 1.0。
+        池 used 不随迁移转移（各池额度独立）。
+        """
+        if self.get(to_pool_id) is None:
+            raise PoolNotFoundError(f"Pool not found: {to_pool_id}")
+        current = (
+            self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.tenant_id == tenant_id).first()
+        )
+        if current is not None and current.pool_id == to_pool_id:
+            if share_ratio is not None:
+                current.share_ratio = share_ratio
+                self._db.flush()
+            return True
+        ratio = share_ratio if share_ratio is not None else (current.share_ratio if current else 1.0)
+        if current is not None:
+            self._db.delete(current)
+        self._db.add(
+            TenantPoolMemberModel(pool_id=to_pool_id, tenant_id=tenant_id, share_ratio=ratio)
+        )
+        self._db.flush()
+        return True
+
     def _require_adjustment(self, adjustment_id: str) -> PoolAdjustmentModel:
         adj = self._db.query(PoolAdjustmentModel).filter(PoolAdjustmentModel.id == adjustment_id).first()
         if adj is None:

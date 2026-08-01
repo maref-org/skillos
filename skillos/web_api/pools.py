@@ -8,6 +8,8 @@
     PUT  /pools/{pool_id}/limit          # 调整池限额（签名，pending 审批）
     POST /pools/{pool_id}/adjustments/{id}/approve   # 审批通过（签名）
     POST /pools/{pool_id}/adjustments/{id}/reject    # 审批驳回（签名）
+    POST /pools/{pool_id}/release        # 归还借用额度（签名，M12-P2）
+    POST /pools/transfer                 # 跨池迁移（签名，M12-P2）
     GET  /pools/{pool_id}                # 池详情（只读）
 
 鉴权: 复用 MessageSigner（Ed25519），可变端点强制签名者身份。
@@ -152,3 +154,39 @@ async def reject_adjustment(
     except (PoolNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"success": True, "adjustment_id": adj.id, "status": adj.status, "pool_id": adj.pool_id}
+
+
+@router.post("/{pool_id}/release")
+async def release_pool_quota(
+    pool_id: str,
+    request: Request,
+    tenant_id: str = Body(..., embed=True),
+    amount: float = Body(..., ge=0, embed=True),
+    db: Session = Depends(get_session),
+):
+    """归还租户从池借用的额度（M12-P2）：池 used 扣减 amount（clamp ≥0）。"""
+    await _require_actor(request, db)
+    service = TenantPoolService(db)
+    if service.get(pool_id) is None:
+        raise HTTPException(status_code=404, detail=f"Pool not found: {pool_id}")
+    released = service.release(pool_id, tenant_id, amount)
+    return {"success": True, "released": released}
+
+
+@router.post("/transfer")
+async def transfer_member(
+    request: Request,
+    tenant_id: str = Body(..., embed=True),
+    to_pool_id: str = Body(..., embed=True),
+    share_ratio: float | None = Body(None, ge=0, embed=True),
+    db: Session = Depends(get_session),
+):
+    """跨池迁移（M12-P2）：租户从当前池移入目标池，原成员关系删除。"""
+    await _require_actor(request, db)
+    service = TenantPoolService(db)
+    try:
+        service.transfer_member(tenant_id, to_pool_id, share_ratio=share_ratio)
+    except PoolNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    rel = service.pool_for_tenant(tenant_id)
+    return {"success": True, "tenant_id": tenant_id, "pool_id": rel[0].pool_id if rel else None}

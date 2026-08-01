@@ -147,6 +147,155 @@ class TestSloAlertWebhook:
         assert alert is not None
 
 
+class TestSloAlertSilence:
+    """M12-P3 — 告警静默策略（维护窗口）。"""
+
+    def _silence(self, db_session, slo="negmarket_api", hours=2):
+        from datetime import datetime, timedelta, timezone
+
+        until = datetime.now(timezone.utc) + timedelta(hours=hours)
+        SloAlertService(db_session).silence(slo, until)
+        return until
+
+    def test_silenced_not_triggered(self, db_session):
+        self._silence(db_session)
+        alert = SloAlertService(db_session).evaluate("negmarket_api", "burning", 10.0)
+        assert alert is None
+        assert SloAlertService(db_session).get_status() == {}
+
+    def test_silence_expired_recovers(self, db_session):
+        from datetime import datetime, timedelta, timezone
+
+        until = datetime.now(timezone.utc) - timedelta(minutes=5)
+        SloAlertService(db_session).silence("negmarket_api", until)
+        assert SloAlertService(db_session).is_silenced("negmarket_api") is False
+        alert = SloAlertService(db_session).evaluate("negmarket_api", "burning", 10.0)
+        assert alert is not None
+        assert alert.status == "firing"
+
+    def test_unsilence(self, db_session):
+        self._silence(db_session)
+        assert SloAlertService(db_session).is_silenced("negmarket_api") is True
+        assert SloAlertService(db_session).unsilence("negmarket_api") is True
+        assert SloAlertService(db_session).is_silenced("negmarket_api") is False
+        assert SloAlertService(db_session).unsilence("negmarket_api") is False
+
+    def test_silence_only_affects_named_slo(self, db_session):
+        self._silence(db_session, "negmarket_api")
+        alert = SloAlertService(db_session).evaluate("other_slo", "burning", 10.0)
+        assert alert is not None
+
+    def test_list_silences(self, db_session):
+        self._silence(db_session)
+        silences = SloAlertService(db_session).list_silences()
+        assert len(silences) == 1
+        assert silences[0]["slo_name"] == "negmarket_api"
+
+    def test_api_silence_flow(self, client):
+        get_slo_manager().record_availability("negmarket_api", False)
+        r = client.get("/monitoring/alerts/status")
+        assert r.status_code == 200
+
+        from datetime import datetime, timedelta, timezone
+
+        until = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        r = client.post("/monitoring/alerts/negmarket_api/silence", json={"until": until})
+        assert r.status_code == 200
+        assert r.json()["slo_name"] == "negmarket_api"
+
+        r = client.get("/monitoring/alerts/silences")
+        assert r.status_code == 200
+        assert any(s["slo_name"] == "negmarket_api" for s in r.json())
+
+        r = client.delete("/monitoring/alerts/negmarket_api/silence")
+        assert r.status_code == 200
+        assert r.json()["removed"] is True
+
+    def test_api_silence_invalid_until(self, client):
+        r = client.post("/monitoring/alerts/negmarket_api/silence", json={"until": "not-a-date"})
+        assert r.status_code == 400 or r.status_code == 500
+
+
+class TestMaintenanceWindow:
+    """M13-P2 — SLO 维护窗口周期化。"""
+
+    def test_window_covers_current(self, db_session):
+        # 每分钟触发的 cron，now 恰在窗口内
+        svc = SloAlertService(db_session)
+        svc.create_maintenance_window("* * * * *", duration_minutes=1)
+        alert = svc.evaluate("negmarket_api", "burning", 10.0)
+        assert alert is None
+
+    def test_window_does_not_cover(self, db_session):
+        # 一年后才会触发的 cron → 现在不覆盖
+        svc = SloAlertService(db_session)
+        svc.create_maintenance_window("0 0 1 1 *", duration_minutes=1)  # 每年 1 月 1 日
+        alert = svc.evaluate("negmarket_api", "burning", 10.0)
+        assert alert is not None
+        assert alert.status == "firing"
+
+    def test_window_slo_name_scoped(self, db_session):
+        svc = SloAlertService(db_session)
+        svc.create_maintenance_window("* * * * *", duration_minutes=1, slo_name="other_slo")
+        assert svc.evaluate("negmarket_api", "burning", 10.0) is not None
+        assert svc.evaluate("other_slo", "burning", 10.0) is None
+
+    def test_window_all_slos(self, db_session):
+        svc = SloAlertService(db_session)
+        svc.create_maintenance_window("* * * * *", duration_minutes=1, slo_name="*")
+        assert svc.evaluate("negmarket_api", "burning", 10.0) is None
+
+    def test_create_invalid_cron(self, db_session):
+        with pytest.raises(ValueError, match="Invalid cron"):
+            SloAlertService(db_session).create_maintenance_window("not-a-cron", 60)
+
+    def test_create_invalid_duration(self, db_session):
+        with pytest.raises(ValueError, match="positive"):
+            SloAlertService(db_session).create_maintenance_window("* * * * *", 0)
+
+    def test_delete_window(self, db_session):
+        svc = SloAlertService(db_session)
+        w = svc.create_maintenance_window("* * * * *", duration_minutes=1)
+        assert svc.delete_maintenance_window(w.id) is True
+        assert svc.delete_maintenance_window(w.id) is False
+
+    def test_list_windows(self, db_session):
+        svc = SloAlertService(db_session)
+        svc.create_maintenance_window("* * * * *", duration_minutes=30, slo_name="api", description="周末维护")
+        rows = svc.list_maintenance_windows()
+        assert len(rows) == 1
+        assert rows[0]["slo_name"] == "api"
+        assert rows[0]["duration_minutes"] == 30
+
+    def test_api_maintenance_crud(self, client):
+        payload = {
+            "cron_expression": "0 2 * * 6",
+            "duration_minutes": 120,
+            "slo_name": "*",
+            "description": "每周六维护",
+        }
+        r = client.post("/monitoring/alerts/maintenance", json=payload)
+        assert r.status_code == 200, r.text
+        window_id = r.json()["window"]["id"]
+
+        r = client.get("/monitoring/alerts/maintenance")
+        assert r.status_code == 200
+        assert any(w["id"] == window_id for w in r.json()["windows"])
+
+        r = client.delete(f"/monitoring/alerts/maintenance/{window_id}")
+        assert r.status_code == 200
+
+        r = client.delete(f"/monitoring/alerts/maintenance/{window_id}")
+        assert r.status_code == 404
+
+    def test_api_maintenance_invalid_cron(self, client):
+        r = client.post(
+            "/monitoring/alerts/maintenance",
+            json={"cron_expression": "bad-cron", "duration_minutes": 60},
+        )
+        assert r.status_code == 400
+
+
 class TestSloAlertApi:
     def test_alerts_status_endpoint(self, client):
         get_slo_manager().record_availability("negmarket_api", False)  # 制造一次失败

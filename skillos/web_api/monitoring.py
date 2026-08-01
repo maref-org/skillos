@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
@@ -92,6 +92,78 @@ async def alerts_events(
 ):
     """SLO 告警事件历史（M11，只读）。"""
     return SloAlertService(db).list_events(slo_name=slo_name, limit=limit)
+
+
+@router.get("/monitoring/alerts/silences")
+async def alerts_silences(db: Session = Depends(get_session)):
+    """当前生效的告警静默（M12-P3，只读）。"""
+    return SloAlertService(db).list_silences()
+
+
+@router.post("/monitoring/alerts/{slo_name}/silence")
+async def alerts_silence(
+    slo_name: str,
+    until: str = Body(..., embed=True, description="ISO 时间（UTC），如 2026-08-02T00:00:00Z"),
+    db: Session = Depends(get_session),
+):
+    """设置该 SLO 的告警静默截止时间（M12-P3）。"""
+    from datetime import datetime
+
+    try:
+        until_dt = datetime.fromisoformat(until.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="until 必须为 ISO 8601 时间字符串") from exc
+    record = SloAlertService(db).silence(slo_name, until_dt)
+    return {"slo_name": record.slo_name, "until": until}
+
+
+@router.delete("/monitoring/alerts/{slo_name}/silence")
+async def alerts_unsilence(slo_name: str, db: Session = Depends(get_session)):
+    """解除该 SLO 的告警静默（M12-P3）。"""
+    removed = SloAlertService(db).unsilence(slo_name)
+    if not removed:
+        return {"slo_name": slo_name, "removed": False, "message": "无生效静默"}
+    return {"slo_name": slo_name, "removed": True}
+
+
+@router.post("/monitoring/alerts/maintenance")
+async def create_maintenance_window(
+    cron_expression: str = Body(..., embed=True),
+    duration_minutes: int = Body(60, ge=1, embed=True),
+    slo_name: str = Body("*", embed=True),
+    description: str = Body("", embed=True),
+    db: Session = Depends(get_session),
+):
+    """创建周期维护窗口（M13-P2）。cron 无效时 400。"""
+    svc = SloAlertService(db)
+    try:
+        window = svc.create_maintenance_window(
+            cron_expression, duration_minutes=duration_minutes, slo_name=slo_name, description=description
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "window": {
+        "id": window.id,
+        "slo_name": window.slo_name,
+        "cron_expression": window.cron_expression,
+        "duration_minutes": window.duration_minutes,
+        "enabled": window.enabled,
+    }}
+
+
+@router.get("/monitoring/alerts/maintenance")
+async def list_maintenance_windows(db: Session = Depends(get_session)):
+    """维护窗口配置列表（M13-P2，只读）。"""
+    return {"windows": SloAlertService(db).list_maintenance_windows()}
+
+
+@router.delete("/monitoring/alerts/maintenance/{window_id}")
+async def delete_maintenance_window(window_id: str, db: Session = Depends(get_session)):
+    """删除维护窗口（M13-P2）。"""
+    removed = SloAlertService(db).delete_maintenance_window(window_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Maintenance window not found: {window_id}")
+    return {"success": True, "window_id": window_id}
 
 
 @router.get("/monitoring/metrics")

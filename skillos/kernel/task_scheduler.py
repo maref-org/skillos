@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from croniter import croniter
+from croniter import croniter  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +228,26 @@ class TaskScheduler:
             logger.error("Task %s failed: %s", task.task_id, e)
 
     async def _invoke_handler(self, handler: str, params: dict[str, Any]) -> Any:
-        """调用处理器"""
-        logger.debug("Invoking handler: %s with params: %s", handler, params)
-        return {"handler": handler, "params": params, "status": "executed"}
+        """调用处理器（M13-P1）。
+
+        handler 形如 `module.path:function` 或 `module.path.function`，
+        按 dot 路径动态导入并调用（同步或 async 均可，统一 await）。
+        无法解析/调用失败时返回错误 dict（不抛错，交给 _execute_task 计数）。
+        """
+        if not handler or not handler.strip():
+            return {"handler": handler, "params": params, "status": "executed"}
+        try:
+            module_name, sep, func_name = handler.partition(":")
+            if not sep:
+                module_name, func_name = handler.rsplit(".", 1)
+            import importlib
+
+            module = importlib.import_module(module_name)
+            func = getattr(module, func_name)
+            result = func(**params) if params else func()
+            if asyncio.iscoroutine(result):
+                result = await result
+            return {"handler": handler, "params": params, "status": "executed", "result": result}
+        except Exception as exc:  # noqa: BLE001 调度任务失败仅记录
+            logger.error("Handler %s failed: %s", handler, exc)
+            return {"handler": handler, "params": params, "status": "error", "error": str(exc)}

@@ -1,14 +1,12 @@
-"""SLO 告警服务 — 错误预算恶化的主动通知（M11）
+"""SLO 告警服务 — 错误预算恶化的主动通知（M11/M12）
 
 状态机（按 slo_name 维度）::
 
     none ──burning/exhausted──▶ firing ──healthy/at_risk──▶ resolved
 
 去重：同一 slo 在 firing 中不重复触发；仅在 none→firing（触发）与
-firing→resolved（恢复）两个沿发送出站 webhook 通知。
-
-出站通道：HTTP POST 到 `SKILLOS_SLO_ALERT_WEBHOOK_URL`（环境变量）。
-无 URL 配置时仅落库（slo_alerts 表），不实际发送 → 无 key/无配置环境可测。
+firing→resolved（恢复）两个沿发送多渠道通知（webhook/smtp/dingtalk/wecom，
+见 alert_channels）。无可用渠道时仅落库（slo_alerts 表）→ 无 key/无配置环境可测。
 
 用法::
 
@@ -19,22 +17,34 @@ firing→resolved（恢复）两个沿发送出站 webhook 通知。
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from skillos.db.models import SloAlertModel
+from skillos.db.models import MaintenanceWindowModel, SloAlertModel
 
 logger = logging.getLogger(__name__)
 
 _ALERTING_STATUSES = ("burning", "exhausted")
 _SEVERITY_MAP = {"burning": "warning", "exhausted": "critical"}
+
+
+def _window_covers(now: datetime, cron_expr: str, duration_minutes: int) -> bool:
+    """判定 now 是否落在 cron 周期窗口内（窗口为 [最近一次 cron 触发, +duration)）。
+
+    cron 触发的窗口若已过期（本次触发早于 now），则找上一次触发作为窗口起点。
+    """
+    try:
+        from croniter import croniter  # type: ignore[import-untyped]
+
+        cron = croniter(cron_expr, now)
+        # 上次触发时刻（get_prev）与下次触发时刻
+        prev = cron.get_prev(datetime)
+        return (now - prev).total_seconds() < duration_minutes * 60
+    except Exception:  # noqa: BLE001 无效 cron 视为不覆盖
+        return False
 
 
 class SloAlertService:
@@ -44,14 +54,26 @@ class SloAlertService:
         self._db = db_session
 
     def evaluate(self, slo_name: str, status: str, remaining_pct: float) -> SloAlertModel | None:
-        """按快照状态推进告警状态机。返回新增/更新的事件记录，无变化返回 None。"""
+        """按快照状态推进告警状态机。返回新增/更新的事件记录，无变化返回 None。
+
+        静默（M12-P3）：静默截止前，该 SLO 的告警不触发、不置 resolved（视为已抑制）。
+        """
+        now = datetime.now(timezone.utc)
+        if self.is_silenced(slo_name, now=now):
+            return None
+        if self.in_maintenance_window(slo_name, now=now):
+            return None
+
         active = (
             self._db.query(SloAlertModel)
-            .filter(SloAlertModel.slo_name == slo_name, SloAlertModel.resolved_at.is_(None))
+            .filter(
+                SloAlertModel.slo_name == slo_name,
+                SloAlertModel.resolved_at.is_(None),
+                SloAlertModel.status != "silenced",
+            )
             .order_by(SloAlertModel.started_at.desc())
             .first()
         )
-        now = datetime.now(timezone.utc)
 
         if status in _ALERTING_STATUSES:
             if active is not None:
@@ -92,10 +114,10 @@ class SloAlertService:
         return None
 
     def get_status(self) -> dict[str, Any]:
-        """返回各 SLO 当前告警状态（活跃未恢复的 firing 记录）。"""
+        """返回各 SLO 当前告警状态（活跃未恢复的 firing 记录，静默记录不计）。"""
         rows = (
             self._db.query(SloAlertModel)
-            .filter(SloAlertModel.resolved_at.is_(None))
+            .filter(SloAlertModel.resolved_at.is_(None), SloAlertModel.status != "silenced")
             .order_by(SloAlertModel.started_at.desc())
             .all()
         )
@@ -132,32 +154,180 @@ class SloAlertService:
             for r in rows
         ]
 
-    def _dispatch(self, event: str, slo_name: str, status: str, remaining_pct: float) -> None:
-        """出站 webhook 通知。无 URL 或发送失败仅记日志，不影响主流程。"""
-        url = os.getenv("SKILLOS_SLO_ALERT_WEBHOOK_URL", "").strip()
-        if not url:
-            logger.info("SLO alert %s for %s (no webhook URL, recorded only)", event, slo_name)
-            return
-        parsed = urllib.parse.urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            logger.warning("SLO alert webhook URL rejected (scheme must be http/https): %s", parsed.scheme)
-            return
-        payload = json.dumps(
+    def silence(self, slo_name: str, until: datetime) -> SloAlertModel:
+        """设置该 SLO 的告警静默截止时间。静默期内 evaluate 不触发。"""
+        active = (
+            self._db.query(SloAlertModel)
+            .filter(SloAlertModel.slo_name == slo_name, SloAlertModel.resolved_at.is_(None))
+            .order_by(SloAlertModel.started_at.desc())
+            .first()
+        )
+        if active is None:
+            active = SloAlertModel(
+                slo_name=slo_name,
+                status="silenced",
+                severity="info",
+                remaining_pct=0.0,
+                started_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                payload={"silenced_until": _iso(until)},
+            )
+            self._db.add(active)
+        active.silenced_until = until.replace(tzinfo=None)
+        active.payload = {**(active.payload or {}), "silenced_until": _iso(until)}
+        self._db.flush()
+        return active
+
+    def unsilence(self, slo_name: str) -> bool:
+        """解除该 SLO 的静默。返回是否确有静默被解除。"""
+        rows = (
+            self._db.query(SloAlertModel)
+            .filter(
+                SloAlertModel.slo_name == slo_name,
+                SloAlertModel.resolved_at.is_(None),
+                SloAlertModel.silenced_until.isnot(None),
+            )
+            .all()
+        )
+        if not rows:
+            return False
+        for r in rows:
+            r.silenced_until = None
+            if r.status == "silenced":
+                r.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        self._db.flush()
+        return True
+
+    def is_silenced(self, slo_name: str, now: datetime | None = None) -> bool:
+        """该 SLO 当前是否处于静默期。"""
+        if now is None:
+            # DB DateTime 读回为 naive UTC，比较用 naive now
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+        else:
+            now = now.replace(tzinfo=None)
+        row = (
+            self._db.query(SloAlertModel)
+            .filter(
+                SloAlertModel.slo_name == slo_name,
+                SloAlertModel.resolved_at.is_(None),
+                SloAlertModel.silenced_until.isnot(None),
+            )
+            .order_by(SloAlertModel.silenced_until.desc())
+            .first()
+        )
+        return row is not None and row.silenced_until is not None and row.silenced_until > now
+
+    def list_silences(self) -> list[dict[str, Any]]:
+        """返回当前生效的静默（silenced_until 未过期且未解除）。"""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        rows = (
+            self._db.query(SloAlertModel)
+            .filter(
+                SloAlertModel.resolved_at.is_(None),
+                SloAlertModel.silenced_until.isnot(None),
+                SloAlertModel.silenced_until > now,
+            )
+            .all()
+        )
+        return [
             {
-                "event": event,
-                "slo_name": slo_name,
-                "status": status,
-                "remaining_pct": remaining_pct,
-                "timestamp": _iso(datetime.now(timezone.utc)),
+                "slo_name": r.slo_name,
+                "until": _iso(r.silenced_until),
+                "started_at": _iso(r.started_at),
             }
-        ).encode("utf-8")
+            for r in rows
+        ]
+
+    def in_maintenance_window(self, slo_name: str, now: datetime | None = None) -> bool:
+        """该 SLO 当前是否处于周期维护窗口内（M13-P2）。"""
+        if now is None:
+            now = datetime.now(timezone.utc)
+        rows = (
+            self._db.query(MaintenanceWindowModel)
+            .filter(MaintenanceWindowModel.enabled.is_(True))
+            .all()
+        )
+        for w in rows:
+            if w.slo_name != "*" and w.slo_name != slo_name:
+                continue
+            if _window_covers(now, w.cron_expression, w.duration_minutes):
+                return True
+        return False
+
+    def create_maintenance_window(
+        self,
+        cron_expression: str,
+        duration_minutes: int = 60,
+        slo_name: str = "*",
+        description: str = "",
+    ) -> MaintenanceWindowModel:
+        """创建周期维护窗口。cron 无效时抛 ValueError。"""
+        if duration_minutes <= 0:
+            raise ValueError(f"duration_minutes must be positive: {duration_minutes}")
+        from croniter import croniter  # type: ignore[import-untyped]
+
         try:
-            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-            # urlopen 受 scheme 白名单约束（仅 http/https），URL 来自环境变量
-            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
-                logger.info("SLO alert webhook sent: %s -> %s (%s)", event, slo_name, resp.status)
-        except Exception as exc:  # noqa: BLE001 出站失败不影响主流程
-            logger.warning("SLO alert webhook failed for %s: %s", slo_name, exc)
+            croniter(cron_expression, datetime.now())
+        except (ValueError, KeyError) as exc:
+            raise ValueError(f"Invalid cron expression: {cron_expression}") from exc
+        window = MaintenanceWindowModel(
+            slo_name=slo_name,
+            cron_expression=cron_expression,
+            duration_minutes=duration_minutes,
+            enabled=True,
+            description=description,
+        )
+        self._db.add(window)
+        self._db.flush()
+        return window
+
+    def list_maintenance_windows(self) -> list[dict[str, Any]]:
+        """返回全部维护窗口配置（含禁用）。"""
+        rows = self._db.query(MaintenanceWindowModel).order_by(MaintenanceWindowModel.created_at.asc()).all()
+        return [
+            {
+                "id": w.id,
+                "slo_name": w.slo_name,
+                "cron_expression": w.cron_expression,
+                "duration_minutes": w.duration_minutes,
+                "enabled": w.enabled,
+                "description": w.description,
+                "created_at": _iso(w.created_at),
+            }
+            for w in rows
+        ]
+
+    def delete_maintenance_window(self, window_id: str) -> bool:
+        """删除维护窗口。返回是否确有删除。"""
+        row = (
+            self._db.query(MaintenanceWindowModel).filter(MaintenanceWindowModel.id == window_id).first()
+        )
+        if row is None:
+            return False
+        self._db.delete(row)
+        self._db.flush()
+        return True
+
+    def _dispatch(self, event: str, slo_name: str, status: str, remaining_pct: float) -> None:
+        """出站多渠道通知（M12-P1）。无可用渠道仅记日志，不影响主流程。"""
+        from skillos.observability.alert_channels import AlertEvent, get_channels
+
+        channels = get_channels()
+        if not channels:
+            logger.info("SLO alert %s for %s (no channel available, recorded only)", event, slo_name)
+            return
+        alert_event = AlertEvent(
+            event=event,
+            slo_name=slo_name,
+            status=status,
+            remaining_pct=remaining_pct,
+            timestamp=_iso(datetime.now(timezone.utc)) or "",
+        )
+        for ch in channels:
+            try:
+                if ch.send(alert_event):
+                    logger.info("SLO alert sent via %s: %s -> %s", ch.name, event, slo_name)
+            except Exception as exc:  # noqa: BLE001 渠道失败不影响主流程
+                logger.warning("SLO alert channel %s failed for %s: %s", ch.name, slo_name, exc)
 
 
 def _iso(dt: datetime | None) -> str | None:

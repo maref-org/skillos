@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from skillos.market.outcome_contracts import OutcomeContractService, Tier
 from skillos.market.payouts import PayoutLimitExceededError, PayoutService
-from skillos.market.tenant_pools import TenantPoolService
+from skillos.market.tenant_pools import PoolNotFoundError, TenantPoolService
 from skillos.market.tenants import TenantService
 from skillos.web_api.onboarding import router as onboarding_router
 from skillos.web_api.pools import router as pools_router
@@ -74,6 +74,75 @@ class TestTenantPoolService:
         svc = TenantPoolService(db_session)
         svc.create("pool-n", total_limit=10000)
         assert svc.consume("pool-n", "tenant-x", 100) is False
+
+
+class TestPoolReleaseAndTransfer:
+    """M12-P2 — 池额度自动回收 + 跨池迁移。"""
+
+    def test_release_reduces_used(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-r", total_limit=10000)
+        svc.add_member("pool-r", "tenant-r", share_ratio=1.0)
+        assert svc.consume("pool-r", "tenant-r", 4000) is True
+        released = svc.release("pool-r", "tenant-r", 1500)
+        assert released == 1500.0
+        assert svc.get("pool-r").used == 2500.0
+
+    def test_release_clamps_at_zero(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-rz", total_limit=10000)
+        svc.add_member("pool-rz", "tenant-rz", share_ratio=1.0)
+        assert svc.consume("pool-rz", "tenant-rz", 1000) is True
+        released = svc.release("pool-rz", "tenant-rz", 5000)
+        assert released == 1000.0
+        assert svc.get("pool-rz").used == 0.0
+
+    def test_release_non_member_noop(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-rn", total_limit=10000)
+        assert svc.release("pool-rn", "tenant-other", 1000) == 0.0
+
+    def test_release_negative_noop(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-rneg", total_limit=10000)
+        svc.add_member("pool-rneg", "tenant-neg", share_ratio=1.0)
+        assert svc.release("pool-rneg", "tenant-neg", -100) == 0.0
+
+    def test_transfer_moves_membership(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-ta", total_limit=10000)
+        svc.create("pool-tb", total_limit=20000)
+        svc.add_member("pool-ta", "tenant-t", share_ratio=0.8)
+        assert svc.transfer_member("tenant-t", "pool-tb") is True
+        rel = svc.pool_for_tenant("tenant-t")
+        assert rel is not None
+        assert rel[0].pool_id == "pool-tb"
+        assert rel[1].share_ratio == 0.8  # 沿用原 share_ratio
+        assert svc.members("pool-ta") == []
+
+    def test_transfer_to_same_pool_noop(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-ts", total_limit=10000)
+        svc.add_member("pool-ts", "tenant-ts", share_ratio=0.5)
+        assert svc.transfer_member("tenant-ts", "pool-ts") is True
+        assert len(svc.members("pool-ts")) == 1
+
+    def test_transfer_missing_target_raises(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-tm", total_limit=10000)
+        svc.add_member("pool-tm", "tenant-tm", share_ratio=0.5)
+        with pytest.raises(PoolNotFoundError):
+            svc.transfer_member("tenant-tm", "pool-missing")
+
+    def test_transfer_keeps_pool_used(self, db_session):
+        svc = TenantPoolService(db_session)
+        svc.create("pool-tu", total_limit=10000)
+        svc.create("pool-tv", total_limit=20000)
+        svc.add_member("pool-tu", "tenant-tu", share_ratio=1.0)
+        svc.consume("pool-tu", "tenant-tu", 3000)
+        svc.transfer_member("tenant-tu", "pool-tv")
+        assert svc.get("pool-tu").used == 3000.0  # used 不迁移
+        assert svc.get("pool-tv").used == 0.0
 
 
 class TestPoolAdjustmentWorkflow:
@@ -230,4 +299,31 @@ class TestPoolsApi:
     def test_set_limit_missing_pool_404(self, client):
         s = self._register(client, "req-pool-4")
         r = self._put(client, s, "/pools/pool-missing/limit", {"new_limit": 9000})
+        assert r.status_code == 404
+
+    def test_release_endpoint(self, client):
+        s = self._register(client, "req-pool-rel")
+        self._post(client, s, "/pools", {"pool_id": "pool-api-rel", "total_limit": 10000})
+        self._post(client, s, "/pools/pool-api-rel/members", {"tenant_id": "tenant-rel", "share_ratio": 1.0})
+        svc_pool = client.get("/pools/pool-api-rel").json()["pool"]
+        assert svc_pool["used"] == 0.0
+        r = self._post(client, s, "/pools/pool-api-rel/release", {"tenant_id": "tenant-rel", "amount": 500})
+        assert r.status_code == 200, r.text
+        assert r.json()["released"] == 0.0  # 池 used 为 0，无额度可还
+
+    def test_transfer_endpoint(self, client):
+        s = self._register(client, "req-pool-tr")
+        self._post(client, s, "/pools", {"pool_id": "pool-api-src", "total_limit": 10000})
+        self._post(client, s, "/pools", {"pool_id": "pool-api-dst", "total_limit": 20000})
+        self._post(client, s, "/pools/pool-api-src/members", {"tenant_id": "tenant-tr", "share_ratio": 1.0})
+        r = self._post(client, s, "/pools/transfer", {"tenant_id": "tenant-tr", "to_pool_id": "pool-api-dst"})
+        assert r.status_code == 200, r.text
+        assert r.json()["pool_id"] == "pool-api-dst"
+        assert client.get("/pools/pool-api-src").json()["pool"]["members"] == []
+
+    def test_transfer_missing_target_404(self, client):
+        s = self._register(client, "req-pool-tm")
+        self._post(client, s, "/pools", {"pool_id": "pool-api-tm", "total_limit": 10000})
+        self._post(client, s, "/pools/pool-api-tm/members", {"tenant_id": "tenant-tm", "share_ratio": 1.0})
+        r = self._post(client, s, "/pools/transfer", {"tenant_id": "tenant-tm", "to_pool_id": "pool-nope"})
         assert r.status_code == 404

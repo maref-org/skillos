@@ -455,7 +455,26 @@ class SloAlertModel(Base):
     remaining_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    silenced_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, server_default="{}")
+
+
+class MaintenanceWindowModel(Base):
+    """SLO 维护窗口 — 周期性抑制告警的时段配置（M13-P2）。
+
+    cron_expression 定义窗口开始时刻，duration_minutes 定义持续长度。
+    slo_name 为 "*" 时对所有 SLO 生效。命中窗口期间 evaluate 不触发告警。
+    """
+
+    __tablename__ = "maintenance_windows"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    slo_name: Mapped[str] = mapped_column(String(64), nullable=False, default="*", index=True)
+    cron_expression: Mapped[str] = mapped_column(String(128), nullable=False)
+    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    description: Mapped[str] = mapped_column(String(256), nullable=False, server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
 
 
 class TenantPoolModel(Base):
