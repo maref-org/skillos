@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 from skillos.db.engine import get_session
 from skillos.db.models import IdentityModel
 from skillos.market.bounties import BountyService
+from skillos.market.outcome_contracts import OutcomeContractService
 from skillos.market.providers import ProviderRegistry
 from skillos.protocol.remote_control import RemoteBridge
 from skillos.security.message_signer import MessageSigner
@@ -50,6 +51,10 @@ def _get_provider_registry(db: Session = Depends(get_session)) -> ProviderRegist
 
 def _get_bounty_service(db: Session = Depends(get_session)) -> BountyService:
     return BountyService(db)
+
+
+def _get_outcome_service(db: Session = Depends(get_session)) -> OutcomeContractService:
+    return OutcomeContractService(db_session=db)
 
 
 async def _require_agent(request: Request, db: Session = Depends(get_session)) -> str:
@@ -207,6 +212,100 @@ async def list_bounties(
         "total": len(rows),
         "page": result.page,
         "page_size": result.page_size,
+    }
+
+
+def _serialize_contract(contract) -> dict[str, Any]:
+    return {
+        "id": contract.id,
+        "requester_id": contract.requester_id,
+        "contractor_id": contract.contractor_id,
+        "tier": contract.tier,
+        "requirement_text": contract.requirement_text,
+        "deliverables": [d.__dict__ for d in contract.deliverables],
+        "base_price": contract.base_price,
+        "price": contract.price,
+        "currency": contract.currency,
+        "deposit": contract.deposit,
+        "deposit_status": contract.deposit_status,
+        "success_rate_commitment": contract.success_rate_commitment,
+        "status": contract.status,
+        "deadline": contract.deadline.isoformat() if contract.deadline else None,
+        "created_at": contract.created_at.isoformat() if contract.created_at else None,
+        "updated_at": contract.updated_at.isoformat() if contract.updated_at else None,
+    }
+
+
+@router.post("/contracts/{contract_id}/team")
+async def create_team(
+    contract_id: str,
+    payload: dict = Body(...),
+    _agent_id: str = Depends(_require_agent),
+    service: OutcomeContractService = Depends(_get_outcome_service),
+):
+    """外部 Agent（contractor）为其承接的契约组队（红线 §8.2：contractor 强制签名身份）。"""
+    contract = service.get(contract_id)
+    if contract is None:
+        return {"error": f"Contract not found: {contract_id}"}
+    if contract.contractor_id != _agent_id:
+        return {"error": f"only the contractor ({contract.contractor_id}) can create team"}
+    members = payload.get("members", [])
+    if not members:
+        return {"error": "members is required"}
+    try:
+        team_id = service.create_service_team(contract_id, _agent_id, members)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    return {"success": True, "team_id": team_id}
+
+
+@router.get("/list_open_contracts")
+async def list_open_contracts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    service: OutcomeContractService = Depends(_get_outcome_service),
+):
+    """列出可承接的 open 契约（外部 Agent 构建者浏览项目长机会，免费只读）。"""
+    rows = service.list_open(page=page, page_size=page_size)
+    return {
+        "contracts": [_serialize_contract(c) for c in rows],
+        "total": len(rows),
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.post("/accept_contract")
+async def accept_contract(
+    payload: dict = Body(...),
+    _agent_id: str = Depends(_require_agent),
+    service: OutcomeContractService = Depends(_get_outcome_service),
+):
+    """外部 Agent 承接 open 契约成为项目长（contractor = 签名 Agent 身份，红线 §8.2）。"""
+    contract_id = payload.get("contract_id", "")
+    if not contract_id:
+        return {"error": "contract_id is required"}
+    try:
+        updated = service.sign(contract_id, _agent_id)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    return {"success": True, "contract": _serialize_contract(updated)}
+
+
+@router.get("/list_my_contracts")
+async def list_my_contracts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    _agent_id: str = Depends(_require_agent),
+    service: OutcomeContractService = Depends(_get_outcome_service),
+):
+    """列出当前 Agent 作为项目长承接的成果契约。"""
+    rows = service.list_by_contractor(_agent_id, page=page, page_size=page_size)
+    return {
+        "contracts": [_serialize_contract(c) for c in rows],
+        "total": len(rows),
+        "page": page,
+        "page_size": page_size,
     }
 
 

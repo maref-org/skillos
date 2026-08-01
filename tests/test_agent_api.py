@@ -283,6 +283,60 @@ class TestAgentBridges:
         assert r.json()["success"] is True
 
 
+class TestAgentTeam:
+    """M7-P3.1 — HTTP 组队端点（contractor 强制为签名身份）。"""
+
+    def _setup(self, client, requester_id="req-team", agent_id="agent-team"):
+        requester = _register_identity(client, requester_id)
+        # 创建契约 + 选档 → open
+        from skillos.market.outcome_contracts import OutcomeContractService
+
+        svc = OutcomeContractService(db_session=_get_db())
+        ctr = svc.create(requester_id, "做内容全流程并分发", base_price=5000.0)
+        svc.select_tier(ctr.id, "balanced")
+        _get_db().commit()
+        # agent 承接成为 contractor
+        agent = _register_identity(client, agent_id)
+        accept_payload = {"contract_id": ctr.id}
+        r = _signed_post(client, agent, "/agent/accept_contract", accept_payload)
+        assert r.status_code == 200, r.text
+        return requester, agent, ctr.id
+
+    def test_create_team_via_http(self, client):
+        _, agent, cid = self._setup(client)
+        payload = {
+            "contract_id": cid,
+            "members": [{"member_id": "author-x", "role": "skill_author", "share_ratio": 0.4}],
+        }
+        r = _signed_post(client, agent, f"/agent/contracts/{cid}/team", payload)
+        assert r.status_code == 200, r.text
+        assert r.json()["success"] is True
+
+    def test_create_team_requires_signature(self, client):
+        _, _, cid = self._setup(client)
+        r = client.post(
+            f"/agent/contracts/{cid}/team",
+            json={"members": [{"member_id": "a", "share_ratio": 0.1}]},
+        )
+        assert r.status_code == 401
+
+    def test_create_team_forbids_non_contractor(self, client):
+        _, agent, cid = self._setup(client)
+        other = _register_identity(client, "intruder-1")
+        payload = {"contract_id": cid, "members": [{"member_id": "a", "share_ratio": 0.1}]}
+        r = _signed_post(client, other, f"/agent/contracts/{cid}/team", payload)
+        # 非 contractor 禁止组队（红线：契约方必须为签名身份）
+        assert r.status_code in (403, 200)
+        if r.status_code == 200:
+            assert "error" in r.json()
+
+
+def _get_db():
+    from skillos.db.engine import get_sessionmaker
+
+    return get_sessionmaker()()
+
+
 def _make_key():
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
