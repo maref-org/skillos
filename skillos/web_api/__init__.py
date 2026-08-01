@@ -5,12 +5,15 @@ from skillos.web_api.economics import router as economics_router
 from skillos.web_api.flags import router as flags_router
 from skillos.web_api.monitoring import router as monitoring_router
 from skillos.web_api.onboarding import router as onboarding_router
+from skillos.web_api.outcome import router as outcome_router
+from skillos.web_api.payments import router as payments_router
 from skillos.web_api.protocol import router as protocol_router
 from skillos.web_api.scheduler import router as scheduler_router
 from skillos.web_api.security import router as security_router
 from skillos.web_api.sessions import router as sessions_router
 from skillos.web_api.skills import router as skills_router
 from skillos.web_api.system import router as system_router
+from skillos.web_api.tenants import router as tenants_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -24,4 +27,7 @@ api_router.include_router(system_router)
 api_router.include_router(scheduler_router)
 api_router.include_router(protocol_router)
 api_router.include_router(onboarding_router)
+api_router.include_router(outcome_router)
+api_router.include_router(payments_router)
 api_router.include_router(agent_router)
+api_router.include_router(tenants_router)
