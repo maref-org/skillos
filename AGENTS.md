@@ -220,3 +220,15 @@ make install-hooks
 - 全量测试 **1479 passed, 0 failed**, 1 skipped, coverage 89.77%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
 
 **下一步候选 (M11)**: 支付宝/微信真实沙箱账号对接执行（需持牌方测试 key，人工步骤）；SLO 自动告警推送（邮件/IM/webhook）；跨租户共享额度池与配额审批流。核心代码层自动落地方向基本收敛，M11 起以人工对接 + 告警运营为主。
+
+### What we did (2026-08-01) — Session 11
+
+**M11: SLO 自动告警推送 + 跨租户共享额度池** — 设计 `docs/plans/2026-08-01-outcome-contract-m11-design.md`。
+- **P1 SLO 自动告警**: `SloAlertModel` + migration 012（幂等，down=011）；`skillos/observability/slo_alerts.py` — `SloAlertService.evaluate`（状态机 none→firing→resolved，firing 中不重复触发）/`get_status`（活跃告警，resolved_at IS NULL）/`list_events`；出站 webhook urllib POST 到 `SKILLOS_SLO_ALERT_WEBHOOK_URL`，无 URL 仅落库；`GET /monitoring/alerts/status` + `alerts/events`
+- **P2 跨租户共享额度池**: `TenantPoolModel`/`TenantPoolMemberModel`/`PoolAdjustmentModel` + `TenantPoolService`（create/add_member/set_limit 审批单/approve/reject/check_available/consume）；`PayoutService` 限额校验升级「自有超限→池借用，池不足才拒绝」；`web_api/pools.py` 池 CRUD + 审批端点
+- **安全修复**: bandit B310（urllib urlopen file:/ scheme）中危 → scheme 白名单（仅 http/https）+ nosec B310
+- **踩坑**: resolve 复用原 firing 记录会丢事件历史 → 保留触发记录仅标记 resolved_at + 另插 resolved 事件；活跃判定用 `resolved_at IS NULL` 而非 status
+- 真实服务冒烟: 告警 status 空库正常；池 API 全链路（建池→加成员→调额 pending→approve→80000 生效）
+- 全量测试 **1512 passed, 0 failed**, 1 skipped, coverage 89.76%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
+
+**下一步候选 (M12)**: 告警多渠道推送（SMTP 邮件 / 钉钉 / 企业微信，需渠道账号）；池额度自动回收与跨池迁移；SLO 告警抑制/静默策略（维护窗口）。人工对接（真实支付/消息渠道）优先。
