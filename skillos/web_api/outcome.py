@@ -123,10 +123,13 @@ async def create_contract(
     tenant_id: str | None = Body(None, max_length=128),
     db: Session = Depends(get_session),
 ):
-    """提需求 → 创建契约草稿并返回三方案报价（A/B/C）。可选 tenant_id 归入租户。"""
+    """提需求 → 创建契约草稿并返回三方案报价（A/B/C）。可选 tenant_id 归入租户（须 active）。"""
     requester_id = await _require_actor(request, db)
     service = OutcomeContractService(db_session=db)
-    contract = service.create(requester_id, requirement_text, base_price, tenant_id=tenant_id)
+    try:
+        contract = service.create(requester_id, requirement_text, base_price, tenant_id=tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     plans = service.generate_plans(requirement_text, contract.base_price)
     return {
         "success": True,

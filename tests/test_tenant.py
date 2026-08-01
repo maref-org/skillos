@@ -14,6 +14,9 @@ def test_create_tenant_and_contract(db_session):
     assert tenant.name == "内容代运营事业部"
     assert tenant.scene_config == {"template": "内容代运营"}
 
+    # M8：契约须挂 active 租户
+    tsvc.set_status("tenant-ops", "active")
+
     osvc = OutcomeContractService(db_session)
     contract = osvc.create("requester-a", "做内容代运营并分发", base_price=4000.0, tenant_id="tenant-ops")
     assert contract.tenant_id == "tenant-ops"

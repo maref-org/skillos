@@ -397,9 +397,22 @@ class TestPayoutExport:
 class TestTenantStats:
     """P4.3 — 运营看板：按租户聚合。"""
 
+    @staticmethod
+    def _active_tenant(db_session, tenant_id):
+        from skillos.market.tenants import TenantService
+
+        tsvc = TenantService(db_session)
+        try:
+            tsvc.get(tenant_id)
+        except ValueError:
+            tsvc.create(tenant_id, tenant_id)
+        tsvc.set_status(tenant_id, "active")
+
     def test_aggregates_by_tenant(self, client, db_session):
         from skillos.market.outcome_contracts import OutcomeContractService
 
+        self._active_tenant(db_session, "tenant-a")
+        self._active_tenant(db_session, "tenant-b")
         svc = OutcomeContractService(db_session)
         t1 = svc.create("req-t1", "做短视频矩阵", base_price=4000.0, tenant_id="tenant-a")
         svc.select_tier(t1.id, "balanced")
@@ -426,6 +439,7 @@ class TestTenantStats:
     def test_completion_rate_partial(self, client, db_session):
         from skillos.market.outcome_contracts import OutcomeContractService
 
+        self._active_tenant(db_session, "tenant-c")
         svc = OutcomeContractService(db_session)
         done = svc.create("req-p1", "做内容运营", base_price=3000.0, tenant_id="tenant-c")
         svc.select_tier(done.id, "balanced")

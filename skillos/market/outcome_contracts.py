@@ -268,6 +268,15 @@ class OutcomeContractService:
         base_price: float | None = None,
         tenant_id: str | None = None,
     ) -> OutcomeContract:
+        if tenant_id is not None:
+            from skillos.market.tenants import TenantService
+
+            try:
+                tenant = TenantService(self._db).get(tenant_id)
+            except ValueError:
+                raise ValueError(f"Tenant not found: {tenant_id}") from None
+            if tenant.status != "active":
+                raise ValueError(f"Tenant is not active: {tenant_id} (status={tenant.status})")
         deliverables = self.decompose_requirement(requirement_text)
         now = datetime.now(timezone.utc)
         base = base_price if base_price and base_price > 0 else (len(deliverables) or 1) * BASE_PRICE_PER_DELIVERABLE

@@ -31,7 +31,7 @@ from skillos.scenarios.ip_operations import TEMPLATES, IpTrialScenario
 
 
 def _ensure_tenant(tenant_id: str, scenario_name: str):
-    """确保租户存在（不存在则按场景模板创建），供 --tenant 使用。"""
+    """确保租户存在并激活（不存在则按场景模板创建），供 --tenant 使用。"""
     from skillos.db.engine import get_sessionmaker
     from skillos.market.tenants import TenantService
 
@@ -42,7 +42,8 @@ def _ensure_tenant(tenant_id: str, scenario_name: str):
             tsvc.get(tenant_id)
         except ValueError:
             tsvc.create(tenant_id, scenario_name, scene_config={"template": scenario_name})
-            session.commit()
+        tsvc.set_status(tenant_id, "active")
+        session.commit()
     finally:
         session.close()
 

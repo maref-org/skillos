@@ -59,7 +59,7 @@ def run_multi_tenant(
         runner = _InMemoryRunner()
         prefix = ""
 
-    # 确保租户存在（内置模式直连 DB；真实模式共用服务端磁盘库）
+    # 确保租户存在并激活（内置模式直连 DB；真实模式共用服务端磁盘库）
     names = scenario_names or ["内容代运营"] * len(tenant_ids)
     session = get_sessionmaker()()
     tsvc = TenantService(session)
@@ -68,6 +68,7 @@ def run_multi_tenant(
             tsvc.get(tid)
         except ValueError:
             tsvc.create(tid, name, scene_config={"template": name})
+        tsvc.set_status(tid, "active")
     session.commit()
     session.close()
 
