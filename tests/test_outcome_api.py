@@ -435,6 +435,9 @@ class TestTenantStats:
         assert stats["tenant-b"]["contracts"] == 1
         assert stats["tenant-b"]["completion_rate"] == 0.0
         assert stats["default"]["contracts"] == 1
+        # default 租户不限额（M9-P1.3）
+        assert stats["default"]["payout_limit"] == 0.0
+        assert stats["default"]["payout_remaining"] is None
 
     def test_completion_rate_partial(self, client, db_session):
         from skillos.market.outcome_contracts import OutcomeContractService
@@ -522,3 +525,34 @@ class TestTenantStats:
         assert r.status_code == 200
         body = r.json()
         assert body["trend"] == {}
+
+    def test_stats_include_payout_quota(self, client, db_session):
+        """stats 含租户出款配额字段（default 租户不限额）。"""
+        self._active_tenant(db_session, "tenant-quota-s")
+        from skillos.market.outcome_contracts import OutcomeContractService
+        from skillos.market.tenants import TenantService
+
+        svc = OutcomeContractService(db_session)
+        c = svc.create("req-quota-s", "做内容运营", base_price=2000.0, tenant_id="tenant-quota-s")
+        svc.select_tier(c.id, "stable")
+
+        tsvc = TenantService(db_session)
+        tsvc.set_payout_quota("tenant-quota-s", 5000)
+        r = client.get("/outcome/tenant-stats")
+        assert r.status_code == 200
+        stats = {s["tenant_id"]: s for s in r.json()["stats"]}
+        assert stats["tenant-quota-s"]["payout_limit"] == 5000.0
+        assert stats["tenant-quota-s"]["payout_used"] == 0.0
+        assert stats["tenant-quota-s"]["payout_remaining"] == 5000.0
+
+    def test_stats_include_slo_snapshot(self, client):
+        """stats 含 SLO 实时错误预算快照（M9-P2）。"""
+        from skillos.kernel.slo import get_slo_manager
+
+        get_slo_manager().record_availability("negmarket_api", True)
+        r = client.get("/outcome/tenant-stats")
+        assert r.status_code == 200
+        body = r.json()
+        assert "slo" in body
+        assert "negmarket_api" in body["slo"]
+        assert "error_budget" in body["slo"]["negmarket_api"]

@@ -176,3 +176,38 @@ class TestContractTenantValidation:
         )
         assert r.status_code == 200
         assert r.json()["contract"]["tenant_id"] is None
+
+
+class TestTenantPayoutQuotaApi:
+    def test_set_quota(self, client):
+        signer = _register(client, "req-quota-1")
+        _signed_post(client, signer, "/tenants", {"tenant_id": "tenant-quota-1", "name": "限额定"})
+        r = _signed_put(client, signer, "/tenants/tenant-quota-1/quota", {"payout_limit": 50000})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["tenant"]["payout_limit"] == 50000
+        assert body["usage"] == {"limit": 50000.0, "used": 0.0, "remaining": 50000.0}
+
+    def test_quota_requires_signature(self, client):
+        r = client.put("/tenants/tenant-quota-x/quota", json={"payout_limit": 100})
+        assert r.status_code == 401
+
+    def test_set_quota_missing_tenant_404(self, client):
+        signer = _register(client, "req-quota-2")
+        r = _signed_put(client, signer, "/tenants/tenant-missing/quota", {"payout_limit": 100})
+        assert r.status_code == 404
+
+    def test_negative_quota_rejected(self, client):
+        signer = _register(client, "req-quota-3")
+        _signed_post(client, signer, "/tenants", {"tenant_id": "tenant-quota-3", "name": "负"})
+        r = _signed_put(client, signer, "/tenants/tenant-quota-3/quota", {"payout_limit": -5})
+        assert r.status_code == 422
+
+    def test_tenant_serialization_includes_quota(self, client):
+        signer = _register(client, "req-quota-4")
+        _signed_post(client, signer, "/tenants", {"tenant_id": "tenant-quota-4", "name": "序列化"})
+        r = client.get("/tenants/tenant-quota-4")
+        assert r.status_code == 200
+        t = r.json()["tenant"]
+        assert t["payout_limit"] == 0.0
+        assert t["payout_used"] == 0.0

@@ -31,6 +31,19 @@ from skillos.types import SkillCall
 
 logger = logging.getLogger(__name__)
 
+_SLO_NAME = "negmarket_api"
+
+
+def _record_settle_metric(success: bool) -> None:
+    """SLO 埋点（M9-P2）：结算作为 negmarket_api 可用性观测点。
+
+    避免循环依赖：kernel.slo 的 get_slo_manager 在调用时才加载。
+    """
+    from skillos.kernel.slo import get_slo_manager
+
+    slo = get_slo_manager()
+    slo.record_availability(_SLO_NAME, success)
+
 
 class OutcomeContractStatus:
     DRAFT = "draft"
@@ -489,6 +502,8 @@ class OutcomeContractService:
             "Settle outcome contract (deposit released)",
             {"amount": model.price, "deposit": model.deposit, "deposit_status": "released"},
         )
+        # SLO 埋点（M9-P2）：结算作为 negmarket_api 可用性观测点
+        _record_settle_metric(success=True)
         return {
             "contract_id": contract_id,
             "amount": model.price,

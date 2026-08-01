@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
 from skillos.db.models import IdentityModel, OutcomeContractModel, ReputationModel
+from skillos.kernel.slo import get_slo_manager
 from skillos.market.outcome_contracts import (
     OutcomeContract,
     OutcomeContractService,
@@ -37,6 +38,7 @@ from skillos.market.outcome_contracts import (
     Tip,
 )
 from skillos.market.payouts import PayoutService
+from skillos.market.tenants import TenantService
 from skillos.security.message_signer import MessageSigner
 
 logger = logging.getLogger(__name__)
@@ -300,6 +302,24 @@ def get_payout_manifest(
     return manifest
 
 
+def _payout_usage(db: Session, tenant_id: str) -> dict[str, Any]:
+    """取租户出款配额使用情况；default/未知租户返回 0（不限额）。
+
+    键名统一为 payout_limit/payout_used/payout_remaining（与 tenants API 序列化一致）。
+    """
+    if tenant_id == "default":
+        return {"payout_limit": 0.0, "payout_used": 0.0, "payout_remaining": None}
+    try:
+        usage = TenantService(db).get_payout_usage(tenant_id)
+        return {
+            "payout_limit": usage["limit"],
+            "payout_used": usage["used"],
+            "payout_remaining": usage["remaining"],
+        }
+    except ValueError:
+        return {"payout_limit": 0.0, "payout_used": 0.0, "payout_remaining": None}
+
+
 @router.get("/tenant-stats")
 def get_tenant_stats(
     days: int = Query(7, ge=1, le=90),
@@ -310,6 +330,8 @@ def get_tenant_stats(
     租户为空归入 "default"。completion_rate = paid / (paid + cancelled)。
     trend: 近 `days` 天按日聚合的契约数/成交额折线（看板趋势图）。
     contracts: 各租户契约明细分页（id/状态/金额/创建时间）。
+    stats[]: 各租户配额（payout_limit/payout_used/payout_remaining）。
+    slo: SLOManager 实时错误预算快照（M9-P2）。
     """
     rows = db.query(OutcomeContractModel).all()
     buckets: dict[str, list[OutcomeContractModel]] = {}
@@ -340,6 +362,7 @@ def get_tenant_stats(
                 "paid": len(paid),
                 "cancelled": len(cancelled),
                 "avg_delivery_days": round(total_days / with_dates, 2) if with_dates else None,
+                **_payout_usage(db, tenant_id),
             }
         )
 
@@ -370,7 +393,9 @@ def get_tenant_stats(
         ]
         details[tenant_id] = {"total": len(items), "items": items}
 
-    return {"stats": stats, "trend": trend, "contracts": details}
+    slo = get_slo_manager().get_slo_summary()
+
+    return {"stats": stats, "trend": trend, "contracts": details, "slo": slo}
 
 
 @router.get("/reputation/{entity_id}")

@@ -10,6 +10,7 @@
     GET  /tenants/{tenant_id}              # 租户详情（只读）
     PUT  /tenants/{tenant_id}/scene        # 更新场景配置（签名）
     POST /tenants/{tenant_id}/activate     # 开通场景 draft→active（签名）
+    PUT  /tenants/{tenant_id}/quota        # 设置出款限额（签名）
 
 鉴权: 复用 MessageSigner（Ed25519），可变端点强制签名者身份。
 """
@@ -56,6 +57,8 @@ def _serialize_tenant(tenant: TenantModel) -> dict[str, Any]:
         "name": tenant.name,
         "status": tenant.status,
         "scene_config": tenant.scene_config or {},
+        "payout_limit": tenant.payout_limit or 0.0,
+        "payout_used": tenant.payout_used or 0.0,
         "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
         "updated_at": tenant.updated_at.isoformat() if tenant.updated_at else None,
     }
@@ -130,6 +133,23 @@ async def activate_tenant(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"success": True, "tenant": _serialize_tenant(tenant)}
+
+
+@router.put("/{tenant_id}/quota")
+async def set_quota(
+    tenant_id: str,
+    request: Request,
+    payout_limit: float = Body(..., ge=0, embed=True),
+    db: Session = Depends(get_session),
+):
+    """设置租户出款限额（0 = 不限额）。"""
+    await _require_actor(request, db)
+    service = TenantService(db)
+    try:
+        tenant = service.set_payout_quota(tenant_id, payout_limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"success": True, "tenant": _serialize_tenant(tenant), "usage": service.get_payout_usage(tenant_id)}
 
 
 def _tenant_exists(db: Session, tenant_id: str) -> bool:
