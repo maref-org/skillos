@@ -55,6 +55,81 @@ class TestAlipayAdapter:
             provider.verify_webhook({}, {"app_id": "other", "notify_type": "fund_trans_order_status"})
 
 
+class TestAlipayPublicKeyVerification:
+    """M7-P1.2 — 支付宝公钥 RSA2 验签（可选配置，无公钥降级字段校验）。"""
+
+    def _provider_with_pubkey(self):
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pub_pem = (
+            key.public_key()
+            .public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("utf-8")
+        )
+        provider = AlipayProvider(app_id="app-test", public_key_pem=pub_pem)
+        return key, provider
+
+    def test_verify_webhook_requires_valid_rsa2_signature_when_pubkey_set(self):
+        _, provider = self._provider_with_pubkey()
+        body = {
+            "app_id": "app-test",
+            "notify_type": "fund_trans_order_status",
+            "status": "SUCCESS",
+            "instruction_ids": ["pay-1"],
+        }
+        with pytest.raises(ValueError, match="signature"):
+            provider.verify_webhook({}, body)
+
+    def test_verify_webhook_accepts_valid_rsa2_signature(self):
+        from skillos.market.payments.alipay import _build_sign_content
+
+        key, provider = self._provider_with_pubkey()
+        body = {
+            "app_id": "app-test",
+            "notify_type": "fund_trans_order_status",
+            "status": "SUCCESS",
+            "instruction_ids": ["pay-1"],
+            "out_biz_no": "alipay-real-1",
+        }
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        content = _build_sign_content(body)
+        sig = key.sign(content.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        body["sign"] = __import__("base64").b64encode(sig).decode("utf-8")
+
+        receipt = provider.verify_webhook({}, body)
+        assert receipt.instruction_ids == ["pay-1"]
+        assert receipt.external_ref == "alipay-real-1"
+
+    def test_verify_webhook_rejects_tampered_signature(self):
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        from skillos.market.payments.alipay import _build_sign_content
+
+        key, provider = self._provider_with_pubkey()
+        body = {
+            "app_id": "app-test",
+            "notify_type": "fund_trans_order_status",
+            "status": "SUCCESS",
+            "instruction_ids": ["pay-1"],
+        }
+        content = _build_sign_content(body)
+        sig = key.sign(content.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        body["sign"] = __import__("base64").b64encode(sig).decode("utf-8")
+        body["status"] = "SUCCESS"  # 篡改字段后原签名不再有效（覆盖在签名串内）
+
+        tampered = {**body, "instruction_ids": ["pay-9"]}
+        with pytest.raises(ValueError, match="signature"):
+            provider.verify_webhook({}, tampered)
+
+
 class TestWechatAdapter:
     def test_missing_key_raises(self):
         with pytest.raises(ProviderNotConfiguredError, match="SKILLOS_WECHAT"):

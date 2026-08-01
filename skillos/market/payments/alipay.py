@@ -8,6 +8,7 @@
 配置（环境变量）：
   - SKILLOS_ALIPAY_APP_ID      支付宝应用 ID（沙箱或正式）
   - SKILLOS_ALIPAY_PRIVATE_KEY 商户 RSA2 私钥 PEM
+  - SKILLOS_ALIPAY_PUBLIC_KEY  支付宝公钥 PEM（可选；配置后 webhook 走 RSA2 验签）
   - SKILLOS_ALIPAY_GATEWAY      网关 URL（默认官方沙箱网关）
 """
 
@@ -34,15 +35,19 @@ class AlipayProvider:
 
     name = "alipay"
 
-    def __init__(self, app_id: str = "", private_key_pem: str = "", gateway: str = ""):
+    def __init__(self, app_id: str = "", private_key_pem: str = "", public_key_pem: str = "", gateway: str = ""):
         self.app_id = app_id or os.environ.get("SKILLOS_ALIPAY_APP_ID", "")
         self.private_key_pem = (
             private_key_pem or os.environ.get("SKILLOS_ALIPAY_PRIVATE_KEY", "")
         ).replace("\\n", "\n")
+        self.public_key_pem = (
+            public_key_pem or os.environ.get("SKILLOS_ALIPAY_PUBLIC_KEY", "")
+        ).replace("\\n", "\n")
         self.gateway = gateway or os.environ.get("SKILLOS_ALIPAY_GATEWAY", ALIPAY_GATEWAY)
-        if not self.app_id or not self.private_key_pem:
+        if not self.app_id or not (self.private_key_pem or self.public_key_pem):
             raise ProviderNotConfiguredError(
-                "Alipay provider needs SKILLOS_ALIPAY_APP_ID and SKILLOS_ALIPAY_PRIVATE_KEY"
+                "Alipay provider needs SKILLOS_ALIPAY_APP_ID and private key "
+                "(or public key for webhook verification)"
             )
 
     # ------------------------------------------------------------------
@@ -69,13 +74,14 @@ class AlipayProvider:
         )
 
     def verify_webhook(self, headers: dict[str, Any], body: dict[str, Any]) -> WebhookReceipt:
-        """验签支付宝异步通知（沙箱测试固定结构）。
+        """验签支付宝异步通知。
 
-        真实环境须用支付宝公钥对 notify 的 sign 字段做 RSA2 验签（签名串为
-        form 参数按 ASCII 排序，同 _build_sign_content），且签名覆盖 app_id、
-        out_biz_no、status 等字段；沙箱无支付宝公钥，故仅做字段级校验。
+        - 配置了支付宝公钥（SKILLOS_ALIPAY_PUBLIC_KEY）→ 先做 RSA2 验签，失败抛 ValueError。
+        - 未配置公钥（沙箱降级）→ 仅做字段级校验。
         """
-        # 沙箱环境：校验 app_id 匹配 + 通知类型 + out_biz_no/order_id 存在
+        if self.public_key_pem:
+            self._verify_rsa2_signature(body)
+        # 字段级校验：app_id 匹配 + 通知类型 + 转账状态
         if body.get("app_id") != self.app_id:
             raise ValueError("alipay webhook app_id mismatch")
         notify_type = body.get("notify_type", "")
@@ -91,6 +97,29 @@ class AlipayProvider:
             instruction_ids=list(instruction_ids),
             external_ref=body.get("out_biz_no", ""),
         )
+
+    def _verify_rsa2_signature(self, body: dict[str, Any]) -> None:
+        """用支付宝公钥对 sign 字段做 RSA2 验签（PKCS1v15 + SHA256）。"""
+        import base64
+
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        sign_b64 = body.get("sign", "")
+        if not sign_b64:
+            raise ValueError("alipay webhook missing signature")
+        content = _build_sign_content(body)
+        try:
+            public_key = serialization.load_pem_public_key(self.public_key_pem.encode("utf-8"))
+            public_key.verify(
+                base64.b64decode(sign_b64.encode("utf-8")),
+                content.encode("utf-8"),
+                padding.PKCS1v15(),
+                hashes.SHA256(),
+            )
+        except (InvalidSignature, ValueError) as exc:
+            raise ValueError(f"invalid alipay RSA2 signature: {exc}") from exc
 
     # ------------------------------------------------------------------
     def _build_biz_content(self, manifest: dict[str, Any]) -> dict[str, Any]:
