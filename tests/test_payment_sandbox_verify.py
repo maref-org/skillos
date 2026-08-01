@@ -27,7 +27,7 @@ def test_no_key_skips(monkeypatch, capfd):
         "SKILLOS_WECHAT_PRIVATE_KEY",
     ):
         monkeypatch.delenv(k, raising=False)
-    rc = _mod.main()
+    rc = _mod.main([])
     assert rc == 0
     out = capfd.readouterr().out
     assert "SKIP" in out
@@ -52,7 +52,7 @@ def test_with_dummy_keys_builds_payloads(monkeypatch, capfd):
     monkeypatch.setenv("SKILLOS_WECHAT_APIV3_KEY", "v3-key")
     monkeypatch.delenv("SKILLOS_ALIPAY_PUBLIC_KEY", raising=False)
     monkeypatch.delenv("SKILLOS_WECHAT_PRIVATE_KEY", raising=False)
-    rc = _mod.main()
+    rc = _mod.main([])
     assert rc == 0
     out = capfd.readouterr().out
     # 输出签名/载荷摘要，但不打印密钥本体
@@ -60,3 +60,55 @@ def test_with_dummy_keys_builds_payloads(monkeypatch, capfd):
     assert "wechat" in out
     assert pem not in out
     assert "v3-key" not in out
+
+
+def test_with_provider_arg_selects_single(monkeypatch, capfd):
+    """--provider alipay 只验证 alipay，wechat 不参与。"""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = (
+        key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        .decode("utf-8")
+    )
+    monkeypatch.setenv("SKILLOS_ALIPAY_APP_ID", "app-test")
+    monkeypatch.setenv("SKILLOS_ALIPAY_PRIVATE_KEY", pem)
+    monkeypatch.delenv("SKILLOS_WECHAT_MCH_ID", raising=False)
+    monkeypatch.delenv("SKILLOS_WECHAT_APIV3_KEY", raising=False)
+    rc = _mod.main(["--provider", "alipay"])
+    assert rc == 0
+    out = capfd.readouterr().out
+    assert "alipay" in out
+    assert "wechat" not in out
+
+
+def test_submit_query_loop_checks_status(monkeypatch, capfd):
+    """有 key 时 submit_manifest + query_status 闭环被调用。"""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = (
+        key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        .decode("utf-8")
+    )
+    monkeypatch.setenv("SKILLOS_ALIPAY_APP_ID", "app-test")
+    monkeypatch.setenv("SKILLOS_ALIPAY_PRIVATE_KEY", pem)
+    monkeypatch.delenv("SKILLOS_WECHAT_MCH_ID", raising=False)
+    monkeypatch.delenv("SKILLOS_WECHAT_APIV3_KEY", raising=False)
+    rc = _mod.main(["--provider", "alipay"])
+    assert rc == 0
+    out = capfd.readouterr().out
+    assert "提交" in out
+    assert "查询" in out
+    assert "external_ref" in out
+    assert "闭环" in out
