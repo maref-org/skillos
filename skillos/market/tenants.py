@@ -75,3 +75,36 @@ class TenantService:
             return self.get(tenant_id).scene_config or {}
         except ValueError:
             return {}
+
+    def set_payout_quota(self, tenant_id: str, payout_limit: float) -> TenantModel:
+        """设置租户月出款限额。0 = 不限额；负数拒绝。"""
+        if payout_limit < 0:
+            raise ValueError(f"payout_limit cannot be negative: {payout_limit}")
+        model = self.get(tenant_id)
+        model.payout_limit = round(float(payout_limit), 2)
+        model.updated_at = datetime.now(timezone.utc)
+        self._db.flush()
+        return model
+
+    def add_payout_used(self, tenant_id: str, amount: float) -> TenantModel:
+        """累计租户已用出款额（仅首次生成指令时调用，幂等导出不叠加）。"""
+        if amount < 0:
+            raise ValueError(f"payout amount cannot be negative: {amount}")
+        model = self.get(tenant_id)
+        model.payout_used = round(model.payout_used + float(amount), 2)
+        model.updated_at = datetime.now(timezone.utc)
+        self._db.flush()
+        return model
+
+    def get_payout_usage(self, tenant_id: str) -> dict[str, Any]:
+        """返回租户出款配额使用情况：limit/used/remaining。"""
+        model = self.get(tenant_id)
+        limit = float(model.payout_limit or 0.0)
+        used = float(model.payout_used or 0.0)
+        if limit <= 0:
+            return {"limit": 0.0, "used": round(used, 2), "remaining": None}
+        return {
+            "limit": round(limit, 2),
+            "used": round(used, 2),
+            "remaining": round(max(0.0, limit - used), 2),
+        }
