@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from skillos.audit import AuditEventType, log_audit
 from skillos.db.models import OutcomeContractModel, PayoutInstructionModel, ServiceTeamMemberModel, ServiceTeamModel
+from skillos.market.tenant_pools import TenantPoolService
 from skillos.market.tenants import TenantService
 
 logger = logging.getLogger(__name__)
@@ -78,14 +79,20 @@ class PayoutService:
         if contract.status != "paid":
             raise ValueError(f"Only paid contracts can generate payouts, current: {contract.status}")
 
-        # 租户出款限额校验（M9）：limit>0 且 used+price 超限 → 拒绝
+        # 租户出款限额校验（M9 + M11）：先自有配额，再池共享余额联合判断
         if contract.tenant_id:
-            usage = TenantService(self._db).get_payout_usage(contract.tenant_id)
-            if usage["limit"] > 0 and usage["used"] + contract.price > usage["limit"]:
-                raise PayoutLimitExceededError(
-                    f"Tenant payout limit exceeded: {contract.tenant_id} "
-                    f"used={usage['used']} + price={contract.price} > limit={usage['limit']}"
-                )
+            tenant_svc = TenantService(self._db)
+            usage = tenant_svc.get_payout_usage(contract.tenant_id)
+            own_over = usage["limit"] > 0 and usage["used"] + contract.price > usage["limit"]
+            if own_over:
+                # 自有超限 → 尝试从共享池借用
+                pool_svc = TenantPoolService(self._db)
+                rel = pool_svc.pool_for_tenant(contract.tenant_id)
+                if rel is None or not pool_svc.consume(rel[0].pool_id, contract.tenant_id, contract.price):
+                    raise PayoutLimitExceededError(
+                        f"Tenant payout limit exceeded: {contract.tenant_id} "
+                        f"used={usage['used']} + price={contract.price} > limit={usage['limit']}"
+                    )
 
         now = datetime.now(timezone.utc)
         instructions: list[PayoutInstruction] = []

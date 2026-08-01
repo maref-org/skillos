@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 
 from fastapi import APIRouter, Depends, Query
@@ -8,14 +9,34 @@ from sqlalchemy.orm import Session
 from skillos.db.engine import get_session
 from skillos.kernel.slo import get_slo_manager
 from skillos.observability.metrics import get_metrics
+from skillos.observability.slo_alerts import SloAlertService
 from skillos.observability.slo_snapshots import SloSnapshotService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["监控中心"])
 
 
+def _capture_and_evaluate(db: Session, slo_name: str | None = None) -> None:
+    """落 SLO 快照并推进告警状态机（M11）。异常不影响主流程。"""
+    try:
+        SloSnapshotService(db).capture([slo_name] if slo_name else None)
+        summary = get_slo_manager().get_slo_summary()
+        names = [slo_name] if slo_name else list(summary.keys())
+        alert_svc = SloAlertService(db)
+        for name in names:
+            item = summary.get(name)
+            if not isinstance(item, dict):
+                continue
+            eb = item.get("error_budget", {})
+            alert_svc.evaluate(name, eb.get("status", "healthy"), eb.get("remaining_pct", 0.0))
+    except Exception as exc:  # noqa: BLE001 可观测性路径失败不影响请求
+        logger.warning("SLO capture/evaluate failed: %s", exc)
+
+
 @router.get("/monitoring/overview")
 async def overview(db: Session = Depends(get_session)):
-    SloSnapshotService(db).capture()
+    _capture_and_evaluate(db)
     slo = get_slo_manager()
     slo_summary = slo.get_slo_summary()
     healthy_count = sum(
@@ -35,7 +56,7 @@ async def overview(db: Session = Depends(get_session)):
 
 @router.get("/monitoring/slo")
 async def slo_summary(db: Session = Depends(get_session)):
-    SloSnapshotService(db).capture()
+    _capture_and_evaluate(db)
     slo = get_slo_manager()
     return slo.get_slo_summary()
 
@@ -52,8 +73,25 @@ async def slo_trend(
     查询前自动捕获当前快照，保证趋势包含最新状态。
     """
     service = SloSnapshotService(db)
-    service.capture([slo_name] if slo_name else None)
+    _capture_and_evaluate(db, slo_name)
     return service.get_trend(slo_name=slo_name, days=days)
+
+
+@router.get("/monitoring/alerts/status")
+async def alerts_status(db: Session = Depends(get_session)):
+    """SLO 告警状态（M11）：各 SLO 当前活跃告警（只读）。"""
+    _capture_and_evaluate(db)
+    return SloAlertService(db).get_status()
+
+
+@router.get("/monitoring/alerts/events")
+async def alerts_events(
+    slo_name: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_session),
+):
+    """SLO 告警事件历史（M11，只读）。"""
+    return SloAlertService(db).list_events(slo_name=slo_name, limit=limit)
 
 
 @router.get("/monitoring/metrics")

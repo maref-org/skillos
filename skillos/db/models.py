@@ -436,3 +436,68 @@ class SloSnapshotModel(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="healthy")
     remaining_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     sampled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, index=True)
+
+
+class SloAlertModel(Base):
+    """SLO 告警 — 错误预算恶化的主动通知记录（M11）。
+
+    SLOManager 状态健康→高危（burning/exhausted）时触发告警（firing），
+    恢复（healthy/at_risk）时解除（resolved）。同一 slo 最多一条活跃记录，
+    事件明细写入 payload_json 供追溯。
+    """
+
+    __tablename__ = "slo_alerts"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    slo_name: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="firing")
+    severity: Mapped[str] = mapped_column(String(16), nullable=False, server_default="warning")
+    remaining_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, server_default="{}")
+
+
+class TenantPoolModel(Base):
+    """共享额度池 — 跨租户出款限额共享（M11-P2）。
+
+    多个租户可加入同一池，从池的剩余额度（total_limit - used）按 share_ratio
+    借用出款额度。池额度调整走审批流（pending → approved/rejected）。
+    """
+
+    __tablename__ = "tenant_pools"
+
+    pool_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    total_limit: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    used: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, onupdate=_utc_now)
+
+
+class TenantPoolMemberModel(Base):
+    """池成员 — 租户从共享池可借用的额度比例。"""
+
+    __tablename__ = "tenant_pool_members"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    pool_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    share_ratio: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
+
+
+class PoolAdjustmentModel(Base):
+    """池额度调整审批单 — 调整共享池限额需审批（pending → approved/rejected）。"""
+
+    __tablename__ = "pool_adjustments"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    pool_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    new_limit: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    requested_by: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    approved_by: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, onupdate=_utc_now)
