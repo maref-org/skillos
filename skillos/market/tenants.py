@@ -16,6 +16,8 @@ from skillos.db.models import TenantModel
 class TenantService:
     """租户 CRUD + 场景配置管理。"""
 
+    VALID_STATUS = ("draft", "active", "inactive")
+
     def __init__(self, db_session: Session):
         self._db = db_session
 
@@ -24,18 +26,31 @@ class TenantService:
         tenant_id: str,
         name: str = "",
         scene_config: dict[str, Any] | None = None,
+        status: str = "draft",
     ) -> TenantModel:
+        if status not in self.VALID_STATUS:
+            raise ValueError(f"Invalid tenant status: {status}")
         if self._db.query(TenantModel).filter(TenantModel.tenant_id == tenant_id).first() is not None:
             raise ValueError(f"Tenant already exists: {tenant_id}")
         now = datetime.now(timezone.utc)
         model = TenantModel(
             tenant_id=tenant_id,
             name=name,
+            status=status,
             scene_config=scene_config or {},
             created_at=now,
             updated_at=now,
         )
         self._db.add(model)
+        self._db.flush()
+        return model
+
+    def set_status(self, tenant_id: str, status: str) -> TenantModel:
+        if status not in self.VALID_STATUS:
+            raise ValueError(f"Invalid tenant status: {status}")
+        model = self.get(tenant_id)
+        model.status = status
+        model.updated_at = datetime.now(timezone.utc)
         self._db.flush()
         return model
 

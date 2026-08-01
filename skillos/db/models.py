@@ -319,6 +319,7 @@ class TenantModel(Base):
 
     tenant_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="draft")
     scene_config: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now, onupdate=_utc_now)

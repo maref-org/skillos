@@ -47,3 +47,43 @@ def test_contract_without_tenant_defaults_none(db_session):
     osvc = OutcomeContractService(db_session)
     contract = osvc.create("requester-b", "写一篇公众号文章")
     assert contract.tenant_id is None
+
+
+def test_tenant_status_defaults_draft(db_session):
+    """租户默认 draft 状态。"""
+    from skillos.market.tenants import TenantService
+
+    svc = TenantService(db_session)
+    svc.create("tenant-st-1", "状态默认")
+    assert svc.get("tenant-st-1").status == "draft"
+
+
+def test_tenant_set_status_flow(db_session):
+    """set_status 流转 draft → active → inactive。"""
+    from skillos.market.tenants import TenantService
+
+    svc = TenantService(db_session)
+    svc.create("tenant-st-2", "状态流转", status="draft")
+    svc.set_status("tenant-st-2", "active")
+    assert svc.get("tenant-st-2").status == "active"
+    svc.set_status("tenant-st-2", "inactive")
+    assert svc.get("tenant-st-2").status == "inactive"
+
+
+def test_tenant_set_status_invalid_raises(db_session):
+    """非法状态值被拒绝。"""
+    from skillos.market.tenants import TenantService
+
+    svc = TenantService(db_session)
+    svc.create("tenant-st-3", "非法状态")
+    with pytest.raises(ValueError, match="Invalid tenant status"):
+        svc.set_status("tenant-st-3", "bogus")
+
+
+def test_tenant_create_with_status(db_session):
+    """create 支持直接指定状态。"""
+    from skillos.market.tenants import TenantService
+
+    svc = TenantService(db_session)
+    tenant = svc.create("tenant-st-4", "直接激活", status="active")
+    assert tenant.status == "active"
