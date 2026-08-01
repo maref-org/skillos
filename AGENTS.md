@@ -232,3 +232,24 @@ make install-hooks
 - 全量测试 **1512 passed, 0 failed**, 1 skipped, coverage 89.76%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
 
 **下一步候选 (M12)**: 告警多渠道推送（SMTP 邮件 / 钉钉 / 企业微信，需渠道账号）；池额度自动回收与跨池迁移；SLO 告警抑制/静默策略（维护窗口）。人工对接（真实支付/消息渠道）优先。
+
+### What we did (2026-08-01) — Session 12
+
+**M12: 告警多渠道推送 + 池额度回收/跨池迁移 + SLO 告警静默策略** — 设计 `docs/plans/2026-08-01-outcome-contract-m12-design.md`。
+- **P1 告警多渠道推送**: `skillos/observability/alert_channels.py` — `AlertChannel` 协议 + `AlertEvent` + 四适配器（`WebhookChannel`/`SmtpChannel`/`DingtalkChannel`/`WecomChannel`）；`get_channels()` 工厂按 `SKILLOS_ALERT_CHANNELS` 实例化（缺省 webhook），无 key 渠道 `NotConfiguredError` 跳过降级；`SloAlertService._dispatch` 改走 channels
+- **P2 池额度回收/跨池迁移**: `TenantPoolService.release`（池 used 扣减 clamp≥0，非成员 no-op）+ `transfer_member`（删旧成员关系→建新，share_ratio 沿用，used 不迁移）；API `POST /pools/{id}/release` + `POST /pools/transfer`（签名鉴权）
+- **P3 SLO 告警静默**: `slo_alerts.silenced_until` + migration 013（幂等，down=012）；`silence/unsilence/is_silenced/list_silences`，evaluate 静默期直接 return None（不触发不恢复）；活跃告警查询排除 `status=="silenced"`；API `GET /monitoring/alerts/silences` + `POST/DELETE /monitoring/alerts/{slo}/silence`
+- **踩坑**: 静默记录未排除会被 evaluate 当活跃告警→过期无法触发（查询排除 status=="silenced"）；DB DateTime 读回 naive 与 aware now 比较 TypeError（统一 `replace(tzinfo=None)`）；bandit B310 nosec 必须与 urlopen 同行（block comment 无效）；urllib req.headers key 为 `Content-type`（非 `Content-Type`）
+- 全量测试 **1459 passed, 0 failed**, 1 skipped（排除挂起 e2e/integration）, coverage 89%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
+
+**下一步候选 (M13)**: 告警多渠道真实账号对接（SMTP/钉钉/企微需渠道账号，人工步骤）；池额度自动回收调度器接入（当前 release 为惰性触发）；SLO 告警维护窗口的周期化（当前为一次性 until）。核心代码层自动落地方向基本收敛，后续以人工对接 + 运营为主。
+
+### What we did (2026-08-01) — Session 13
+
+**M13: 池额度自动回收调度器 + SLO 维护窗口周期化** — 设计 `docs/plans/2026-08-01-outcome-contract-m13-design.md`。
+- **P1 池额度自动回收**: `skillos/market/pool_reclaim.py` — `PoolReclaimService.reclaim`（遍历活跃池，按成员自有富余量归还超自有部分的池 used，share_ratio 封顶）/`reclaim_scheduled`（调度器无参入口）；`TaskScheduler._invoke_handler` 由 stub 升级为 dot path 动态导入（`module:func` 或 `module.func`，同步/异步统一 await，失败返回 error dict）；`web_api/scheduler.py` 任务 CRUD + enable/disable + `POST /pools/reclaim`（签名鉴权，注册校验 handler 可导入）
+- **P2 SLO 维护窗口周期化**: `MaintenanceWindowModel`（slo_name 支持 `*`）+ migration 014（幂等，down=013）；`SloAlertService.in_maintenance_window`（croniter get_prev 判定 [触发, +duration)）+ 窗口 CRUD；evaluate 命中窗口直接 return None（与一次性 silence 并存）；monitoring `POST/GET /monitoring/alerts/maintenance` + `DELETE /{id}`
+- **踩坑**: `get_session` 无 @contextmanager 装饰不能 `with` → 调度器入口用 `get_sessionmaker()()` 手动建 session；`_invoke_handler` 被 `system.py scheduled_tasks()` 复用须保持返回 dict；签名测试须 `sign_headers(payload)` 与实际请求 body 一致
+- 全量测试 **1483 passed, 0 failed**, 1 skipped（排除挂起 e2e/integration）, coverage 89%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
+
+**下一步候选 (M14)**: 告警多渠道真实账号对接（SMTP/钉钉/企微，人工步骤）；池回收调度器真实 cron 任务注册（运行期）；SLO 告警维护窗口的组合叠加（多窗口/时间段叠加）。核心代码层自动落地方向已收敛，M14 起以人工对接 + 运营为主。
