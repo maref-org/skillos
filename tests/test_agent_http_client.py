@@ -167,7 +167,7 @@ async def test_concurrency_smoke(client, db_session):
 
     app.include_router(api_router)
     results = await mod.run_demo(
-        "http://testserver", 2, contract_ids=ids, transport=httpx.ASGITransport(app=app)
+        "http://testserver", 2, contract_ids=ids, transport=httpx.ASGITransport(app=app), serial=True
     )
     assert len(results) == 2
     for r in results:

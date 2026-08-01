@@ -103,43 +103,54 @@ class _Agent:
         return r.json()["contracts"]
 
 
-async def _run_single(base_url: str, identity_id: str, client, contract_id: str | None, transport=None) -> dict:
-    """单个 Agent 的完整生命周期（含断线重连幂等验证）。"""
-    agent = _Agent(base_url, identity_id, client)
-    await agent.register()
+async def _run_single(base_url: str, identity_id: str, transport=None, contract_id: str | None = None) -> dict:
+    """单个 Agent 的完整生命周期（含断线重连幂等验证）。
 
-    open_contracts = await agent.list_open()
-    my_cid = contract_id or (open_contracts[0]["id"] if open_contracts else None)
-    if not my_cid:
-        return {"identity": identity_id, "ok": False, "reason": "no open contracts"}
-
-    accepted = await agent.accept(my_cid)
-    teamed = await agent.create_team(my_cid)
-    connected = await agent.connect_bridge(f"bridge-{identity_id}")
-    heartbeat = await agent.heartbeat(f"bridge-{identity_id}")
-    mine = await agent.list_my()
-
-    # 断线重连：close 后重建 client，但复用同一 signer（同名身份幂等）
-    await client.aclose()
+    每个 Agent 使用独立 AsyncClient（并发/串行均安全），断线重连时
+    关闭自身 client 并重建，复用同一 signer（同名身份幂等）。
+    """
     from httpx import AsyncClient
 
-    new_client = AsyncClient(base_url=base_url, timeout=30.0, transport=transport)
+    client = AsyncClient(base_url=base_url, timeout=30.0, transport=transport)
+    agent = _Agent(base_url, identity_id, client)
     try:
-        agent2 = _Agent(base_url, identity_id, new_client, signer=agent.signer)
-        await agent2.register()
-        mine_after = await agent2.list_my()
-    finally:
-        await new_client.aclose()
+        await agent.register()
 
-    ok = (
-        accepted
-        and teamed
-        and connected
-        and heartbeat
-        and any(c["id"] == my_cid for c in mine)
-        and any(c["id"] == my_cid for c in mine_after)
-    )
-    return {"identity": identity_id, "contract_id": my_cid, "ok": ok}
+        open_contracts = await agent.list_open()
+        my_cid = contract_id or (open_contracts[0]["id"] if open_contracts else None)
+        if not my_cid:
+            return {"identity": identity_id, "ok": False, "reason": "no open contracts"}
+
+        accepted = await agent.accept(my_cid)
+        teamed = await agent.create_team(my_cid)
+        connected = await agent.connect_bridge(f"bridge-{identity_id}")
+        heartbeat = await agent.heartbeat(f"bridge-{identity_id}")
+        mine = await agent.list_my()
+
+        # 断线重连：close 后重建 client，但复用同一 signer（同名身份幂等）
+        await client.aclose()
+        new_client = AsyncClient(base_url=base_url, timeout=30.0, transport=transport)
+        try:
+            agent2 = _Agent(base_url, identity_id, new_client, signer=agent.signer)
+            await agent2.register()
+            mine_after = await agent2.list_my()
+        finally:
+            await new_client.aclose()
+
+        ok = (
+            accepted
+            and teamed
+            and connected
+            and heartbeat
+            and any(c["id"] == my_cid for c in mine)
+            and any(c["id"] == my_cid for c in mine_after)
+        )
+        return {"identity": identity_id, "contract_id": my_cid, "ok": ok}
+    finally:
+        try:
+            await client.aclose()
+        except Exception:
+            pass
 
 
 async def run_demo(
@@ -147,29 +158,31 @@ async def run_demo(
     n_agents: int,
     contract_ids: list[str] | None = None,
     transport=None,
+    serial: bool = False,
 ) -> list[dict]:
     """并发运行 N 个 Agent，返回各自的 GO/NO-GO 结果。
 
     contract_ids: 每个 Agent 独立的承接目标（并发下避免竞争同一契约）；
                   None 时各 Agent 取当前第一个 open 契约。
     transport: 可选的 httpx transport（测试注入 ASGITransport 以等价真实 HTTP）。
+    serial: True 时顺序执行（内存 SQLite StaticPool 单连接不支持并发写，
+            测试环境需串行以保证稳定；真实服务模式保持并发默认 False）。
     """
-    from httpx import AsyncClient
-
-    async with AsyncClient(base_url=base_url, timeout=30.0, transport=transport) as client:
-        results = await asyncio.gather(
-            *[
-                _run_single(
-                    base_url,
-                    f"agent-conc-{i}",
-                    client,
-                    contract_ids[i] if contract_ids and i < len(contract_ids) else None,
-                    transport=transport,
-                )
-                for i in range(n_agents)
-            ]
+    coros = [
+        _run_single(
+            base_url,
+            f"agent-conc-{i}",
+            transport=transport,
+            contract_id=contract_ids[i] if contract_ids and i < len(contract_ids) else None,
         )
-    return results
+        for i in range(n_agents)
+    ]
+    if serial:
+        results = []
+        for c in coros:
+            results.append(await c)
+        return results
+    return await asyncio.gather(*coros)
 
 
 def main() -> int:
