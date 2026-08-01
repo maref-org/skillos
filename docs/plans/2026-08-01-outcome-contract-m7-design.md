@@ -406,7 +406,7 @@ def test_create_tenant_and_contract(db_session):
 - P3.1：`POST /agent/contracts/{id}/team`（`_require_agent` 签名鉴权 + contractor 强制签名身份），`ip_operations_trial.py` 真实模式改走 HTTP 组队（不再跳过）。
 - P3.2：`RemoteBridge` 惰性清理心跳超 TTL（默认 120s）的会话，`list_bridges`/`get_stats` 均回收。
 - P3.3：`scripts/agent_concurrency_demo.py` N Agent 并发（注册→承接→组队→心跳→断线重连幂等），内置 ASGI + 真实 HTTP 双模式。
-- 踩坑：端口 8080 被 openclaw llm_proxy 占用 → 用 9090 验证；2 Agent 竞争同一契约致第二个 accept 失败 → 每 Agent 各建契约；断线重连须复用同一 signer（重建 keypair 签名与注册公钥不符 403）；`_run_single` 曾关闭共享 client 致并发竞态 → 改为每 Agent 独立 AsyncClient，内存 StaticPool 下测试用 `serial=True` 保稳定。
+- 踩坑：本机默认端口被占用 → 用 9090 验证；2 Agent 竞争同一契约致第二个 accept 失败 → 每 Agent 各建契约；断线重连须复用同一 signer（重建 keypair 签名与注册公钥不符 403）；`_run_single` 曾关闭共享 client 致并发竞态 → 改为每 Agent 独立 AsyncClient，内存 StaticPool 下测试用 `serial=True` 保稳定。
 
 **P4 垂直场景多租户上线**（4 提交）：
 - P4.1：`TenantModel`（tenants 表）+ `OutcomeContractModel.tenant_id`（nullable+index）+ `TenantService`（create/get/list/update_scene_config/get_scene_config）+ migration 008（幂等，down=007）。

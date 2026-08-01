@@ -180,7 +180,7 @@ make install-hooks
 - **P2 真实沙箱验证**: `verify_payment_sandbox.py` 无 key SKIP（rc=0）/有 key 签名载荷摘要且不打印密钥
 - **P3 外部 Agent 接入**: `POST /agent/contracts/{id}/team` 组队端点 + RemoteBridge 心跳 TTL 惰性回收 + `agent_concurrency_demo.py` N Agent 并发（内置 ASGI + 真实 HTTP 双模式）
 - **P4 垂直场景多租户**: `TenantModel` + `OutcomeContractModel.tenant_id` + `TenantService` + migration 008；IpTrialScenario 从租户场景配置读模板/档位/小费；`GET /outcome/tenant-stats` 按租户聚合；`multi_tenant_trial.py` 并发内测
-- **踩坑**: 无 key 工厂降级 sandbox 因缺 X-Sandbox-Token 401 → HTTP 测试 monkeypatch dummy key 走真实 adapter；RSA 测试需真实密钥（dummy PEM 报 MalformedFraming）；端口 8080 被占用 → 9090；2 Agent 竞争契约失败 → 各建契约；断线重连须复用同一 signer（重建 keypair 403）
+- **踩坑**: 无 key 工厂降级 sandbox 因缺 X-Sandbox-Token 401 → HTTP 测试 monkeypatch dummy key 走真实 adapter；RSA 测试需真实密钥（dummy PEM 报 MalformedFraming）；本机默认端口被占用 → 换 9090；2 Agent 竞争契约失败 → 各建契约；断线重连须复用同一 signer（重建 keypair 403）
 - 全量测试 **1431 passed, 0 failed**, 1 skipped, coverage 89.54%, ruff 0 问题, 3 verify scripts PASS
 
 **下一步候选 (M8)**: 租户开通 API 化（`POST /tenants` 注册 → 签约方自助开通场景）；tenant-stats 接入运营面板；支付宝/微信真实沙箱账号对接（需持牌方测试 key）；多租户配额/计费隔离。
