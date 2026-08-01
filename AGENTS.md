@@ -209,3 +209,14 @@ make install-hooks
 - 全量测试 **1469 passed, 0 failed**, 1 skipped, coverage 89.70%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
 
 **下一步候选 (M10)**: 支付宝/微信真实沙箱账号对接执行（需持牌方测试 key，人工步骤）；运营面板 SLO 趋势曲线（当前仅快照）；平台级跨租户风控。核心代码层已无自动可落地方向，M10 起以人工对接 + 数据运营为主。
+
+### What we did (2026-08-01) — Session 10
+
+**M10: SLO 趋势曲线 + 平台级跨租户风控面板** — 设计 `docs/plans/2026-08-01-outcome-contract-m10-design.md`。
+- **P1 SLO 趋势曲线**: `SloSnapshotModel`（slo_snapshots 表）+ migration 011（幂等，down=010）；`skillos/observability/slo_snapshots.py` — `SloSnapshotService.capture`（读 SLOManager 落库）/`get_trend`（按日聚合取当日末条，slo_name 可省略）；`web_api/monitoring.py` overview/slo 访问时自动 capture + 新增 `GET /monitoring/slo/trend`
+- **P2 平台级跨租户风控**: `TenantService.get_platform_payout_risk()`（汇总 limit>0 租户总额/已用/剩余/占用率 + over_limit/at_risk 租户识别）+ `web_api/outcome.py` 新增 `GET /outcome/platform-risk`
+- **踩坑**: 同日多条快照时间戳相同 → 聚合取末条须 `>=` 而非 `>`；真实服务端点挂在 `/api/v1` 前缀（独立测试 FastAPI 无前缀 → 冒烟须带 /api/v1）
+- 真实服务冒烟: slo/trend 返回 4 SLO + 当日快照点；platform-risk 空库正常
+- 全量测试 **1479 passed, 0 failed**, 1 skipped, coverage 89.77%（≥80%）, ruff + bandit 0 问题, 3 verify scripts PASS
+
+**下一步候选 (M11)**: 支付宝/微信真实沙箱账号对接执行（需持牌方测试 key，人工步骤）；SLO 自动告警推送（邮件/IM/webhook）；跨租户共享额度池与配额审批流。核心代码层自动落地方向基本收敛，M11 起以人工对接 + 告警运营为主。
