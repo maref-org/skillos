@@ -128,7 +128,26 @@ M7 完成了垂直场景多租户上线的基础层（TenantModel + tenant_id + 
 
 ## 11. 落地记录
 
-（待 M8 执行完成后补记。）
+### M8 全阶段落地（2026-08-01，Session 8）
+
+**P1 租户开通 API 化**（2 提交）：
+- P1.1：`TenantModel.status`（String(16)，default "draft"）+ `TenantService.set_status`（draft/active/inactive 校验）+ migration 009（幂等，down=008）。
+- P1.2：新建 `skillos/web_api/tenants.py`（POST/GET /tenants + PUT scene + POST activate，签名鉴权，幂等开通）；`OutcomeContractService.create` 增加租户存在性 + active 校验（API 映射 422）；`web_api/__init__.py` 挂载 tenants router（真实服务暴露）。
+- 语义升级：契约只能挂 active 租户 —— 旧测试 `test_create_tenant_and_contract`、`TestTenantStats`、`multi_tenant_trial` 均需先 `set_status("active")`。
+- 踩坑：真实 HTTP 验证租户 API 时发现 `api_router` 未聚合 tenants router → `/tenants` 404（独立测试 FastAPI 挂了、生产 app 没挂）→ 补挂载。
+
+**P2 运营面板增强**（1 提交）：
+- `GET /outcome/tenant-stats` 扩展 `trend`（近 N 天按日契约数/成交额折线，默认 7 天，`days` 参数）+ `contracts`（租户契约明细列表）；`stats` 聚合保持向后兼容（M7 测试不动即绿）。
+
+**P3 真实沙箱闭环**（1 提交）：
+- `scripts/verify_payment_sandbox.py` 支持 `--provider alipay|wechat|all`；有 key 时完整闭环 submit_manifest → query_status → 回执校验（不打印密钥）；无 key SKIP（rc=0）。
+- 踩坑：脚本引入 argparse 后 `main()` 无参调用会误读 pytest 的 `sys.argv` → 需 `parse_args(argv or sys.argv[1:])`，测试显式传参。
+
+**最终审计**：`make audit` 全绿 — **1452 passed, 0 failed**, 1 skipped，coverage 89.66%（≥80%），ruff + bandit 0 问题，3 verify scripts PASS。
+
+**真实服务冒烟**：租户 API 全链路（register→create draft→activate active→list）+ `multi_tenant_trial --real-server` 2 租户 GO ✅ + 隔离 PASS ✅ + tenant-stats 面板趋势/明细数据正确。
+
+**下一步候选（M9）**：租户配额/计费隔离（每租户独立出款限额）；运营面板接入实时指标（SLOManager 集成）；支付宝/微信真实沙箱账号对接执行（需持牌方测试 key，人工步骤）。
 
 ## 12. 新会话交接指引
 
