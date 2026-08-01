@@ -9,11 +9,15 @@
 """
 
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# 心跳过期阈值：超过该时长未心跳的桥接会话视为失联，惰性回收
+BRIDGE_HEARTBEAT_TTL = 120.0
 
 
 @dataclass
@@ -91,7 +95,8 @@ class RemoteBridge:
         }
 
     async def list_bridges(self) -> list[dict]:
-        """列出所有活跃桥接"""
+        """列出所有活跃桥接（惰性清理心跳过期会话）"""
+        self._purge_stale()
         return [
             {
                 "session_id": b.session_id,
@@ -215,10 +220,25 @@ class RemoteBridge:
         return False
 
     def get_stats(self) -> dict:
-        """获取桥接统计"""
+        """获取桥接统计（惰性清理心跳过期会话）"""
+        self._purge_stale()
         connected = sum(1 for b in self.active_bridges.values() if b.status == "connected")
         return {
             "total_bridges": len(self.active_bridges),
             "connected_bridges": connected,
             "disconnected_bridges": len(self.active_bridges) - connected,
         }
+
+    def _purge_stale(self) -> None:
+        """清理心跳超过 TTL 未刷新的桥接会话。"""
+        now = time.time()
+        stale = [
+            sid
+            for sid, b in self.active_bridges.items()
+            if now - b.last_heartbeat > BRIDGE_HEARTBEAT_TTL
+        ]
+        for sid in stale:
+            bridge = self.active_bridges.pop(sid, None)
+            if bridge:
+                bridge.status = "disconnected"
+                logger.info("Bridge heartbeat expired, purged: %s", sid)
