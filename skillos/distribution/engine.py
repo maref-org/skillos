@@ -241,6 +241,10 @@ class DistributionEngine:
         """周期结算（日/周/月）"""
         period_key = self._get_current_period_key(period)
         total_revenue = self._period_revenue.get(period_key, 0.0)
+        # I6 修复：内存无数据时从 DB 聚合（进程重启后 `_period_revenue` 归零，
+        # 但 distribution_records 已持久化）。DB 为空则按内存值返回。
+        if total_revenue == 0 and self._db_session is not None:
+            total_revenue = self._db_period_revenue(period)
 
         if total_revenue == 0:
             logger.info("No revenue to settle for period %s", period_key)
@@ -388,7 +392,27 @@ class DistributionEngine:
 
     def get_period_revenue(self, period: SettlementPeriod) -> float:
         period_key = self._get_current_period_key(period)
-        return self._period_revenue.get(period_key, 0.0)
+        mem = self._period_revenue.get(period_key, 0.0)
+        # I6 修复：内存归零时回退 DB 聚合
+        if mem == 0 and self._db_session is not None:
+            return self._db_period_revenue(period)
+        return mem
+
+    def _db_period_revenue(self, period: SettlementPeriod) -> float:
+        """I6 修复：从 distribution_records 聚合当前周期收入（重启后内存归零兜底）。"""
+        import datetime
+
+        from skillos.db.models import DistributionRecordModel
+
+        start_dt = datetime.datetime.fromtimestamp(
+            self._get_period_start(period), tz=datetime.timezone.utc
+        )
+        rows = (
+            self._db_session.query(DistributionRecordModel)
+            .filter(DistributionRecordModel.timestamp >= start_dt)
+            .all()
+        )
+        return round(sum(float(r.total_amount or 0.0) for r in rows), 6)
 
     @staticmethod
     def _compute_secondary_distribution(contributor_pool: float) -> dict[str, float]:

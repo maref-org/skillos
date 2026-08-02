@@ -62,9 +62,15 @@ class PaymentProvider(Protocol):
     def query_status(self, external_ref: str) -> ProviderStatus:
         """查询某笔出款指令在持牌平台侧的状态。"""
 
-    def verify_webhook(self, headers: dict[str, Any], body: dict[str, Any]) -> WebhookReceipt:
+    def verify_webhook(
+        self,
+        headers: dict[str, Any],
+        body: dict[str, Any],
+        raw_body: str | None = None,
+    ) -> WebhookReceipt:
         """验签持牌平台回执，返回已确认成功的 instruction 列表与平台侧流水号。
 
+        raw_body 为原始请求体字符串（部分平台对原始字节验签），可为 None。
         验签失败应抛异常（由调用方映射为 401）。
         """
 

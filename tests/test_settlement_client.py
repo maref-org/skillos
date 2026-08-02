@@ -59,15 +59,15 @@ class TestSettlementReport:
 class TestSettlementClientInit:
     def test_default_init(self):
         client = SettlementClient()
-        assert client.base_url == "http://localhost:8080"
-        assert client.api_key is None
+        assert client.base_url == "https://localhost:8080"
+        assert client._api_key is None
         assert client._pending_records == []
         assert client._settled_records == []
 
     def test_custom_init(self):
-        client = SettlementClient(base_url="http://example.com", api_key="key-123")
-        assert client.base_url == "http://example.com"
-        assert client.api_key == "key-123"
+        client = SettlementClient(base_url="https://example.com", api_key="key-123")
+        assert client.base_url == "https://example.com"
+        assert client._api_key == "key-123"
 
 
 class TestSettlementClientAuthHeaders:
@@ -134,7 +134,7 @@ class TestSettlementClientComputeSplit:
 
 
 class TestSettlementClientSubmitRecord:
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_submit_large_amount_goes_remote(self, mock_post):
         mock_resp = MagicMock(status_code=200)
         mock_post.return_value = mock_resp
@@ -153,7 +153,7 @@ class TestSettlementClientSubmitRecord:
         result = client.submit_record(record)
         assert result is True
 
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_submit_small_amount_auto_settles(self, mock_post):
         client = SettlementClient()
         record = SettlementRecord(
@@ -190,7 +190,7 @@ class TestSettlementClientSubmitRecord:
     def test_submit_above_threshold_goes_remote(self):
         client = SettlementClient()
 
-        with patch("skillos.protocol.settlement_client.requests.post") as mock_post:
+        with patch("skillos.protocol.settlement_client.requests.request") as mock_post:
             mock_resp = MagicMock(status_code=200)
             mock_post.return_value = mock_resp
 
@@ -220,7 +220,7 @@ class TestSettlementClientSubmitRecord:
             contributor_pool=0.0,
         )
 
-        with patch("skillos.protocol.settlement_client.requests.post") as mock_post:
+        with patch("skillos.protocol.settlement_client.requests.request") as mock_post:
             mock_resp = MagicMock(status_code=200)
             mock_post.return_value = mock_resp
             client.submit_record(record)
@@ -229,7 +229,7 @@ class TestSettlementClientSubmitRecord:
         assert record.ecosystem_fee == pytest.approx(2.5, abs=1e-6)
         assert record.contributor_pool == pytest.approx(7.0, abs=1e-6)
 
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_submit_remote_failure(self, mock_post):
         import requests as req_lib
 
@@ -261,7 +261,7 @@ class TestSettlementClientSubmitRecord:
             contributor_pool=0.0,
         )
 
-        with patch("skillos.protocol.settlement_client.requests.post") as mock_post:
+        with patch("skillos.protocol.settlement_client.requests.request") as mock_post:
             mock_resp = MagicMock(status_code=200)
             mock_post.return_value = mock_resp
             client.submit_record(record)
@@ -287,7 +287,7 @@ class TestSettlementClientSubmitRecord:
         assert record in client._settled_records
         assert record.status == "auto_settled"
 
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_submit_sends_correct_payload(self, mock_post):
         mock_resp = MagicMock(status_code=200)
         mock_post.return_value = mock_resp
@@ -312,7 +312,7 @@ class TestSettlementClientSubmitRecord:
         assert params["caller_id"] == "caller-abc"
         assert params["amount_usd"] == 2.0
 
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_submit_with_auth(self, mock_post):
         mock_resp = MagicMock(status_code=200)
         mock_post.return_value = mock_resp
@@ -335,7 +335,7 @@ class TestSettlementClientSubmitRecord:
 
 
 class TestSettlementClientGetSettlementStatus:
-    @patch("skillos.protocol.settlement_client.requests.get")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_get_status_success(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -362,7 +362,7 @@ class TestSettlementClientGetSettlementStatus:
         assert report.record_count == 50
         assert report.status == "completed"
 
-    @patch("skillos.protocol.settlement_client.requests.get")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_get_status_non_200(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 500
@@ -373,7 +373,7 @@ class TestSettlementClientGetSettlementStatus:
 
         assert report is None
 
-    @patch("skillos.protocol.settlement_client.requests.get")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_get_status_network_error(self, mock_get):
         import requests as req_lib
 
@@ -384,7 +384,7 @@ class TestSettlementClientGetSettlementStatus:
 
         assert report is None
 
-    @patch("skillos.protocol.settlement_client.requests.get")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_get_status_default_period(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -399,7 +399,7 @@ class TestSettlementClientGetSettlementStatus:
 
 
 class TestSettlementClientTriggerSettlement:
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_trigger_success(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
@@ -423,7 +423,7 @@ class TestSettlementClientTriggerSettlement:
         assert report.period_end == 2000.0
         assert report.status == "completed"
 
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_trigger_failure(self, mock_post):
         import requests as req_lib
 
@@ -434,7 +434,7 @@ class TestSettlementClientTriggerSettlement:
 
         assert report is None
 
-    @patch("skillos.protocol.settlement_client.requests.post")
+    @patch("skillos.protocol.settlement_client.requests.request")
     def test_trigger_sends_correct_payload(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"result": {}}
@@ -457,7 +457,7 @@ class TestSettlementClientGetPendingCount:
     def test_pending_count_after_submit(self):
         client = SettlementClient()
 
-        with patch("skillos.protocol.settlement_client.requests.post") as mock_post:
+        with patch("skillos.protocol.settlement_client.requests.request") as mock_post:
             mock_resp = MagicMock(status_code=200)
             mock_post.return_value = mock_resp
 

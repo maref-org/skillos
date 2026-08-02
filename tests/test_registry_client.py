@@ -10,20 +10,17 @@ from skillos.protocol.registry_client import RegistryClient, RegistryConfig, Sea
 class TestRegistryConfig:
     def test_defaults(self):
         config = RegistryConfig()
-        assert config.base_url == "http://localhost:8080"
-        assert config.api_key is None
+        assert config.base_url == "https://localhost:8080"
         assert config.timeout == 10.0
         assert config.cache_ttl == 300.0
 
     def test_custom_values(self):
         config = RegistryConfig(
-            base_url="http://example.com",
-            api_key="key-123",
+            base_url="https://example.com",
             timeout=30.0,
             cache_ttl=600.0,
         )
-        assert config.base_url == "http://example.com"
-        assert config.api_key == "key-123"
+        assert config.base_url == "https://example.com"
         assert config.timeout == 30.0
         assert config.cache_ttl == 600.0
 
@@ -49,18 +46,18 @@ class TestSearchResult:
 class TestRegistryClientInit:
     def test_default_init(self):
         client = RegistryClient()
-        assert client.config.base_url == "http://localhost:8080"
+        assert client.config.base_url == "https://localhost:8080"
         assert client._cache == {}
 
     def test_custom_config(self):
-        config = RegistryConfig(base_url="http://custom", cache_ttl=100.0)
+        config = RegistryConfig(base_url="https://custom", cache_ttl=100.0)
         client = RegistryClient(config=config)
-        assert client.config.base_url == "http://custom"
+        assert client.config.base_url == "https://custom"
         assert client.config.cache_ttl == 100.0
 
 
 class TestRegistryClientRegister:
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_register_success(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"result": {"id": "skill-001"}}
@@ -78,7 +75,7 @@ class TestRegistryClientRegister:
         result = client.register(manifest)
         assert result == "skill-001"
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_register_fallback_on_error(self, mock_post):
         import requests as req_lib
 
@@ -96,7 +93,7 @@ class TestRegistryClientRegister:
         result = client.register(manifest)
         assert result == "fallback-skill"
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_register_sends_correct_payload(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"result": {"id": "skill-001"}}
@@ -122,14 +119,14 @@ class TestRegistryClientRegister:
         assert params["author"] == "alice"
         assert params["price_per_call"] == 0.1
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
+    @patch.dict("os.environ", {"SKILLOS_API_KEY": "secret-key"})
     def test_register_with_auth(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"result": {"id": "skill-001"}}
         mock_post.return_value = mock_resp
 
-        config = RegistryConfig(api_key="secret-key")
-        client = RegistryClient(config=config)
+        client = RegistryClient()
         manifest = SkillManifest(
             id="skill-001",
             name="Auth Test",
@@ -143,7 +140,7 @@ class TestRegistryClientRegister:
         _, kwargs = mock_post.call_args
         assert kwargs["headers"]["Authorization"] == "Bearer secret-key"
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_register_caches_on_error(self, mock_post):
         import requests as req_lib
 
@@ -177,7 +174,7 @@ class TestRegistryClientGetSkill:
             "price_per_call": 0.05,
         }
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_skill_success(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -191,7 +188,7 @@ class TestRegistryClientGetSkill:
         assert result.id == "skill-001"
         assert result.name == "Test"
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_skill_not_found(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 404
@@ -202,7 +199,7 @@ class TestRegistryClientGetSkill:
 
         assert result is None
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_skill_network_error(self, mock_get):
         import requests as req_lib
 
@@ -213,7 +210,7 @@ class TestRegistryClientGetSkill:
 
         assert result is None
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_skill_cache_hit(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -229,7 +226,7 @@ class TestRegistryClientGetSkill:
         assert cached is not None
         mock_get.assert_not_called()
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_skill_cache_expired(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -251,7 +248,7 @@ class TestRegistryClientGetSkill:
         client.get_skill("skill-001")
         mock_get.assert_called_once()
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_skill_with_version(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -264,7 +261,7 @@ class TestRegistryClientGetSkill:
         _, kwargs = mock_get.call_args
         assert kwargs["params"]["version"] == "2.0.0"
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_skill_different_cache_keys_for_versions(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -287,7 +284,7 @@ class TestRegistryClientSearch:
             "per_page": per_page,
         }
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_search_success(self, mock_get):
         items = [
             {
@@ -318,7 +315,7 @@ class TestRegistryClientSearch:
         assert result.total == 2
         assert len(result.skills) == 2
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_search_with_filters(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -336,7 +333,7 @@ class TestRegistryClientSearch:
         assert params["page"] == 2
         assert params["per_page"] == 50
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_search_network_error(self, mock_get):
         import requests as req_lib
 
@@ -349,15 +346,15 @@ class TestRegistryClientSearch:
         assert result.total == 0
         assert result.page == 1
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
+    @patch.dict("os.environ", {"SKILLOS_API_KEY": "key-123"})
     def test_search_with_auth(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = self._make_search_response()
         mock_get.return_value = mock_resp
 
-        config = RegistryConfig(api_key="key-123")
-        client = RegistryClient(config=config)
+        client = RegistryClient()
         client.search("test")
 
         _, kwargs = mock_get.call_args
@@ -365,7 +362,7 @@ class TestRegistryClientSearch:
 
 
 class TestRegistryClientPublish:
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_publish_success(self, mock_post):
         mock_resp = MagicMock()
         mock_post.return_value = mock_resp
@@ -375,7 +372,7 @@ class TestRegistryClientPublish:
 
         assert result is True
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_publish_failure(self, mock_post):
         import requests as req_lib
 
@@ -386,7 +383,7 @@ class TestRegistryClientPublish:
 
         assert result is False
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_publish_sends_correct_method(self, mock_post):
         mock_resp = MagicMock()
         mock_post.return_value = mock_resp
@@ -401,7 +398,7 @@ class TestRegistryClientPublish:
 
 
 class TestRegistryClientDeprecate:
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_deprecate_success(self, mock_post):
         mock_resp = MagicMock()
         mock_post.return_value = mock_resp
@@ -411,7 +408,7 @@ class TestRegistryClientDeprecate:
 
         assert result is True
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_deprecate_failure(self, mock_post):
         import requests as req_lib
 
@@ -422,7 +419,7 @@ class TestRegistryClientDeprecate:
 
         assert result is False
 
-    @patch("skillos.protocol.registry_client.requests.post")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_deprecate_default_reason(self, mock_post):
         mock_resp = MagicMock()
         mock_post.return_value = mock_resp
@@ -435,7 +432,7 @@ class TestRegistryClientDeprecate:
 
 
 class TestRegistryClientGetCallStats:
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_stats_success(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -448,7 +445,7 @@ class TestRegistryClientGetCallStats:
         assert stats["total_calls"] == 1000
         assert stats["total_revenue"] == 50.0
 
-    @patch("skillos.protocol.registry_client.requests.get")
+    @patch("skillos.protocol.registry_client.requests.request")
     def test_get_stats_network_error(self, mock_get):
         import requests as req_lib
 

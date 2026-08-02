@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -25,10 +24,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
-from skillos.db.models import IdentityModel
 from skillos.kernel.task_scheduler import TaskScheduler
 from skillos.market.pool_reclaim import PoolReclaimService
-from skillos.security.message_signer import MessageSigner
+from skillos.web_api.auth import require_actor
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +38,16 @@ def _get_scheduler() -> TaskScheduler:
 
 
 def _validate_handler(handler: str) -> None:
-    """校验 handler 可动态导入，避免注册了运行时不存在的任务。"""
+    """校验 handler 可动态导入，避免注册了运行时不存在的任务。
+
+    I8 修复：仅允许 ``skillos.`` 包内 handler（白名单，防 RCE）。
+    """
     if not handler or not handler.strip():
         raise HTTPException(status_code=400, detail="handler 不能为空")
+    from skillos.kernel.task_scheduler import is_allowed_handler
+
+    if not is_allowed_handler(handler):
+        raise HTTPException(status_code=400, detail=f"handler 不在白名单内（仅 skillos. 包）: {handler}")
     module_name, sep, func_name = handler.partition(":")
     if not sep:
         try:
@@ -60,16 +65,11 @@ def _validate_handler(handler: str) -> None:
 
 
 async def _require_actor(request: Request, db: Session = Depends(get_session)) -> str:
-    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。"""
-    raw = await request.body()
-    payload: dict[str, Any] = json.loads(raw) if raw else {}
-    headers = {k.lower(): v for k, v in request.headers.items()}
-    signer_id = headers.get("x-signer-id", "")
-    if not signer_id or not MessageSigner.verify(payload, headers):
-        raise HTTPException(status_code=401, detail="invalid or missing signature")
-    if not db.query(IdentityModel).filter(IdentityModel.identity_id == signer_id).first():
-        raise HTTPException(status_code=403, detail="identity not registered")
-    return signer_id
+    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。
+
+    C1 修复：用注册公钥验签（身份-公钥绑定），防止身份冒充。
+    """
+    return await require_actor(request, db)
 
 
 @router.post("/scheduler/tasks")

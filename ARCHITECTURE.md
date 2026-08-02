@@ -1,6 +1,6 @@
 # SkillOS Architecture
 
-**版本**: v0.5.0-beta | **最后更新**: 2026-06-09
+**版本**: v0.6.0-beta | **最后更新**: 2026-07-30
 **层数**: 4（实际实现）— 替代历史文档中的 8 层架构声明
 
 ---
@@ -36,7 +36,7 @@ SkillOS 的经济核心——收入分配与贡献者激励。
 | 功能 | 状态 | 说明 |
 |------|------|------|
 | 双 Token 系统 (SkillCoin+GovToken) | **存根** | `_types.py` 中 `ModelTier` 枚举已存在，无实际 token 操作 |
-| NegMarket（负样本市场） | **MVP** | `negmarket/` 四步脱敏 + 加密存储 + 反模式 Skill 生成 + SQLite |
+| NegMarket（负样本市场） | **MVP** | `skillos/negmarket/` 四步脱敏 + 加密存储 + 反模式 Skill 生成 + SQLite |
 
 ---
 
@@ -123,7 +123,7 @@ SkillOS 的核心逻辑——Agent 路由、调度、会话管理、隔离执行
 | `skillos.governance` | 8 层架构声明 | **缺失** — 仅有 `test_governance_layer.py` 引用 |
 | `skillos.intelligence` | 8 层架构声明 | **[已实现]** `intent_compiler.py` / `evolution.py` / `distillation.py` |
 | `skillos.market` | 增强 8 层架构 | **缺失** — 仅有 `test_market_layer.py` 引用 |
-| NegMarket (负样本市场) | OpenSkill Protocol §2.2 | **未实现** |
+| NegMarket (负样本市场) | OpenSkill Protocol §2.2 | **MVP** (见 L3 经济层 — `skillos/negmarket/`) |
 | HaaS API | 架构 v1.0 §2.2.2 | **未实现** |
 | 语音输入/TTS | 架构增强 §1.1 | **未实现** |
 | 联邦知识蒸馏 | 架构 §2.1 | **未实现** |

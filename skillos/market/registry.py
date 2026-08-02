@@ -186,7 +186,7 @@ class SkillRegistry:
         model = self._db.query(SkillListingModel).filter(SkillListingModel.id == listing_id).first()
         if model:
             model.total_calls = (model.total_calls or 0) + 1
-            model.total_revenue = (model.total_revenue or 0.0) + revenue
+            model.total_revenue = round((model.total_revenue or 0.0) + revenue, 2)
             self._db.flush()
 
     def add_review(self, listing_id: str, reviewer_id: str, rating: int, review_text: str = "") -> bool:

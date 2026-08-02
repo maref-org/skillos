@@ -16,7 +16,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from skillos.kernel.logging_config import get_logger
 
@@ -130,10 +130,10 @@ class YAMLSkillConverter:
             if not isinstance(data, dict):
                 errors.append("YAML content must be a mapping")
                 return ImportResult(manifest=manifest, warnings=warnings, errors=errors, success=False)
-            manifest.name = data.get("name", data.get("skill", data.get("id", "unnamed")))
-            manifest.description = data.get("description", data.get("desc", ""))
+            manifest.name = data.get("name", data.get("skill", data.get("id", "unnamed")))  # type: ignore[assignment]
+            manifest.description = data.get("description", data.get("desc", ""))  # type: ignore[assignment]
             manifest.version = str(data.get("version", "1.0.0"))
-            manifest.author = data.get("author", data.get("maintainer", ""))
+            manifest.author = data.get("author", data.get("maintainer", ""))  # type: ignore[assignment]
             manifest.tags = data.get("tags", [])
             manifest.category = data.get("category", "general")
             manifest.steps = self._convert_steps(data)

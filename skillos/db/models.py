@@ -320,6 +320,8 @@ class TenantModel(Base):
     tenant_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="draft")
+    # I2 修复：租户 owner（开通者签名身份），写操作仅 owner 可执行
+    owner_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     scene_config: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, server_default="{}")
     payout_limit: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")
     payout_used: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.0")

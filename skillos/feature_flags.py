@@ -22,6 +22,7 @@ from enum import Enum
 from typing import Any
 
 import skillos.db.engine as _db_engine
+from skillos.audit import AuditEventType, log_audit
 from skillos.db.models import FeatureFlagModel
 
 
@@ -62,6 +63,7 @@ class FeatureFlagManager:
 
     _instance: FeatureFlagManager | None = None
     _lock = threading.Lock()
+    _write_lock = threading.Lock()
 
     def __new__(cls, *args: Any, **kwargs: Any) -> FeatureFlagManager:
         if cls._instance is None:
@@ -148,28 +150,41 @@ class FeatureFlagManager:
         if not name or not isinstance(name, str):
             raise ValueError("flag name must be a non-empty string")
 
-        session = _db_engine.SessionLocal()
-        try:
-            existing = session.query(FeatureFlagModel).filter_by(name=name).first()
-            if existing is not None:
-                raise ValueError(f"flag '{name}' already exists")
+        with self._write_lock:
+            session = _db_engine.SessionLocal()
+            try:
+                existing = session.query(FeatureFlagModel).filter_by(name=name).first()
+                if existing is not None:
+                    raise ValueError(f"flag '{name}' already exists")
 
-            model = FeatureFlagModel(
-                name=name,
-                flag_type=flag_type.value,
-                state=state.value,
-                value=value,
-                description=description,
-            )
-            session.add(model)
-            session.commit()
+                model = FeatureFlagModel(
+                    name=name,
+                    flag_type=flag_type.value,
+                    state=state.value,
+                    value=value,
+                    description=description,
+                )
+                session.add(model)
+                session.commit()
 
-            flag = self._model_to_flag(model)
-            with self._cache_lock:
-                self._cache[name] = flag
-            return flag
-        finally:
-            session.close()
+                flag = self._model_to_flag(model)
+                with self._cache_lock:
+                    self._cache[name] = flag
+                log_audit(
+                    AuditEventType.CONFIG_CHANGED,
+                    "system",
+                    name,
+                    "Create feature flag",
+                    {
+                        "action": "create",
+                        "flag_type": flag_type.value,
+                        "state": state.value,
+                        "description": description,
+                    },
+                )
+                return flag
+            finally:
+                session.close()
 
     def update_flag(
         self,
@@ -179,44 +194,67 @@ class FeatureFlagManager:
         description: str | None = None,
     ) -> FeatureFlag | None:
         """更新开关状态（动态生效，无需重启）。"""
-        session = _db_engine.SessionLocal()
-        try:
-            model = session.query(FeatureFlagModel).filter_by(name=name).first()
-            if model is None:
-                return None
+        with self._write_lock:
+            session = _db_engine.SessionLocal()
+            try:
+                model = session.query(FeatureFlagModel).filter_by(name=name).first()
+                if model is None:
+                    return None
 
-            if state is not None:
-                model.state = state.value
-            if value is not None:
-                model.value = value
-            if description is not None:
-                model.description = description
+                prev_state = model.state
+                if state is not None:
+                    model.state = state.value
+                if value is not None:
+                    model.value = value
+                if description is not None:
+                    model.description = description
 
-            session.commit()
+                session.commit()
 
-            flag = self._model_to_flag(model)
-            with self._cache_lock:
-                self._cache[name] = flag
-            return flag
-        finally:
-            session.close()
+                flag = self._model_to_flag(model)
+                with self._cache_lock:
+                    self._cache[name] = flag
+                log_audit(
+                    AuditEventType.CONFIG_CHANGED,
+                    "system",
+                    name,
+                    "Update feature flag",
+                    {
+                        "action": "update",
+                        "prev_state": prev_state,
+                        "new_state": flag.state.value,
+                        "flag_type": flag.flag_type.value,
+                    },
+                )
+                return flag
+            finally:
+                session.close()
 
     def delete_flag(self, name: str) -> bool:
         """删除开关。"""
-        session = _db_engine.SessionLocal()
-        try:
-            model = session.query(FeatureFlagModel).filter_by(name=name).first()
-            if model is None:
-                return False
+        with self._write_lock:
+            session = _db_engine.SessionLocal()
+            try:
+                model = session.query(FeatureFlagModel).filter_by(name=name).first()
+                if model is None:
+                    return False
 
-            session.delete(model)
-            session.commit()
+                prev_state = model.state
+                session.delete(model)
+                session.commit()
 
-            with self._cache_lock:
-                self._cache.pop(name, None)
-            return True
-        finally:
-            session.close()
+                with self._cache_lock:
+                    self._cache.pop(name, None)
+                log_audit(
+                    AuditEventType.CONFIG_CHANGED,
+                    "system",
+                    name,
+                    "Delete feature flag",
+                    {"action": "delete", "prev_state": prev_state},
+                )
+                return True
+            finally:
+                session.close()
 
     def refresh(self) -> None:
         """强制从 DB 刷新缓存。"""

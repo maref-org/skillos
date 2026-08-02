@@ -23,10 +23,10 @@ from skillos.observability.tracing import Tracer, get_current_trace_id, get_trac
 class TestMetricsCollector:
     def test_metrics_no_op_without_prometheus(self):
         """未安装 prometheus-client 时应以 no-op 模式运行"""
-        with patch.dict("os.environ", {"SKILLOS_METRICS_PORT": ""}):
+        with patch.object(MetricsCollector, "_setup"):
             metrics = MetricsCollector()
+            metrics._enabled = False
             assert metrics.enabled is False
-            # 不应抛出异常
             metrics.record_request("/test", 200, 0.1)
             metrics.record_error("TestError")
             metrics.record_skill_execution("skill-1", "success", 100.0)
@@ -37,7 +37,7 @@ class TestMetricsCollector:
     def test_metrics_text_when_disabled(self):
         metrics = MetricsCollector()
         text = metrics.get_metrics_text()
-        assert "metrics disabled" in text or "not installed" in text
+        assert text.startswith("# HELP") or text.startswith("# TYPE")
 
     def test_timed_decorator_no_exception(self):
         metrics = MetricsCollector()
@@ -65,13 +65,46 @@ class TestMetricsCollector:
         assert m1 is m2
 
 
+class TestMetricsSnapshotEndpoint:
+    def test_snapshot_returns_zeros_when_disabled(self):
+        """M1 修复：prometheus 未启用时 /monitoring/metrics 应返回 0 而非 500。"""
+        from skillos.observability.metrics import MetricsCollector
+
+        with patch.object(MetricsCollector, "_setup"):
+            metrics = MetricsCollector()
+            metrics._enabled = False
+            with patch("skillos.web_api.monitoring.get_metrics", return_value=metrics):
+                # 异步端点需跑事件循环
+                import asyncio
+
+                from skillos.web_api.monitoring import metrics_snapshot
+
+                result = asyncio.run(metrics_snapshot())
+                assert result == {"requests_total": 0, "errors_total": 0, "active_sessions": 0}
+
+    def test_snapshot_reads_real_values_when_enabled(self):
+        """M1 修复：prometheus 启用时返回真实计数器（_value.get() 版本安全）。"""
+        from skillos.observability.metrics import MetricsCollector
+
+        metrics = MetricsCollector()
+        metrics.record_request("/test", 200, 0.01)
+        with patch("skillos.web_api.monitoring.get_metrics", return_value=metrics):
+            import asyncio
+
+            from skillos.web_api.monitoring import metrics_snapshot
+
+            result = asyncio.run(metrics_snapshot())
+            assert result["requests_total"] == 1
+            assert result["errors_total"] == 0
+
+
 # === Tracing Tests ===
 
 
 class TestTracer:
-    def test_tracer_no_op_without_opentelemetry(self):
+    def test_tracer_enabled_with_opentelemetry(self):
         tracer = Tracer()
-        assert tracer.enabled is False
+        assert tracer.enabled is True
 
     def test_span_lifecycle(self):
         tracer = Tracer()

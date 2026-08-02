@@ -4,17 +4,17 @@ import sys
 from pathlib import Path
 
 _self = Path(__file__).resolve()
-_proj_parent = _self.parent.parent.parent  # scripts/../.. = skillos root's parent
-if str(_proj_parent) not in sys.path:
-    sys.path.insert(0, str(_proj_parent))
+_proj_root = _self.parent.parent  # scripts/.. = project root
+if str(_proj_root) not in sys.path:
+    sys.path.insert(0, str(_proj_root))
 
-from skillos._types import SkillCall  # noqa: E402
 from skillos.distribution.engine import (  # noqa: E402
     CONTRIBUTOR_SECONDARY_SPLIT,
     ECOSYSTEM_FUND_ALLOCATION,
     WEIGHT_FORMULA_COEFFICIENTS,
     DistributionEngine,
 )
+from skillos.types import SkillCall  # noqa: E402
 
 errors = []
 

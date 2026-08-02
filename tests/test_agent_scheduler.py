@@ -8,6 +8,7 @@ import pytest
 from skillos._types import Task
 from skillos.kernel.agent_scheduler import (
     AgentAssignment,
+    AgentExecutionError,
     AgentScheduler,
     ConsensusResult,
     ModelRoute,
@@ -376,3 +377,130 @@ class TestAssignmentHistory:
         assert summary["total_assignments"] == 2
         assert summary["total_estimated_cost_usd"] == pytest.approx(0.003, abs=1e-4)
         assert len(summary["by_model"]) == 2
+
+
+class TestExecuteWithFallback:
+    """Test execute_with_fallback() — sub-agent failure retry via fallback_chain (P1 #3)."""
+
+    def test_primary_succeeds_no_fallback(self, medium_task):
+        """Primary model succeeds — no fallback needed."""
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(medium_task)
+        calls = []
+
+        def execute_fn(task, model_group):
+            calls.append(model_group)
+            return {"result": "success", "model_group": model_group}
+
+        result = scheduler.execute_with_fallback(medium_task, assignment, execute_fn)
+        assert result["result"] == "success"
+        # Only primary called
+        assert len(calls) == 1
+        assert calls[0] == assignment.model_group
+
+    def test_primary_fails_secondary_succeeds(self, medium_task):
+        """Primary fails, secondary succeeds — fallback works."""
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(medium_task)
+        # LOW tier: fallback_chain = ["primary", "secondary", "local"]
+        assert assignment.fallback_chain == ["primary", "secondary", "local"]
+
+        calls = []
+
+        def execute_fn(task, model_group):
+            calls.append(model_group)
+            if model_group == "primary":
+                raise RuntimeError("primary model timeout")
+            return {"result": "success", "model_group": model_group}
+
+        result = scheduler.execute_with_fallback(medium_task, assignment, execute_fn)
+        assert result["result"] == "success"
+        assert result["model_group"] == "secondary"
+        # Primary + secondary called
+        assert calls == ["primary", "secondary"]
+
+    def test_all_fail_raises_execution_error(self, medium_task):
+        """All fallback models fail — raises AgentExecutionError."""
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(medium_task)
+
+        calls = []
+
+        def execute_fn(task, model_group):
+            calls.append(model_group)
+            raise RuntimeError(f"{model_group} failed")
+
+        with pytest.raises(AgentExecutionError) as exc_info:
+            scheduler.execute_with_fallback(medium_task, assignment, execute_fn)
+
+        assert "All 3 fallback models exhausted" in str(exc_info.value)
+        # All 3 groups tried
+        assert calls == ["primary", "secondary", "local"]
+
+    def test_empty_chain_uses_model_group(self, simple_task):
+        """Empty fallback_chain falls back to model_group."""
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(simple_task)
+        # FREE tier: fallback_chain = ["local"], only 1 entry
+        assert assignment.fallback_chain == ["local"]
+
+        def execute_fn(task, model_group):
+            return {"result": "ok"}
+
+        result = scheduler.execute_with_fallback(simple_task, assignment, execute_fn)
+        assert result["result"] == "ok"
+
+    def test_single_element_chain_failure_raises(self, simple_task):
+        """Single-element chain that fails raises AgentExecutionError."""
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(simple_task)
+
+        def execute_fn(task, model_group):
+            raise RuntimeError("local model crashed")
+
+        with pytest.raises(AgentExecutionError) as exc_info:
+            scheduler.execute_with_fallback(simple_task, assignment, execute_fn)
+        assert "All 1 fallback models exhausted" in str(exc_info.value)
+
+    def test_preserves_last_error_cause(self, medium_task):
+        """AgentExecutionError chains the last exception as cause."""
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(medium_task)
+
+        def execute_fn(task, model_group):
+            raise ValueError("specific error")
+
+        with pytest.raises(AgentExecutionError) as exc_info:
+            scheduler.execute_with_fallback(medium_task, assignment, execute_fn)
+
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ValueError)
+
+    def test_caller_id_from_metadata(self, medium_task):
+        """caller_id is extracted from task.metadata."""
+        medium_task.metadata["caller_id"] = "user-123"
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(medium_task)
+
+        def execute_fn(task, model_group):
+            return "ok"
+
+        scheduler.execute_with_fallback(medium_task, assignment, execute_fn)
+        # No assertion on audit log — just ensure no crash
+
+    def test_high_tier_two_fallbacks(self, complex_task):
+        """HIGH tier has 2 fallbacks — both fail raises error."""
+        scheduler = AgentScheduler()
+        assignment = scheduler.schedule(complex_task)
+        # HIGH tier: fallback_chain = ["secondary", "primary"]
+        assert assignment.fallback_chain == ["secondary", "primary"]
+
+        calls = []
+
+        def execute_fn(task, model_group):
+            calls.append(model_group)
+            raise RuntimeError(f"{model_group} failed")
+
+        with pytest.raises(AgentExecutionError):
+            scheduler.execute_with_fallback(complex_task, assignment, execute_fn)
+        assert calls == ["secondary", "primary"]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
@@ -11,10 +11,13 @@ from skillos.kernel.slo import get_slo_manager
 from skillos.observability.metrics import get_metrics
 from skillos.observability.slo_alerts import SloAlertService
 from skillos.observability.slo_snapshots import SloSnapshotService
+from skillos.web_api.auth import require_actor
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["监控中心"])
+
+_PROCESS_START = time.time()
 
 
 def _capture_and_evaluate(db: Session, slo_name: str | None = None) -> None:
@@ -43,14 +46,22 @@ async def overview(db: Session = Depends(get_session)):
         1 for s in slo_summary.values()
         if isinstance(s, dict) and s.get("error_budget", {}).get("status") == "healthy"
     )
+    # M10：用真实 SLO 观测数据替代硬编码假值（请求量 / 可用性失败率）。
+    total_requests = sum(int(s.get("requests", 0)) for s in slo_summary.values())
+    availability_failures = sum(
+        int(s.get("availability_failures", 0)) for s in slo_summary.values()
+    )
+    error_rate = (
+        round(availability_failures / total_requests, 4) if total_requests else 0.0
+    )
     return {
         "total_slos": len(slo_summary),
         "healthy_slos": healthy_count,
-        "error_rate": 0.05,
+        "error_rate": error_rate,
         "active_sessions": 0,
         "total_skills": 0,
         "version": "0.6.0-beta",
-        "uptime_seconds": time.time(),
+        "uptime_seconds": round(time.time() - _PROCESS_START, 2),
     }
 
 
@@ -103,10 +114,15 @@ async def alerts_silences(db: Session = Depends(get_session)):
 @router.post("/monitoring/alerts/{slo_name}/silence")
 async def alerts_silence(
     slo_name: str,
+    request: Request,
     until: str = Body(..., embed=True, description="ISO 时间（UTC），如 2026-08-02T00:00:00Z"),
     db: Session = Depends(get_session),
 ):
-    """设置该 SLO 的告警静默截止时间（M12-P3）。"""
+    """设置该 SLO 的告警静默截止时间（M12-P3）。
+
+    I9 修复：静默可掩盖故障告警，要求签名身份。
+    """
+    await require_actor(request, db)
     from datetime import datetime
 
     try:
@@ -118,8 +134,16 @@ async def alerts_silence(
 
 
 @router.delete("/monitoring/alerts/{slo_name}/silence")
-async def alerts_unsilence(slo_name: str, db: Session = Depends(get_session)):
-    """解除该 SLO 的告警静默（M12-P3）。"""
+async def alerts_unsilence(
+    slo_name: str,
+    request: Request,
+    db: Session = Depends(get_session),
+):
+    """解除该 SLO 的告警静默（M12-P3）。
+
+    I9 修复：要求签名身份。
+    """
+    await require_actor(request, db)
     removed = SloAlertService(db).unsilence(slo_name)
     if not removed:
         return {"slo_name": slo_name, "removed": False, "message": "无生效静默"}
@@ -128,13 +152,18 @@ async def alerts_unsilence(slo_name: str, db: Session = Depends(get_session)):
 
 @router.post("/monitoring/alerts/maintenance")
 async def create_maintenance_window(
+    request: Request,
     cron_expression: str = Body(..., embed=True),
     duration_minutes: int = Body(60, ge=1, embed=True),
     slo_name: str = Body("*", embed=True),
     description: str = Body("", embed=True),
     db: Session = Depends(get_session),
 ):
-    """创建周期维护窗口（M13-P2）。cron 无效时 400。"""
+    """创建周期维护窗口（M13-P2）。cron 无效时 400。
+
+    I9 修复：维护窗口可关闭告警，要求签名身份。
+    """
+    await require_actor(request, db)
     svc = SloAlertService(db)
     try:
         window = svc.create_maintenance_window(
@@ -158,8 +187,16 @@ async def list_maintenance_windows(db: Session = Depends(get_session)):
 
 
 @router.delete("/monitoring/alerts/maintenance/{window_id}")
-async def delete_maintenance_window(window_id: str, db: Session = Depends(get_session)):
-    """删除维护窗口（M13-P2）。"""
+async def delete_maintenance_window(
+    window_id: str,
+    request: Request,
+    db: Session = Depends(get_session),
+):
+    """删除维护窗口（M13-P2）。
+
+    I9 修复：要求签名身份。
+    """
+    await require_actor(request, db)
     removed = SloAlertService(db).delete_maintenance_window(window_id)
     if not removed:
         raise HTTPException(status_code=404, detail=f"Maintenance window not found: {window_id}")
@@ -169,20 +206,21 @@ async def delete_maintenance_window(window_id: str, db: Session = Depends(get_se
 @router.get("/monitoring/metrics")
 async def metrics_snapshot():
     metrics = get_metrics()
+    if not getattr(metrics, "_enabled", False):
+        return {"requests_total": 0, "errors_total": 0, "active_sessions": 0}
+
+    def _sum_metric(metric) -> float:
+        """聚合 Counter 全部 label 组合的值（prometheus-client 版本安全）。"""
+        if metric is None:
+            return 0.0
+        total = 0.0
+        for label_metric in getattr(metric, "_metrics", {}).values():
+            value = getattr(label_metric, "_value", 0.0)
+            total += value.get() if hasattr(value, "get") else float(value)
+        return total
+
     return {
-        "requests_total": (
-            metrics.skillos_requests_total._value.get()
-            if hasattr(metrics, "skillos_requests_total")
-            else 0
-        ),
-        "errors_total": (
-            metrics.skillos_errors_total._value.get()
-            if hasattr(metrics, "skillos_errors_total")
-            else 0
-        ),
-        "active_sessions": (
-            metrics.skillos_session_active_count._value.get()
-            if hasattr(metrics, "skillos_session_active_count")
-            else 0
-        ),
+        "requests_total": _sum_metric(metrics._requests_total),
+        "errors_total": _sum_metric(metrics._errors_total),
+        "active_sessions": _sum_metric(metrics._session_active_count),
     }

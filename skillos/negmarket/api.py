@@ -47,6 +47,7 @@ async def upload_negative_sample(
     storage: StorageBackend = Depends(get_storage),
     pipeline: DesensitizationPipeline = Depends(get_pipeline),
 ):
+    # contributor_secret 以明文传输，生产环境必须使用 HTTPS
     sample = pipeline.process(raw_text, contributor_id, category)
     encrypted = storage.encrypt_for_sample(sample, contributor_secret)
     sample.encrypted_blob = encrypted

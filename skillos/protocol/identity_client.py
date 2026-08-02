@@ -22,6 +22,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
+from skillos.audit import AuditEventType, log_audit
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +54,7 @@ class IdentityClient:
     ):
         # 强制 HTTPS：生产环境禁止 HTTP
         raw_url = base_url or os.getenv("SKILLOS_IDENTITY_URL", "https://localhost:8080")
-        self.base_url = self._enforce_https(raw_url)
+        self.base_url = self._enforce_https(raw_url)  # type: ignore[arg-type]
         # API Key 从环境变量读取，禁止明文存储
         self._api_key = api_key or os.getenv("SKILLOS_API_KEY")
         self._identities: dict[str, IdentityRecord] = {}
@@ -122,6 +124,13 @@ class IdentityClient:
 
         self._identities[identity_id] = record
         logger.info("Identity registered: %s (role=%s)", identity_id, role)
+        log_audit(
+            AuditEventType.IDENTITY_REGISTERED,
+            identity_id,
+            identity_id,
+            f"Register identity (role={role})",
+            {"role": role, "verified": False},
+        )
         return record
 
     def verify_identity(self, identity_id: str, challenge: str, challenge_signature: str) -> bool:
@@ -138,10 +147,24 @@ class IdentityClient:
         record = self._identities.get(identity_id)
         if record is None:
             logger.warning("Identity not found for verification: %s", identity_id)
+            log_audit(
+                AuditEventType.AUTH_FAILURE,
+                identity_id,
+                identity_id,
+                "Identity verification failed (identity not found)",
+                {"reason": "identity_not_found"},
+            )
             return False
 
         if not challenge or not isinstance(challenge, str):
             logger.warning("Invalid challenge for identity: %s", identity_id)
+            log_audit(
+                AuditEventType.AUTH_FAILURE,
+                identity_id,
+                identity_id,
+                "Identity verification failed (invalid challenge)",
+                {"reason": "invalid_challenge"},
+            )
             return False
 
         try:
@@ -150,12 +173,33 @@ class IdentityClient:
             public_key.verify(signature_bytes, challenge.encode("utf-8"))
             record.verified = True
             logger.info("Identity verified: %s", identity_id)
+            log_audit(
+                AuditEventType.IDENTITY_VERIFIED,
+                identity_id,
+                identity_id,
+                "Identity verified (challenge-response)",
+                {"role": record.role},
+            )
             return True
         except InvalidSignature:
             logger.warning("Invalid challenge signature for identity: %s", identity_id)
+            log_audit(
+                AuditEventType.AUTH_FAILURE,
+                identity_id,
+                identity_id,
+                "Identity verification failed (invalid signature)",
+                {"reason": "invalid_signature"},
+            )
             return False
         except Exception as exc:
             logger.error("Verification error for identity %s: %s", identity_id, exc)
+            log_audit(
+                AuditEventType.AUTH_FAILURE,
+                identity_id,
+                identity_id,
+                "Identity verification failed (exception)",
+                {"reason": "verification_error", "error": str(exc)},
+            )
             return False
 
     def sign(self, identity_id: str, data: str) -> Signature | None:
@@ -212,6 +256,13 @@ class IdentityClient:
         record = self._identities.get(signature.signer_id)
         if record is None:
             logger.warning("Identity not found for signature verification: %s", signature.signer_id)
+            log_audit(
+                AuditEventType.IDENTITY_SIGN,
+                signature.signer_id,
+                signature.data_hash,
+                "Signature verification failed (identity not found)",
+                {"valid": False, "reason": "identity_not_found"},
+            )
             return False
 
         try:
@@ -223,15 +274,43 @@ class IdentityClient:
             expected_hash = hashlib.sha256(original_data.encode("utf-8")).hexdigest()
             if signature.data_hash != expected_hash:
                 logger.warning("Data hash mismatch for signature by identity: %s", signature.signer_id)
+                log_audit(
+                    AuditEventType.IDENTITY_SIGN,
+                    signature.signer_id,
+                    signature.data_hash,
+                    "Signature verification failed (hash mismatch)",
+                    {"valid": False, "reason": "hash_mismatch"},
+                )
                 return False
 
             logger.info("Signature verified for identity: %s", signature.signer_id)
+            log_audit(
+                AuditEventType.IDENTITY_SIGN,
+                signature.signer_id,
+                signature.data_hash,
+                "Signature verified (Ed25519)",
+                {"valid": True},
+            )
             return True
         except InvalidSignature:
             logger.warning("Invalid signature for identity: %s", signature.signer_id)
+            log_audit(
+                AuditEventType.IDENTITY_SIGN,
+                signature.signer_id,
+                signature.data_hash,
+                "Signature verification failed (invalid signature)",
+                {"valid": False, "reason": "invalid_signature"},
+            )
             return False
         except Exception as exc:
             logger.error("Signature verification error for %s: %s", signature.signer_id, exc)
+            log_audit(
+                AuditEventType.IDENTITY_SIGN,
+                signature.signer_id,
+                signature.data_hash,
+                "Signature verification failed (exception)",
+                {"valid": False, "reason": "verification_error", "error": str(exc)},
+            )
             return False
 
     def generate_challenge(self, identity_id: str) -> dict[str, Any]:
@@ -303,8 +382,7 @@ class IdentityClient:
 
     @staticmethod
     def _load_public_key(pem: str) -> Ed25519PublicKey:
-        """从 PEM 字符串加载 Ed25519 公钥"""
-        return serialization.load_pem_public_key(pem.encode("utf-8"))
+        return serialization.load_pem_public_key(pem.encode("utf-8"))  # type: ignore[return-value]
 
     @staticmethod
     def _b64encode(data: bytes) -> str:

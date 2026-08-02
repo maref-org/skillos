@@ -15,8 +15,9 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
+from skillos.audit import AuditEventType, log_audit
 from skillos.types import ModelTier, Task
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,10 @@ class AgentAssignment:
     estimated_cost_usd: float
     estimated_latency_ms: float
     fallback_chain: list[str]
+
+
+class AgentExecutionError(Exception):
+    """Agent 执行失败 — 所有 fallback 模型均已耗尽。"""
 
 
 @dataclass
@@ -109,6 +114,97 @@ class AgentScheduler:
         )
 
         return assignment
+
+    def execute_with_fallback(
+        self,
+        task: Task,
+        assignment: AgentAssignment,
+        execute_fn: Callable[[Task, str], Any],
+    ) -> Any:
+        """使用 fallback_chain 执行任务，失败自动重试（sub-agent 失败重试）。
+
+        遍历 assignment.fallback_chain 中的 model group，依次尝试执行：
+        1. 调用 execute_fn(task, model_group) 尝试执行
+        2. 成功则返回结果（并记录审计日志）
+        3. 失败则记录错误，尝试下一个 model group
+        4. 全部失败则抛出 AgentExecutionError
+
+        Args:
+            task: 要执行的任务
+            assignment: schedule() 返回的调度分配（含 fallback_chain）
+            execute_fn: 执行函数，签名为 (task, model_group) -> result
+                        执行失败时应抛出 Exception
+
+        Returns:
+            执行结果
+
+        Raises:
+            AgentExecutionError: 所有 fallback 模型均失败
+        """
+        chain = assignment.fallback_chain or [assignment.model_group]
+        last_error: Exception | None = None
+        attempted: list[dict[str, Any]] = []
+        caller_id = task.metadata.get("caller_id", "unknown")
+
+        for idx, model_group in enumerate(chain):
+            try:
+                result = execute_fn(task, model_group)
+                # 成功
+                log_audit(
+                    AuditEventType.SKILL_EXECUTED,
+                    caller_id,
+                    task.task_id,
+                    "execute_with_fallback succeeded"
+                    if idx > 0
+                    else "execute_with_fallback succeeded (primary)",
+                    {
+                        "model_group": model_group,
+                        "attempt": idx + 1,
+                        "total_attempts": len(chain),
+                        "succeeded": True,
+                    },
+                )
+                if idx > 0:
+                    logger.info(
+                        "Task %s succeeded on fallback #%d (group=%s)",
+                        task.task_id,
+                        idx + 1,
+                        model_group,
+                    )
+                return result
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                attempted.append(
+                    {
+                        "model_group": model_group,
+                        "error": str(exc),
+                        "attempt": idx + 1,
+                    }
+                )
+                logger.warning(
+                    "Task %s failed on model_group=%s (attempt %d/%d): %s",
+                    task.task_id,
+                    model_group,
+                    idx + 1,
+                    len(chain),
+                    exc,
+                )
+
+        # 所有 fallback 都失败
+        log_audit(
+            AuditEventType.SKILL_EXECUTED,
+            caller_id,
+            task.task_id,
+            "execute_with_fallback exhausted all fallbacks",
+            {
+                "succeeded": False,
+                "attempts": attempted,
+                "total_attempts": len(chain),
+            },
+        )
+        raise AgentExecutionError(
+            f"All {len(chain)} fallback models exhausted for task {task.task_id}"
+        ) from last_error
 
     def cascade(self, task: Task, confidence: float) -> ModelRoute:
         """级联策略：置信度不足时升级模型"""
@@ -241,13 +337,11 @@ class AgentScheduler:
 
     @staticmethod
     def _find_majority_index(scores: list[float], n: int) -> int:
-        if not scores:
+        if not scores or n <= 1:
             return 0
-        max_idx = scores.index(max(scores))
-        idx = 0
-        for i in range(n):
-            for _j in range(i + 1, n):
-                if idx == max_idx:
-                    return i
-                idx += 1
-        return 0
+        from itertools import combinations
+        pairs = list(combinations(range(n), 2))
+        if not pairs:
+            return 0
+        best_idx = scores.index(max(scores))
+        return pairs[best_idx][0]

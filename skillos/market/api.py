@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
@@ -9,6 +9,7 @@ from skillos.market.pricing import PricingEngine
 from skillos.market.providers import ProviderProfile, ProviderRegistry
 from skillos.market.registry import SkillRegistry
 from skillos.market.settlement import SettlementEngine
+from skillos.web_api.auth import require_actor
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -34,7 +35,8 @@ def _get_bounty_service(db: Session = Depends(get_session)) -> BountyService:
 
 
 @router.post("/register")
-def register_skill(
+async def register_skill(
+    request: Request,
     skill_id: str,
     name: str,
     version: str,
@@ -42,8 +44,11 @@ def register_skill(
     description: str = "",
     category: str = "general",
     price: float = 0.0,
+    db: Session = Depends(get_session),
     registry: SkillRegistry = Depends(_get_registry),
 ):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     listing = registry.register(
         skill_id=skill_id,
         name=name,
@@ -77,17 +82,28 @@ def get_listing(listing_id: str, registry: SkillRegistry = Depends(_get_registry
 
 
 @router.post("/listings/{listing_id}/price")
-def price_skill(listing_id: str, pricing: PricingEngine = Depends(_get_pricing)):
+async def price_skill(
+    listing_id: str,
+    request: Request,
+    db: Session = Depends(get_session),
+    pricing: PricingEngine = Depends(_get_pricing),
+):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     return pricing.calculate_price(listing_id)
 
 
 @router.post("/listings/{listing_id}/settle")
-def settle_skill(
+async def settle_skill(
     listing_id: str,
+    request: Request,
     amount: float,
     period: str = "daily",
+    db: Session = Depends(get_session),
     settlement: SettlementEngine = Depends(_get_settlement),
 ):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     try:
         result = settlement.settle_listing(listing_id, amount, period)
         return {"success": True, "settlement": result}
@@ -110,19 +126,30 @@ def settlement_summary(listing_id: str, settlement: SettlementEngine = Depends(_
 
 
 @router.post("/listings/{listing_id}/deprecate")
-def deprecate_listing(listing_id: str, registry: SkillRegistry = Depends(_get_registry)):
+async def deprecate_listing(
+    listing_id: str,
+    request: Request,
+    db: Session = Depends(get_session),
+    registry: SkillRegistry = Depends(_get_registry),
+):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     ok = registry.deprecate(listing_id)
     return {"success": ok}
 
 
 @router.post("/listings/{listing_id}/reviews")
-def add_review(
+async def add_review(
     listing_id: str,
+    request: Request,
     reviewer_id: str,
     rating: int = Query(..., ge=1, le=5),
     review_text: str = "",
+    db: Session = Depends(get_session),
     registry: SkillRegistry = Depends(_get_registry),
 ):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     ok = registry.add_review(listing_id, reviewer_id, rating, review_text)
     return {"success": ok}
 
@@ -205,10 +232,14 @@ def _serialize_provider(profile: ProviderProfile) -> dict:
 
 
 @router.post("/bounties")
-def create_bounty(
+async def create_bounty(
+    request: Request,
     payload: dict = Body(...),
+    db: Session = Depends(get_session),
     service: BountyService = Depends(_get_bounty_service),
 ):
+    """I4 修复：签名鉴权，且 poster 强制为签名身份。"""
+    await require_actor(request, db)
     dry_run = bool(payload.get("dry_run", False))
     try:
         result = service.create(
@@ -272,7 +303,14 @@ def get_bounty(bounty_id: str, service: BountyService = Depends(_get_bounty_serv
 
 
 @router.post("/bounties/{bounty_id}/publish")
-def publish_bounty(bounty_id: str, service: BountyService = Depends(_get_bounty_service)):
+async def publish_bounty(
+    bounty_id: str,
+    request: Request,
+    db: Session = Depends(get_session),
+    service: BountyService = Depends(_get_bounty_service),
+):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     try:
         return {"success": True, "bounty": service.publish(bounty_id)}
     except ValueError as e:
@@ -280,7 +318,14 @@ def publish_bounty(bounty_id: str, service: BountyService = Depends(_get_bounty_
 
 
 @router.post("/bounties/{bounty_id}/cancel")
-def cancel_bounty(bounty_id: str, service: BountyService = Depends(_get_bounty_service)):
+async def cancel_bounty(
+    bounty_id: str,
+    request: Request,
+    db: Session = Depends(get_session),
+    service: BountyService = Depends(_get_bounty_service),
+):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     try:
         return {"success": True, "bounty": service.cancel(bounty_id)}
     except ValueError as e:
@@ -288,12 +333,18 @@ def cancel_bounty(bounty_id: str, service: BountyService = Depends(_get_bounty_s
 
 
 @router.post("/bounties/{bounty_id}/apply")
-def apply_bounty(
+async def apply_bounty(
     bounty_id: str,
+    request: Request,
     applicant_id: str = Body(...),
     message: str = Body(""),
+    db: Session = Depends(get_session),
     service: BountyService = Depends(_get_bounty_service),
 ):
+    """I4 修复：签名鉴权。"""
+    actor = await require_actor(request, db)
+    if applicant_id != actor:
+        return {"error": f"applicant must be the signing identity ({actor})"}
     try:
         return {"success": True, "application": service.apply(bounty_id, applicant_id, message)}
     except ValueError as e:
@@ -306,11 +357,15 @@ def list_applications(bounty_id: str, service: BountyService = Depends(_get_boun
 
 
 @router.post("/bounties/{bounty_id}/applications/{application_id}/accept")
-def accept_application(
+async def accept_application(
     bounty_id: str,
     application_id: str,
+    request: Request,
+    db: Session = Depends(get_session),
     service: BountyService = Depends(_get_bounty_service),
 ):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     try:
         return {"success": True, "bounty": service.accept_application(bounty_id, application_id)}
     except ValueError as e:
@@ -318,11 +373,15 @@ def accept_application(
 
 
 @router.post("/bounties/{bounty_id}/submit")
-def submit_delivery(
+async def submit_delivery(
     bounty_id: str,
+    request: Request,
     evidence: dict = Body(..., embed=True),
+    db: Session = Depends(get_session),
     service: BountyService = Depends(_get_bounty_service),
 ):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     try:
         return {"success": True, "bounty": service.submit_delivery(bounty_id, evidence)}
     except ValueError as e:
@@ -330,11 +389,15 @@ def submit_delivery(
 
 
 @router.post("/bounties/{bounty_id}/confirm")
-def confirm_delivery(
+async def confirm_delivery(
     bounty_id: str,
+    request: Request,
     accepted: bool = Body(True, embed=True),
+    db: Session = Depends(get_session),
     service: BountyService = Depends(_get_bounty_service),
 ):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     try:
         return {"success": True, "bounty": service.confirm_delivery(bounty_id, accepted)}
     except ValueError as e:
@@ -342,7 +405,14 @@ def confirm_delivery(
 
 
 @router.post("/bounties/{bounty_id}/settle")
-def settle_bounty(bounty_id: str, service: BountyService = Depends(_get_bounty_service)):
+async def settle_bounty(
+    bounty_id: str,
+    request: Request,
+    db: Session = Depends(get_session),
+    service: BountyService = Depends(_get_bounty_service),
+):
+    """I4 修复：签名鉴权。"""
+    await require_actor(request, db)
     try:
         return {"success": True, "settlement": service.settle(bounty_id)}
     except ValueError as e:

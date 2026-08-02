@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from skillos.db.engine import get_session
 from skillos.market.payments import get_provider, submit_contract_payout
 from skillos.market.payments.base import ProviderNotConfiguredError
+from skillos.web_api.auth import require_actor
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,8 @@ async def webhook(
     headers = {k.lower(): v for k, v in request.headers.items()}
 
     try:
-        receipt = p.verify_webhook(headers, body)
+        raw_str = raw.decode("utf-8") if raw else None
+        receipt = p.verify_webhook(headers, body, raw_body=raw_str)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=f"webhook verification failed: {exc}") from exc
 
@@ -93,10 +95,15 @@ async def webhook(
 @router.post("/contracts/{contract_id}/submit")
 async def submit_contract_payout_api(
     contract_id: str,
+    request: Request,
     payload: dict = Body(...),
     db: Session = Depends(get_session),
 ):
-    """手动触发出款提交到持牌平台（记账层内部触发为主，此端点为运维手动重试）。"""
+    """手动触发出款提交到持牌平台（C8 修复：签名鉴权，防匿名触发出款）。
+
+    记账层内部触发为主，此端点为运维手动重试，必须签名身份。
+    """
+    await require_actor(request, db)
     provider_name = payload.get("provider", "")
     try:
         provider = get_provider(provider_name) if provider_name else get_provider()

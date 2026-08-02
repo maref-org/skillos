@@ -211,3 +211,29 @@ class TestTenantPayoutQuotaApi:
         t = r.json()["tenant"]
         assert t["payout_limit"] == 0.0
         assert t["payout_used"] == 0.0
+
+
+class TestTenantOwnerGuard:
+    """I2 — 租户写操作仅 owner 可执行。"""
+
+    def test_non_owner_cannot_modify_scene(self, client):
+        owner = _register(client, "owner-1")
+        intruder = _register(client, "intruder-1")
+        _signed_post(client, owner, "/tenants", {"tenant_id": "tenant-own-1", "name": "有主租户"})
+        r = _signed_put(client, intruder, "/tenants/tenant-own-1/scene", {"scene_config": {"template": "hacked"}})
+        assert r.status_code == 403
+        assert "owner" in r.json()["detail"]
+
+    def test_non_owner_cannot_set_quota(self, client):
+        owner = _register(client, "owner-2")
+        intruder = _register(client, "intruder-2")
+        _signed_post(client, owner, "/tenants", {"tenant_id": "tenant-own-2", "name": "限额定"})
+        r = _signed_put(client, intruder, "/tenants/tenant-own-2/quota", {"payout_limit": 100000})
+        assert r.status_code == 403
+
+    def test_owner_can_modify(self, client):
+        owner = _register(client, "owner-3")
+        _signed_post(client, owner, "/tenants", {"tenant_id": "tenant-own-3", "name": "自有"})
+        r = _signed_put(client, owner, "/tenants/tenant-own-3/scene", {"scene_config": {"template": "短视频矩阵"}})
+        assert r.status_code == 200, r.text
+        assert r.json()["tenant"]["scene_config"]["template"] == "短视频矩阵"

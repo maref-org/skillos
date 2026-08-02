@@ -12,11 +12,24 @@ import json
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _utcnow() -> datetime:
+    """M7 修复：统一 UTC 时间（与全仓 db/models.py 的 _utc_now 一致）。"""
+    return datetime.now(timezone.utc)
+
+
+def _parse_utc(value: str) -> datetime:
+    """解析 DB 时间戳；旧数据无 tz 时按 UTC 兜底，避免与 aware now 比较 TypeError。"""
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 _DEFAULT_DB_PATH = "data/skillos_state.db"
 
@@ -86,7 +99,7 @@ class StatePersistor:
 
     def save_state(self, state: PersistentState) -> bool:
         """保存会话状态"""
-        now = datetime.now().isoformat()
+        now = _utcnow().isoformat()
         created = state.created_at or now
         try:
             with self._get_conn() as conn:
@@ -105,8 +118,8 @@ class StatePersistor:
                 )
             logger.debug("State saved: %s/%s", state.session_id, state.state_key)
             return True
-        except Exception as e:
-            logger.error("Failed to save state: %s", e)
+        except Exception:
+            logger.exception("Failed to save state")
             return False
 
     def load_state(self, session_id: str, state_key: str) -> Any | None:
@@ -124,8 +137,8 @@ class StatePersistor:
             ttl = row["ttl_seconds"]
 
             if ttl > 0:
-                updated_at = datetime.fromisoformat(row["updated_at"])
-                if (datetime.now() - updated_at).total_seconds() > ttl:
+                updated_at = _parse_utc(row["updated_at"])
+                if (_utcnow() - updated_at).total_seconds() > ttl:
                     conn.execute(
                         "DELETE FROM session_states WHERE session_id=? AND state_key=?",
                         (session_id, state_key),
@@ -169,7 +182,7 @@ class StatePersistor:
         status: str = "completed",
     ) -> bool:
         """保存任务执行结果到 memory"""
-        now = datetime.now().isoformat()
+        now = _utcnow().isoformat()
         try:
             with self._get_conn() as conn:
                 conn.execute(
@@ -188,8 +201,8 @@ class StatePersistor:
                 )
             logger.debug("Task result saved: %s", task_id)
             return True
-        except Exception as e:
-            logger.error("Failed to save task result: %s", e)
+        except Exception:
+            logger.exception("Failed to save task result")
             return False
 
     def get_task_history(self, session_id: str, limit: int = 10) -> list[dict]:
@@ -237,14 +250,14 @@ class StatePersistor:
 
     def cleanup_expired(self) -> int:
         """清理过期状态"""
-        now = datetime.now()
+        now = _utcnow()
         count = 0
         with self._get_conn() as conn:
             cursor = conn.execute(
                 "SELECT session_id, state_key, ttl_seconds, updated_at FROM session_states WHERE ttl_seconds > 0"
             )
             for row in cursor.fetchall():
-                updated_at = datetime.fromisoformat(row["updated_at"])
+                updated_at = _parse_utc(row["updated_at"])
                 if (now - updated_at).total_seconds() > row["ttl_seconds"]:
                     conn.execute(
                         "DELETE FROM session_states WHERE session_id=? AND state_key=?",

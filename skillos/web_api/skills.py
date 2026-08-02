@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from skillos.kernel.agent_scheduler import AgentScheduler
 from skillos.kernel.skill_kernel import SkillKernel
 
 router = APIRouter(tags=["技能管理"])
+
+logger = logging.getLogger(__name__)
 
 _kernel: SkillKernel | None = None
 _scheduler: AgentScheduler | None = None
@@ -63,6 +67,7 @@ async def execute_skill(skill_id: str):
         )
         return {"status": "ok", "result": result}
     except Exception as e:
+        logger.exception("Skill %s execution failed", skill_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 

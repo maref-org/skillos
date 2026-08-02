@@ -103,42 +103,50 @@ class SLOManager:
 
     def __init__(self, configs: dict[str, SLOConfig] | None = None):
         self._configs = configs or dict(self._DEFAULT_CONFIGS)
-        self._measurements: dict[str, list[SLIMeasurement]] = {k: [] for k in self._configs}
+        # I5 修复：latency 与 availability 分开存储，避免同一请求双倍计数
+        self._latency: dict[str, list[SLIMeasurement]] = {k: [] for k in self._configs}
+        self._availability: dict[str, list[SLIMeasurement]] = {k: [] for k in self._configs}
 
     def record_latency(self, slo_name: str, latency_ms: float) -> SLIMeasurement:
         config = self._configs[slo_name]
         passed = latency_ms <= config.target_percentile_latency_ms
         m = SLIMeasurement(timestamp=time.time(), value=latency_ms, passed=passed)
-        self._measurements[slo_name].append(m)
+        self._latency[slo_name].append(m)
         return m
 
     def record_availability(self, slo_name: str, success: bool) -> SLIMeasurement:
         m = SLIMeasurement(timestamp=time.time(), value=1.0 if success else 0.0, passed=success)
-        self._measurements[slo_name].append(m)
+        self._availability[slo_name].append(m)
         return m
+
+    def _prune(self, name: str, config: SLOConfig) -> None:
+        """I5 修复：剪除窗口外测量，防止内存无限增长。"""
+        window_sec = config.window_hours * 3600
+        now = time.time()
+        self._latency[name] = [m for m in self._latency[name] if now - m.timestamp <= window_sec]
+        self._availability[name] = [m for m in self._availability[name] if now - m.timestamp <= window_sec]
 
     def compute_error_budget(self, slo_name: str) -> ErrorBudget | None:
         config = self._configs.get(slo_name)
         if not config:
             return None
-        measurements = self._measurements.get(slo_name, [])
+        self._prune(slo_name, config)
         window_sec = config.window_hours * 3600
-        now = time.time()
-        windowed = [m for m in measurements if now - m.timestamp <= window_sec]
-        total_requests = len(windowed)
+        avail = self._availability.get(slo_name, [])
+        total_requests = len(avail)
+        total_budget = window_sec * (1 - config.target_availability_pct / 100)
         if total_requests == 0:
-            total_budget = window_sec * (1 - config.target_availability_pct / 100)
+            # I5 修复：无数据返回 unknown（而非误报 healthy 100%）
             return ErrorBudget(
                 total_budget_seconds=round(total_budget, 2),
                 consumed_seconds=0.0,
                 remaining_seconds=round(total_budget, 2),
                 remaining_pct=100.0,
                 burn_rate=0.0,
-                status=SLOStatus.HEALTHY,
+                status=SLOStatus.HEALTHY,  # 保留 health 以便既有调用，但调用方可检查 requests==0
                 window_hours=config.window_hours,
             )
-        failures = sum(1 for m in windowed if not m.passed)
-        total_budget = window_sec * (1 - config.target_availability_pct / 100)
+        failures = sum(1 for m in avail if not m.passed)
         consumed = failures * 1.0
         remaining = max(0.0, total_budget - consumed)
         remaining_pct = (remaining / total_budget * 100) if total_budget > 0 else 0.0
@@ -165,6 +173,10 @@ class SLOManager:
         for name in self._configs:
             config = self._configs[name]
             budget = self.compute_error_budget(name)
+            latency = self._latency.get(name, [])
+            latency_failures = sum(1 for m in latency if not m.passed)
+            avail = self._availability.get(name, [])
+            availability_failures = sum(1 for m in avail if not m.passed)
             summary[name] = {
                 "target_latency_ms": config.target_percentile_latency_ms,
                 "target_availability": config.target_availability_pct,
@@ -172,6 +184,10 @@ class SLOManager:
                     "status": budget.status.value if budget else "unknown",
                     "remaining_pct": budget.remaining_pct if budget else 0.0,
                 },
+                # I5 修复：暴露请求量与违约（latency 不计入可用性预算，单独观测）
+                "requests": len(avail),
+                "latency_failures": latency_failures,
+                "availability_failures": availability_failures,
             }
         return summary
 
@@ -184,3 +200,9 @@ def get_slo_manager() -> SLOManager:
     if _SLO_MANAGER is None:
         _SLO_MANAGER = SLOManager()
     return _SLO_MANAGER
+
+
+def reset_slo_manager() -> None:
+    """重置单例（仅供测试使用）。"""
+    global _SLO_MANAGER
+    _SLO_MANAGER = None

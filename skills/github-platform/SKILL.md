@@ -10,20 +10,20 @@ user-invocable: true
 ## 触发条件
 - 用户提到 GitHub 相关操作（仓库、提交、PR、Issue、CI/CD）
 - 用户使用 gh CLI 命令
-- 用户需要管理 frankiehot-tech 组织的仓库
+- 用户需要管理 maref-org 组织的仓库
 
 ## 执行步骤
 
 ### 1. 仓库管理
 ```bash
 # 列出组织仓库
-gh repo list frankiehot-tech
+gh repo list maref-org
 
 # 创建新仓库
-gh repo create frankiehot-tech/<repo-name> --private --description "<desc>"
+gh repo create maref-org/<repo-name> --private --description "<desc>"
 
 # 克隆仓库
-gh repo clone frankiehot-tech/<repo-name>
+gh repo clone maref-org/<repo-name>
 ```
 
 ### 2. 代码提交
@@ -62,7 +62,7 @@ gh run rerun <run-id>
 ### 5. 安全配置
 ```bash
 # 启用 Dependabot
-gh api repos/frankiehot-tech/<repo>/vulnerability-alerts -X PUT
+gh api repos/maref-org/<repo>/vulnerability-alerts -X PUT
 
 # 扫描密钥泄露
 trufflehog filesystem <path>
@@ -74,7 +74,7 @@ trufflehog filesystem <path>
 - 安全扫描：发现/未发现漏洞
 
 ## 配置
-- 用户名: frankiehot-tech
+- 用户名: maref-org
 - 工具: gh CLI, git, trufflehog
 - 智能提交: 启用
 - 默认工作流: 启用

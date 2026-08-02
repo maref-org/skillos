@@ -289,4 +289,4 @@ ffmpeg -i doubao_v1.mp4 -c:v libx264 -crf 22 -c:a aac doubao_v1_h264.mp4
 - 2026-05-10: v0.2 — Compose UI 交互协议, 即梦 Web 替代方案, 视频合成协议, 踩坑经验集成
 - 2026-05-09: v0.1 — 即梦 I2V 验证通过, 豆包登录通过, Skill 骨架创建
 
-Base directory: file:///Volumes/1TB-M2/public/skillos/skills/phone-video-factory
+Base directory: file://$LOCAL_ROOT/public/skillos/skills/phone-video-factory

@@ -48,6 +48,21 @@ def _make_identity(client, identity_id="prov-1", role="provider"):
     return key, r
 
 
+def _signed_signer(client, identity_id="prov-1", role="provider"):
+    """注册自持密钥身份并返回可签名请求的 MessageSigner（I3 修复：画像更新需签名）。"""
+    from skillos.security.message_signer import MessageSigner
+
+    key, r = _make_identity(client, identity_id=identity_id, role=role)
+    assert r.status_code == 200
+    return MessageSigner(signer_id=identity_id, private_key=key)
+
+
+def _signed_profile(client, signer, profile, provider_id=None):
+    """签名更新画像（provider_id 默认用签名者身份）。"""
+    payload = {"provider_id": provider_id or signer.signer_id, "profile": profile}
+    return client.post("/onboarding/profile", json=payload, headers=signer.sign_headers(payload))
+
+
 class TestOnboardingRegister:
     def test_register_creates_identity_and_profile(self, client, db_session):
         r = client.post("/onboarding/register", json={"identity_id": "prov-a", "role": "provider"})
@@ -129,22 +144,20 @@ class TestOnboardingVerify:
 
 class TestOnboardingProfile:
     def _complete(self, client):
-        client.post("/onboarding/register", json={"identity_id": "prov-x", "role": "provider"})
-        r = client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "prov-x",
-                "profile": {
-                    "headline": "Errand Runner",
-                    "bio": "Fast and reliable runner in Shanghai",
-                    "skills": [{"skill_id": "errand", "proficiency": 0.9, "category": "physical"}],
-                    "city": "Shanghai",
-                    "country": "CN",
-                    "timezone": "Asia/Shanghai",
-                    "hourly_rate": 60.0,
-                    "currency": "CNY",
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        signer = _signed_signer(client, identity_id="prov-x")
+        r = _signed_profile(
+            client,
+            signer,
+            {
+                "headline": "Errand Runner",
+                "bio": "Fast and reliable runner in Shanghai",
+                "skills": [{"skill_id": "errand", "proficiency": 0.9, "category": "physical"}],
+                "city": "Shanghai",
+                "country": "CN",
+                "timezone": "Asia/Shanghai",
+                "hourly_rate": 60.0,
+                "currency": "CNY",
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
         )
         return r
@@ -167,8 +180,26 @@ class TestOnboardingProfile:
         assert set(body["missing_fields"]) == {"headline", "bio", "skills", "city", "hourly_rate", "availability"}
 
     def test_profile_unknown_provider(self, client):
-        r = client.post("/onboarding/profile", json={"provider_id": "nope", "profile": {"headline": "x"}})
-        assert r.status_code == 404
+        """I3：注册即建画像骨架；签名者可正常更新自己的画像（200）。"""
+        signer = _signed_signer(client, identity_id="prov-unknown")
+        r = _signed_profile(client, signer, {"headline": "x"})
+        assert r.status_code == 200
+
+    def test_profile_cannot_modify_others(self, client):
+        """I3：签名者不能修改他人的画像（403）。"""
+        _signed_signer(client, identity_id="prov-owner")
+        intruder = _signed_signer(client, identity_id="prov-intruder")
+        r = _signed_profile(client, intruder, {"headline": "hacked"}, provider_id="prov-owner")
+        assert r.status_code == 403
+
+    def test_profile_requires_signature(self, client):
+        """I3：无签名更新画像被拒（401）。"""
+        client.post("/onboarding/register", json={"identity_id": "prov-nosig", "role": "provider"})
+        r = client.post(
+            "/onboarding/profile",
+            json={"provider_id": "prov-nosig", "profile": {"headline": "x"}},
+        )
+        assert r.status_code == 401
 
     def test_completeness_unknown_provider(self, client):
         r = client.get("/onboarding/profile/nope/completeness")
@@ -177,19 +208,17 @@ class TestOnboardingProfile:
 
 class TestMarketProviders:
     def test_search_only_complete_profiles(self, client):
-        client.post("/onboarding/register", json={"identity_id": "prov-1", "role": "provider"})
-        client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "prov-1",
-                "profile": {
-                    "headline": "Runner",
-                    "bio": "I run errands in Shanghai",
-                    "skills": [{"skill_id": "errand", "proficiency": 0.8}],
-                    "city": "Shanghai",
-                    "hourly_rate": 40.0,
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        signer = _signed_signer(client, identity_id="prov-1")
+        _signed_profile(
+            client,
+            signer,
+            {
+                "headline": "Runner",
+                "bio": "I run errands in Shanghai",
+                "skills": [{"skill_id": "errand", "proficiency": 0.8}],
+                "city": "Shanghai",
+                "hourly_rate": 40.0,
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
         )
         r = client.get("/market/providers/search?city=Shanghai")
@@ -199,19 +228,17 @@ class TestMarketProviders:
 
     def test_search_filters_by_max_rate(self, client):
         for pid, rate in [("prov-a", 30.0), ("prov-b", 100.0)]:
-            client.post("/onboarding/register", json={"identity_id": pid, "role": "provider"})
-            client.post(
-                "/onboarding/profile",
-                json={
-                    "provider_id": pid,
-                    "profile": {
-                        "headline": "H",
-                        "bio": "Available for tasks",
-                        "skills": [{"skill_id": "s", "proficiency": 0.8}],
-                        "city": "Shanghai",
-                        "hourly_rate": rate,
-                        "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                    },
+            signer = _signed_signer(client, identity_id=pid)
+            _signed_profile(
+                client,
+                signer,
+                {
+                    "headline": "H",
+                    "bio": "Available for tasks",
+                    "skills": [{"skill_id": "s", "proficiency": 0.8}],
+                    "city": "Shanghai",
+                    "hourly_rate": rate,
+                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
                 },
             )
         r = client.get("/market/providers/search?city=Shanghai&max_rate=50")
@@ -219,20 +246,18 @@ class TestMarketProviders:
         assert r.json()["providers"][0]["provider_id"] == "prov-a"
 
     def test_search_filters_by_category(self, client):
-        client.post("/onboarding/register", json={"identity_id": "prov-c1", "role": "provider"})
-        client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "prov-c1",
-                "profile": {
-                    "headline": "Photographer",
-                    "bio": "Event photography",
-                    "skills": [{"skill_id": "photo", "proficiency": 0.9}],
-                    "categories": ["photography"],
-                    "city": "Shanghai",
-                    "hourly_rate": 80.0,
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        signer = _signed_signer(client, identity_id="prov-c1")
+        _signed_profile(
+            client,
+            signer,
+            {
+                "headline": "Photographer",
+                "bio": "Event photography",
+                "skills": [{"skill_id": "photo", "proficiency": 0.9}],
+                "categories": ["photography"],
+                "city": "Shanghai",
+                "hourly_rate": 80.0,
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
         )
         r = client.get("/market/providers/search?category=photography")
@@ -242,11 +267,8 @@ class TestMarketProviders:
         assert r.json()["total"] == 0
 
     def test_profile_invalid_fields_rejected(self, client):
-        client.post("/onboarding/register", json={"identity_id": "prov-z", "role": "provider"})
-        r = client.post(
-            "/onboarding/profile",
-            json={"provider_id": "prov-z", "profile": {"hourly_rate": "not-a-number"}},
-        )
+        signer = _signed_signer(client, identity_id="prov-z")
+        r = _signed_profile(client, signer, {"hourly_rate": "not-a-number"})
         assert r.status_code == 422
 
     def test_public_profile_omits_sensitive_fields(self, client):
@@ -268,24 +290,24 @@ class TestMarketProviders:
 
 class TestMarketBounties:
     def test_dry_run_preview(self, client):
-        r = client.post(
-            "/market/bounties",
-            json={
-                "poster_id": "prov-1",
-                "title": "Pick up package",
-                "description": "Pick a package from post office and deliver it home",
-                "completion_criteria": "package delivered",
-                "evidence_types": ["photo"],
-                "price": 30.0,
-                "dry_run": True,
-            },
-        )
+        signer = _signed_signer(client, identity_id="prov-1")
+        payload = {
+            "poster_id": "prov-1",
+            "title": "Pick up package",
+            "description": "Pick a package from post office and deliver it home",
+            "completion_criteria": "package delivered",
+            "evidence_types": ["photo"],
+            "price": 30.0,
+            "dry_run": True,
+        }
+        r = client.post("/market/bounties", json=payload, headers=signer.sign_headers(payload))
         assert r.status_code == 200
         body = r.json()
         assert body["dry_run"] is True
         assert body["valid"] is True
 
     def test_dry_run_invalid(self, client):
+        signer = _signed_signer(client, identity_id="prov-1")
         payload = {
             "poster_id": "prov-1",
             "title": "Pick up package",
@@ -293,10 +315,11 @@ class TestMarketBounties:
             "price": 1.0,
             "dry_run": True,
         }
-        r = client.post("/market/bounties", json=payload)
+        r = client.post("/market/bounties", json=payload, headers=signer.sign_headers(payload))
         assert r.json()["error"]
 
     def test_create_missing_poster_id_returns_error(self, client):
+        signer = _signed_signer(client, identity_id="prov-1")
         payload = {
             "title": "Valid task",
             "description": "dddddddddd",
@@ -304,63 +327,73 @@ class TestMarketBounties:
             "evidence_types": ["text"],
             "price": 10.0,
         }
-        r = client.post("/market/bounties", json=payload)
+        r = client.post("/market/bounties", json=payload, headers=signer.sign_headers(payload))
         assert r.status_code == 200
         assert "error" in r.json()
 
     def test_full_bounty_lifecycle(self, client, db_session):
-        for pid, role in [("poster", "consumer"), ("worker", "provider")]:
-            client.post("/onboarding/register", json={"identity_id": pid, "role": role})
-        client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "worker",
-                "profile": {
-                    "headline": "Runner",
-                    "bio": "I run errands",
-                    "skills": [{"skill_id": "errand", "proficiency": 0.9}],
-                    "city": "Shanghai",
-                    "hourly_rate": 30.0,
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        poster = _signed_signer(client, identity_id="poster")
+        worker_signer = _signed_signer(client, identity_id="worker")
+        _signed_profile(
+            client,
+            worker_signer,
+            {
+                "headline": "Runner",
+                "bio": "I run errands",
+                "skills": [{"skill_id": "errand", "proficiency": 0.9}],
+                "city": "Shanghai",
+                "hourly_rate": 30.0,
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
         )
 
-        r = client.post(
-            "/market/bounties",
-            json={
-                "poster_id": "poster",
-                "title": "Pick up package",
-                "description": "Pick a package from post office and deliver it home",
-                "completion_criteria": "package delivered",
-                "evidence_types": ["photo", "link"],
-                "price": 50.0,
-                "city": "Shanghai",
-            },
-        )
+        create_payload = {
+            "poster_id": "poster",
+            "title": "Pick up package",
+            "description": "Pick a package from post office and deliver it home",
+            "completion_criteria": "package delivered",
+            "evidence_types": ["photo", "link"],
+            "price": 50.0,
+            "city": "Shanghai",
+        }
+        r = client.post("/market/bounties", json=create_payload, headers=poster.sign_headers(create_payload))
         assert r.status_code == 200
         bounty_id = r.json()["bounty"]["id"]
 
-        r = client.post(f"/market/bounties/{bounty_id}/publish")
+        r = client.post(f"/market/bounties/{bounty_id}/publish", json={}, headers=poster.sign_headers({}))
         assert r.json()["bounty"]["status"] == "open"
 
+        apply_payload = {"applicant_id": "worker", "message": "I can do this"}
         r = client.post(
             f"/market/bounties/{bounty_id}/apply",
-            json={"applicant_id": "worker", "message": "I can do this"},
+            json=apply_payload,
+            headers=worker_signer.sign_headers(apply_payload),
         )
         assert r.json()["success"] is True
         app_id = r.json()["application"]["id"]
 
-        r = client.post(f"/market/bounties/{bounty_id}/applications/{app_id}/accept")
+        r = client.post(
+            f"/market/bounties/{bounty_id}/applications/{app_id}/accept",
+            json={},
+            headers=poster.sign_headers({}),
+        )
         assert r.json()["bounty"]["status"] == "assigned"
 
-        r = client.post(f"/market/bounties/{bounty_id}/submit", json={"evidence": {"photo": "url"}})
+        r = client.post(
+            f"/market/bounties/{bounty_id}/submit",
+            json={"evidence": {"photo": "url"}},
+            headers=worker_signer.sign_headers({"evidence": {"photo": "url"}}),
+        )
         assert r.json()["bounty"]["status"] == "submitted"
 
-        r = client.post(f"/market/bounties/{bounty_id}/confirm", json={"accepted": True})
+        r = client.post(
+            f"/market/bounties/{bounty_id}/confirm",
+            json={"accepted": True},
+            headers=poster.sign_headers({"accepted": True}),
+        )
         assert r.json()["bounty"]["status"] == "work_completed"
 
-        r = client.post(f"/market/bounties/{bounty_id}/settle")
+        r = client.post(f"/market/bounties/{bounty_id}/settle", json={}, headers=poster.sign_headers({}))
         assert r.json()["settlement"]["status"] == "paid"
         assert r.json()["settlement"]["total_amount"] == 50.0
 
@@ -370,7 +403,12 @@ class TestMarketBounties:
         assert r.json()["settlements"][0]["total_amount"] == 50.0
 
     def test_apply_validation_error(self, client):
-        r = client.post("/market/bounties/bty-nope/apply", json={"applicant_id": "worker"})
+        worker = _signed_signer(client, identity_id="worker")
+        r = client.post(
+            "/market/bounties/bty-nope/apply",
+            json={"applicant_id": "worker"},
+            headers=worker.sign_headers({"applicant_id": "worker"}),
+        )
         assert r.json()["error"]
 
 
@@ -393,19 +431,17 @@ class TestProtocolEndpoints:
         assert r.json()["identities"][0]["identity_id"] == "prov-1"
 
     def test_registry_search_delegates(self, client):
-        client.post("/onboarding/register", json={"identity_id": "prov-1", "role": "provider"})
-        client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "prov-1",
-                "profile": {
-                    "headline": "Errand Runner",
-                    "bio": "I run errands in Shanghai",
-                    "skills": [{"skill_id": "errand", "proficiency": 0.9}],
-                    "city": "Shanghai",
-                    "hourly_rate": 45.0,
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        signer = _signed_signer(client, identity_id="prov-1")
+        _signed_profile(
+            client,
+            signer,
+            {
+                "headline": "Errand Runner",
+                "bio": "I run errands in Shanghai",
+                "skills": [{"skill_id": "errand", "proficiency": 0.9}],
+                "city": "Shanghai",
+                "hourly_rate": 45.0,
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
         )
         r = client.get("/protocol/registry/search?query=Shanghai")
@@ -413,19 +449,17 @@ class TestProtocolEndpoints:
         assert r.json()["results"][0]["provider_id"] == "prov-1"
 
     def test_protocol_providers_endpoint(self, client):
-        client.post("/onboarding/register", json={"identity_id": "prov-1", "role": "provider"})
-        client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "prov-1",
-                "profile": {
-                    "headline": "H",
-                    "bio": "Available",
-                    "skills": [{"skill_id": "s", "proficiency": 0.8}],
-                    "city": "Beijing",
-                    "hourly_rate": 30.0,
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        signer = _signed_signer(client, identity_id="prov-1")
+        _signed_profile(
+            client,
+            signer,
+            {
+                "headline": "H",
+                "bio": "Available",
+                "skills": [{"skill_id": "s", "proficiency": 0.8}],
+                "city": "Beijing",
+                "hourly_rate": 30.0,
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
         )
         r = client.get("/protocol/providers?city=Beijing")

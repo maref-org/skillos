@@ -1,0 +1,50 @@
+rules:
+  - id: no-hardcoded-secrets
+    patterns:
+      - pattern-either:
+          - pattern: 'API_KEY = "..."'
+          - pattern: 'SECRET_KEY = "..."'
+          - pattern: 'PASSWORD = "..."'
+    message: >-
+      Hardcoded secret detected. Use environment variables or a secrets manager.
+    severity: ERROR
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/"
+        - "*.example"
+
+  - id: no-eval
+    patterns:
+      - pattern: eval(...)
+    message: >-
+      Avoid eval() — risk of code injection.
+    severity: WARNING
+    languages: [python]
+
+  - id: no-subprocess-shell
+    patterns:
+      - pattern: subprocess.call(..., shell=True, ...)
+      - pattern: subprocess.Popen(..., shell=True, ...)
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+    message: >-
+      shell=True risks shell injection. Use subprocess.run with list args.
+    severity: WARNING
+    languages: [python]
+    paths:
+      exclude:
+        - "scripts/deploy.py"
+
+  - id: no-sql-injection
+    patterns:
+      - pattern-either:
+          - pattern: 'cursor.execute(f"...{...}...")'
+          - pattern: 'conn.execute(f"...{...}...")'
+    message: >-
+      Possible SQL injection. Use parameterized queries.
+    severity: ERROR
+    languages: [python]
+    paths:
+      exclude:
+        - "tests/"

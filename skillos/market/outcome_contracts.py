@@ -65,8 +65,12 @@ class Tier:
 DEPOSIT_RATIO = 0.10
 TIP_MIN_RATIO = 0.10
 TIP_MAX_RATIO = 0.20
+TIP_LEAD_SHARE_RATIO = 0.50
 BASE_PRICE_PER_DELIVERABLE = 500.0
 BASE_DAYS_PER_DELIVERABLE = 2.0
+
+# C4 修复：L4 仲裁最少独立验证者票数（防止单票操纵裁决）
+MIN_ARBITRATION_VOTES = 3
 
 # 三方案档位配置：成功率承诺 × 价格系数 × 工期系数
 TIER_CONFIG: dict[str, dict[str, Any]] = {
@@ -452,8 +456,8 @@ class OutcomeContractService:
         amount = round(model.price * ratio, 2)
         members = self._team_members(model.id)
         if members:
-            lead_share = round(amount * 0.5, 2)
-            author_share = round(amount * 0.5 / max(len(members), 1), 2)
+            lead_share = round(amount * TIP_LEAD_SHARE_RATIO, 2)
+            author_share = round(amount * TIP_LEAD_SHARE_RATIO / max(len(members), 1), 2)
             distributions = [{"member_id": model.contractor_id, "role": "lead", "amount": lead_share}]
             distributions += [{"member_id": m.member_id, "role": m.role, "amount": author_share} for m in members]
         else:
@@ -529,12 +533,25 @@ class OutcomeContractService:
           - 达到 APPROVE 门限 → 维持交付（work_completed），保证金释放
           - 达到 REJECT 门限 → 判定违约（cancelled），保证金扣留（forfeited）
           - 未达门限/票未满 → 维持 disputed，等待外部仲裁
+
+        C4 修复：强制最少票数（≥ MIN_ARBITRATION_VOTES），且验证者不得为争议双方
+        （requester / contractor），防止单方操纵仲裁结果。
         """
         model = self._require(contract_id)
         if model.status != OutcomeContractStatus.DISPUTED:
             raise ValueError(f"Only disputed contracts can be arbitrated, current: {model.status}")
         if not votes:
             raise ValueError("votes must not be empty")
+        if len(votes) < MIN_ARBITRATION_VOTES:
+            raise ValueError(
+                f"Arbitration requires at least {MIN_ARBITRATION_VOTES} validators, "
+                f"received {len(votes)}"
+            )
+        conflicting = {model.requester_id, model.contractor_id} & set(votes)
+        if conflicting:
+            raise ValueError(
+                f"Disputing parties cannot arbitrate: {sorted(conflicting)}"
+            )
 
         from skillos.collaboration.consensus import ByzantineConsensus, VoteValue
 
@@ -617,8 +634,22 @@ class OutcomeContractService:
         return [OutcomeContract.from_orm(r) for r in rows]
 
     def create_service_team(self, contract_id: str, lead_id: str, members: list[dict[str, Any]]) -> str:
-        """创建服务团队（MVP 平台自营：平台当项目长，技能作者按 share_ratio 分成）。"""
+        """创建服务团队（MVP 平台自营：平台当项目长，技能作者按 share_ratio 分成）。
+
+        C3 修复：校验 share_ratio ∈ [0,1] 且合计 ≤ 1.0，
+        防止负金额/超额分成绕过出款防超发校验（generate_for_contract 的 C3 守卫）。
+        """
         contract = self._require(contract_id)
+        share_total = 0.0
+        for m in members:
+            ratio = float(m.get("share_ratio", 0.0))
+            if not (0.0 <= ratio <= 1.0):
+                raise ValueError(f"share_ratio must be within [0, 1], got {ratio}")
+            share_total += ratio
+        if share_total > 1.0:
+            raise ValueError(
+                f"sum of share_ratio must be ≤ 1.0 (70% contributor pool), got {round(share_total, 4)}"
+            )
         team = ServiceTeamModel(
             id=f"team-{uuid.uuid4().hex[:12]}",
             contract_id=contract.id,

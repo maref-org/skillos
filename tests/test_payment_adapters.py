@@ -32,27 +32,51 @@ class TestAlipayAdapter:
         assert ref.status == "submitted"
         assert ref.external_ref == "pay-abc"
 
-    def test_webhook_ok(self):
+    def test_webhook_fail_closed_without_pubkey(self):
+        """C6：无支付宝公钥时 webhook 校验 fail-closed（不降级字段校验）。"""
         provider = AlipayProvider(
             app_id="app-test",
             private_key_pem="dummy-private-key",
             gateway="https://sandbox",
         )
-        receipt = provider.verify_webhook(
-            {},
-            {
-                "app_id": "app-test",
-                "notify_type": "fund_trans_order_status",
-                "status": "SUCCESS",
-                "instruction_ids": ["pay-1"],
-            },
-        )
-        assert receipt.instruction_ids == ["pay-1"]
+        with pytest.raises(ValueError, match="SKILLOS_ALIPAY_PUBLIC_KEY"):
+            provider.verify_webhook(
+                {},
+                {
+                    "app_id": "app-test",
+                    "notify_type": "fund_trans_order_status",
+                    "status": "SUCCESS",
+                    "instruction_ids": ["pay-1"],
+                },
+            )
 
     def test_webhook_bad_app_id(self):
-        provider = AlipayProvider(app_id="app-test", private_key_pem="dummy-private-key")
+        """配置公钥后仍校验 app_id（签名通过后二次校验）。"""
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
+
+        from skillos.market.payments.alipay import _build_sign_content
+
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pub_pem = (
+            key.public_key()
+            .public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("utf-8")
+        )
+        provider = AlipayProvider(app_id="app-test", public_key_pem=pub_pem)
+        body = {
+            "app_id": "other",
+            "notify_type": "fund_trans_order_status",
+            "instruction_ids": ["pay-1"],
+        }
+        content = _build_sign_content(body)
+        sig = key.sign(content.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        body["sign"] = __import__("base64").b64encode(sig).decode("utf-8")
         with pytest.raises(ValueError, match="app_id mismatch"):
-            provider.verify_webhook({}, {"app_id": "other", "notify_type": "fund_trans_order_status"})
+            provider.verify_webhook({}, body)
 
 
 class TestAlipayPublicKeyVerification:
@@ -207,18 +231,115 @@ class TestWechatAdapter:
         assert "Authorization" in status.raw["headers"]
         assert "WECHATPAY2-SHA256-RSA2048" in status.raw["headers"]["Authorization"]
 
-    def test_webhook_ok(self):
-        provider = WeChatPayProvider(mch_id="mch-1", apiv3_key="v3-key")
-        receipt = provider.verify_webhook(
-            {"wechatpay-serial": "sn-1"},
-            {
-                "event_type": "TRANSFER.TRANSFER_SUCCESS",
-                "resource": {"instruction_ids": ["pay-1", "pay-2"]},
-            },
-        )
-        assert receipt.instruction_ids == ["pay-1", "pay-2"]
+    def _provider_with_platform_key(self):
+        """构造配置了微信平台公钥的 provider（用于 v3 回调验签）。"""
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
 
-    def test_webhook_missing_serial(self):
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pub_pem = (
+            key.public_key()
+            .public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("utf-8")
+        )
+        provider = WeChatPayProvider(
+            mch_id="mch-1",
+            apiv3_key="v3-key",
+            mch_cert_sn="sn-1",
+        )
+        provider.platform_public_key_pem = pub_pem
+        return key, provider
+
+    def test_webhook_fail_closed_without_platform_key(self):
+        """C5：无微信平台公钥时 webhook 校验 fail-closed（不靠 header 存在）。"""
         provider = WeChatPayProvider(mch_id="mch-1", apiv3_key="v3-key")
-        with pytest.raises(ValueError, match="Wechatpay-Serial"):
-            provider.verify_webhook({}, {"event_type": "TRANSFER.TRANSFER_SUCCESS", "resource": {}})
+        with pytest.raises(ValueError, match="PLATFORM_PUBLIC_KEY"):
+            provider.verify_webhook(
+                {"wechatpay-serial": "sn-1"},
+                {
+                    "event_type": "TRANSFER.TRANSFER_SUCCESS",
+                    "resource": {"instruction_ids": ["pay-1", "pay-2"]},
+                },
+            )
+
+    def test_webhook_ok_with_valid_signature(self):
+        """C5：配置平台公钥后，v3 签名有效才放行。"""
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        key, provider = self._provider_with_platform_key()
+        body = {
+            "event_type": "TRANSFER.TRANSFER_SUCCESS",
+            "resource": {"instruction_ids": ["pay-1", "pay-2"], "out_bill_no": "wx-real-1"},
+        }
+        timestamp = "1785599999"
+        nonce = "abc123"
+        raw_body = __import__("json").dumps(body, ensure_ascii=False, separators=(",", ":"))
+        content = f"{timestamp}\n{nonce}\n{raw_body}\n"
+        sig = key.sign(content.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        headers = {
+            "wechatpay-serial": "sn-1",
+            "wechatpay-timestamp": timestamp,
+            "wechatpay-nonce": nonce,
+            "wechatpay-signature": __import__("base64").b64encode(sig).decode("utf-8"),
+        }
+        receipt = provider.verify_webhook(headers, body)
+        assert receipt.instruction_ids == ["pay-1", "pay-2"]
+        assert receipt.external_ref == "wx-real-1"
+
+    def test_webhook_rejects_tampered_body(self):
+        """C5：篡改 body 后 v3 签名校验失败。"""
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        key, provider = self._provider_with_platform_key()
+        body = {
+            "event_type": "TRANSFER.TRANSFER_SUCCESS",
+            "resource": {"instruction_ids": ["pay-1", "pay-2"]},
+        }
+        timestamp = "1785599999"
+        nonce = "abc123"
+        raw_body = __import__("json").dumps(body, ensure_ascii=False, separators=(",", ":"))
+        content = f"{timestamp}\n{nonce}\n{raw_body}\n"
+        sig = key.sign(content.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        headers = {
+            "wechatpay-serial": "sn-1",
+            "wechatpay-timestamp": timestamp,
+            "wechatpay-nonce": nonce,
+            "wechatpay-signature": __import__("base64").b64encode(sig).decode("utf-8"),
+        }
+        tampered = {**body, "resource": {"instruction_ids": ["pay-9"]}}
+        with pytest.raises(ValueError, match="signature"):
+            provider.verify_webhook(headers, tampered)
+
+    def test_webhook_uses_raw_body_when_provided(self):
+        """C5：传入 raw_body 时对原始字节验签（微信 v3 规范），而非重序列化。"""
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        key, provider = self._provider_with_platform_key()
+        # 原始 body 带空格与不同 key 顺序（重序列化会改变字节）
+        raw_body = (
+            '{"resource": {"instruction_ids": ["pay-1"], "out_bill_no": "wx-1"}, '
+            '"event_type": "TRANSFER.TRANSFER_SUCCESS"}'
+        )
+        body = {
+            "event_type": "TRANSFER.TRANSFER_SUCCESS",
+            "resource": {"instruction_ids": ["pay-1"], "out_bill_no": "wx-1"},
+        }
+        timestamp = "1785599999"
+        nonce = "xyz"
+        content = f"{timestamp}\n{nonce}\n{raw_body}\n"
+        sig = key.sign(content.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
+        headers = {
+            "wechatpay-serial": "sn-1",
+            "wechatpay-timestamp": timestamp,
+            "wechatpay-nonce": nonce,
+            "wechatpay-signature": __import__("base64").b64encode(sig).decode("utf-8"),
+        }
+        # 若用重序列化验签（非 raw），此签名必失败；传 raw_body 后应通过
+        receipt = provider.verify_webhook(headers, body, raw_body=raw_body)
+        assert receipt.instruction_ids == ["pay-1"]

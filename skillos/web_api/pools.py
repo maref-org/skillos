@@ -17,17 +17,14 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
-from skillos.db.models import IdentityModel
 from skillos.market.tenant_pools import PoolNotFoundError, TenantPoolService
-from skillos.security.message_signer import MessageSigner
+from skillos.web_api.auth import require_actor
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +36,11 @@ def _get_pool_service(db: Session = Depends(get_session)) -> TenantPoolService:
 
 
 async def _require_actor(request: Request, db: Session = Depends(get_session)) -> str:
-    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。"""
-    raw = await request.body()
-    payload: dict[str, Any] = json.loads(raw) if raw else {}
-    headers = {k.lower(): v for k, v in request.headers.items()}
-    signer_id = headers.get("x-signer-id", "")
-    if not signer_id or not MessageSigner.verify(payload, headers):
-        raise HTTPException(status_code=401, detail="invalid or missing signature")
-    if not db.query(IdentityModel).filter(IdentityModel.identity_id == signer_id).first():
-        raise HTTPException(status_code=403, detail="identity not registered")
-    return signer_id
+    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。
+
+    C1 修复：用注册公钥验签（身份-公钥绑定），防止身份冒充。
+    """
+    return await require_actor(request, db)
 
 
 @router.post("")

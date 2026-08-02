@@ -1,0 +1,6 @@
+{
+  "tag_match": 0.5,
+  "freshness": 0.5,
+  "cross_ref": 0.2,
+  "base_boost": 0.15
+}

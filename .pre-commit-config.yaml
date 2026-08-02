@@ -19,6 +19,14 @@ repos:
         language: system
         stages: [pre-commit]
 
+      - id: athena-sanitize-push
+        name: Athena pre-push sanitization (T3/T2 full repo scan)
+        entry: bash scripts/sanitize-for-push.sh
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.0
     hooks:

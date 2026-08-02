@@ -18,6 +18,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from skillos.audit import AuditEventType, log_audit
 from skillos.db.engine import get_sessionmaker
 from skillos.db.models import SkillModel, SkillNFTModel
 from skillos.db.repository import SkillNFTRepository, SkillRepository
@@ -133,6 +134,13 @@ class SkillKernel:
         with self._cache_lock:
             self._skill_cache[skill_id] = manifest
         logger.info("Skill distilled: %s", skill_id)
+        log_audit(
+            AuditEventType.SKILL_REGISTERED,
+            manifest.author,
+            manifest.id,
+            "Distill skill from repo",
+            {"repo_url": repo_url, "version": manifest.version},
+        )
         return manifest
 
     def mint_nft(self, manifest: SkillManifest) -> SkillNFT:
@@ -166,6 +174,13 @@ class SkillKernel:
         with self._log_lock:
             self._nft_records.append(nft)
         logger.info("Skill NFT minted: %s for %s", nft.token_id, nft.owner)
+        log_audit(
+            AuditEventType.SKILL_PUBLISHED,
+            nft.owner,
+            nft.token_id,
+            "Mint Skill NFT",
+            {"skill_id": nft.skill_id, "metadata_hash": nft.metadata_hash},
+        )
         return nft
 
     def assemble_tools(self, nft: SkillNFT) -> ToolChain:
@@ -218,6 +233,20 @@ class SkillKernel:
                         "status": result["status"],
                     }
                 )
+
+        # 审计日志：在 _execute_lock 之外，避免持锁时文件 IO
+        log_audit(
+            AuditEventType.SKILL_EXECUTED,
+            str(input_data.get("caller_id", "unknown")),
+            tool_chain.skill_id,
+            f"Execute skill in {tool_chain.execution_env}",
+            {
+                "execution_env": tool_chain.execution_env,
+                "status": result.get("status"),
+                "latency_ms": round(elapsed_ms, 2),
+                "error": result.get("error"),
+            },
+        )
 
         return result
 

@@ -67,7 +67,7 @@ class SettlementEngine:
         )
         self._db.add(settlement)
 
-        model.total_revenue = (model.total_revenue or 0.0) + amount
+        model.total_revenue = round((model.total_revenue or 0.0) + amount, 2)
         self._db.flush()
 
         return SettlementResult(

@@ -1,0 +1,36 @@
+name: Load Test (k6)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # 每周一早 6:00 UTC
+  pull_request:
+    paths:
+      - 'skillos/**'
+      - 'scripts/load-test.js'
+
+jobs:
+  k6-load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Start application
+        run: |
+          pip install -e '.[dev,web]'
+          python -c "from skillos.db.engine import init_db; init_db()"
+          uvicorn skillos.app:app --host 0.0.0.0 --port 8000 &
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Application ready"
+              break
+            fi
+            sleep 2
+          done
+          curl -sf http://localhost:8000/health || exit 1
+      - name: Run k6 load test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: scripts/load-test.js
+          flags: -e BASE_URL=http://localhost:8000

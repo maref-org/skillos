@@ -274,7 +274,7 @@ class SessionManager:
 
     def search_sessions(self, user_id: str, query: str) -> list[Session]:
         """搜索会话（基于 metadata）"""
-        sessions = self.list_sessions(user_id=user_id, status=SessionStatus.ACTIVE)
+        sessions = self.list_sessions(user_id=user_id)
         query_lower = query.lower()
 
         results = []
@@ -327,7 +327,7 @@ class SessionManager:
         try:
             repo = SessionRepository(db)
             for sid in expired:
-                session = self._sessions.pop(sid, None)
+                session = self._sessions.pop(sid, None)  # type: ignore[arg-type]
                 if session:
                     user_sessions = self._user_sessions.get(session.user_id, [])
                     if sid in user_sessions:

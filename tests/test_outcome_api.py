@@ -51,6 +51,34 @@ def _signed_post(client, signer, path, payload):
     return client.post(path, json=payload, headers=headers)
 
 
+def _ops_signer(client, identity_id="ops-read-1"):
+    """I1 修复：注册一个签名身份，用于访问需要鉴权的运营/财务只读端点。"""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    key = Ed25519PrivateKey.generate()
+    pem = (
+        key.public_key()
+        .public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
+    r = client.post(
+        "/onboarding/register",
+        json={"identity_id": identity_id, "role": "provider", "public_key_pem": pem},
+    )
+    assert r.status_code == 200
+    return MessageSigner(signer_id=identity_id, private_key=key)
+
+
+def _signed_get(client, signer, path):
+    """带签名头的 GET（payload 为空 dict）。"""
+    headers = signer.sign_headers({})
+    return client.get(path, headers=headers)
+
+
 REQ_TEXT = "给公众号写 30 天内容运营文章并做多平台分发"
 
 
@@ -375,7 +403,8 @@ class TestPayoutExport:
 
     def test_manifest_export_after_settle(self, client, db_session):
         cid = self._paid_contract(client, db_session)
-        r = client.get(f"/outcome/payouts/{cid}")
+        signer = _ops_signer(client)
+        r = _signed_get(client, signer, f"/outcome/payouts/{cid}")
         assert r.status_code == 200, r.text
         manifest = r.json()
         assert manifest["contract_id"] == cid
@@ -385,13 +414,15 @@ class TestPayoutExport:
         assert any(i["payee_id"] == "ctr-payapi" for i in manifest["instructions"])
 
     def test_manifest_404_for_missing(self, client):
-        r = client.get("/outcome/payouts/ctr-nope")
+        signer = _ops_signer(client)
+        r = _signed_get(client, signer, "/outcome/payouts/ctr-nope")
         assert r.status_code == 404
 
-    def test_manifest_requires_signature_context(self, client, db_session):
-        # 未签名 GET 仍可读（只读导出，不要求签名），但契约不存在时应 404
-        r = client.get("/outcome/payouts/ctr-nope")
-        assert r.status_code == 404
+    def test_manifest_requires_signature(self, client, db_session):
+        """I1：出款指令为敏感财务数据，未签名 GET 应 401。"""
+        cid = self._paid_contract(client, db_session)
+        r = client.get(f"/outcome/payouts/{cid}")
+        assert r.status_code == 401
 
 
 class TestTenantStats:
@@ -426,7 +457,7 @@ class TestTenantStats:
 
         svc.create("req-t3", "写一篇公众号文章", base_price=1000.0)  # default 租户
 
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         stats = {s["tenant_id"]: s for s in r.json()["stats"]}
         assert stats["tenant-a"]["contracts"] == 1
@@ -455,14 +486,14 @@ class TestTenantStats:
         svc.select_tier(cancelled.id, "balanced")
         svc.cancel(cancelled.id)
 
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         stats = {s["tenant_id"]: s for s in r.json()["stats"]}
         # completion = paid / (paid + cancelled)
         assert stats["tenant-c"]["completion_rate"] == 0.5
 
     def test_empty_db_returns_empty(self, client):
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         assert r.json()["stats"] == []
 
@@ -479,7 +510,7 @@ class TestTenantStats:
         svc.confirm_delivery(c.id, True)
         svc.settle(c.id)
 
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         body = r.json()
         stats = {s["tenant_id"]: s for s in body["stats"]}
@@ -506,7 +537,7 @@ class TestTenantStats:
         c = svc.create("req-detail", "做内容运营", base_price=2000.0, tenant_id="tenant-detail")
         svc.select_tier(c.id, "stable")
 
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         body = r.json()
         assert "contracts" in body
@@ -521,7 +552,7 @@ class TestTenantStats:
 
     def test_trend_default_points_when_empty(self, client):
         """空库时 trend 仍是近 N 天占位（契约数为 0）。"""
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         body = r.json()
         assert body["trend"] == {}
@@ -538,7 +569,7 @@ class TestTenantStats:
 
         tsvc = TenantService(db_session)
         tsvc.set_payout_quota("tenant-quota-s", 5000)
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         stats = {s["tenant_id"]: s for s in r.json()["stats"]}
         assert stats["tenant-quota-s"]["payout_limit"] == 5000.0
@@ -550,9 +581,49 @@ class TestTenantStats:
         from skillos.kernel.slo import get_slo_manager
 
         get_slo_manager().record_availability("negmarket_api", True)
-        r = client.get("/outcome/tenant-stats")
+        r = _signed_get(client, _ops_signer(client), "/outcome/tenant-stats")
         assert r.status_code == 200
         body = r.json()
         assert "slo" in body
         assert "negmarket_api" in body["slo"]
         assert "error_budget" in body["slo"]["negmarket_api"]
+
+
+class TestSignatureSecurity:
+    """C1/C2 安全修复回归测试 — 鉴权体系（身份-公钥绑定 + 防重放）。"""
+
+    def test_identity_spoofing_rejected(self, client, db_session):
+        """C1：攻击者用自己的密钥 + 受害者的 signer-id → 401（身份冒充被拒）。
+
+        受害者在 /onboarding/register 注册了自己的公钥；
+        攻击者伪造密钥对并声明受害者的身份。服务端用注册公钥验签必须失败。
+        """
+        _register(client, "victim-spoof")  # 受害者在注册表中登记自己的公钥
+        # 攻击者伪造密钥对，但 signer-id 冒用受害者
+        attacker = _register(client, "attacker-spoof")  # 自己注册一个身份
+        payload = {"requirement_text": REQ_TEXT}
+        # 关键：把 attacker 的签名头里 signer-id 换成 victim
+        headers = attacker.sign_headers(payload)
+        headers["X-Signer-Id"] = "victim-spoof"
+        r = client.post("/outcome/contracts", json=payload, headers=headers)
+        # 服务端用 victim 注册公钥验签 attacker 的签名 → 必须 401
+        assert r.status_code == 401
+
+    def test_signature_replay_with_modified_timestamp_rejected(self, client, db_session):
+        """C2：改写时间戳的请求无法通过验签（防重放）。"""
+        requester = _register(client, "req-replay")
+        payload = {"requirement_text": REQ_TEXT}
+        headers = requester.sign_headers(payload)
+        # 攻击者把时间戳改回 10 秒前，试图保持在 TTL 窗口内
+        import time
+
+        headers["X-Signature-Timestamp"] = str(time.time() - 10)
+        r = client.post("/outcome/contracts", json=payload, headers=headers)
+        assert r.status_code == 401
+
+    def test_valid_signature_still_passes(self, client, db_session):
+        """C1/C2 修复后，合法签名请求仍正常工作（不破坏既有流程）。"""
+        requester = _register(client, "req-valid")
+        payload = {"requirement_text": REQ_TEXT}
+        r = _signed_post(client, requester, "/outcome/contracts", payload)
+        assert r.status_code == 200, r.text

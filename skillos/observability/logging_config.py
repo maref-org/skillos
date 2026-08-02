@@ -37,23 +37,23 @@ class _StructuredLogAdapter(logging.LoggerAdapter):
                 kwargs.pop(k, None)
         return msg, kwargs
 
-    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         msg, kwargs = self.process(msg, kwargs)
         self.logger.info(msg, *args, **kwargs)
 
-    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         msg, kwargs = self.process(msg, kwargs)
         self.logger.warning(msg, *args, **kwargs)
 
-    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         msg, kwargs = self.process(msg, kwargs)
         self.logger.error(msg, *args, **kwargs)
 
-    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         msg, kwargs = self.process(msg, kwargs)
         self.logger.debug(msg, *args, **kwargs)
 
-    def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
+    def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         msg, kwargs = self.process(msg, kwargs)
         self.logger.critical(msg, *args, **kwargs)
 

@@ -136,7 +136,7 @@ class TestSessionManagerPerformance:
 class TestDistributionPerformance:
     def test_distribute_benchmark(self, db_session):
         """1000 次收入分配的耗时"""
-        engine = DistributionEngine(db_session=db_session)
+        engine = DistributionEngine()
         start = time.perf_counter()
 
         for i in range(1000):
@@ -155,7 +155,7 @@ class TestDistributionPerformance:
 
     def test_compute_payouts_benchmark(self, db_session):
         """计算 100 个贡献者的 payout 耗时"""
-        engine = DistributionEngine(db_session=db_session)
+        engine = DistributionEngine()
         contributors = [Contributor(f"c-{i}", f"Name-{i}", 0.5, 0.5, 0.8, 0.3) for i in range(100)]
 
         start = time.perf_counter()
@@ -168,7 +168,7 @@ class TestDistributionPerformance:
 
     def test_calculate_weight_benchmark(self, db_session):
         """计算 10000 次权重耗时"""
-        engine = DistributionEngine(db_session=db_session)
+        engine = DistributionEngine()
         contributor = Contributor("c1", "Alice", 0.8, 0.7, 0.9, 0.5)
 
         start = time.perf_counter()
@@ -283,7 +283,7 @@ class TestDbBulkPerformance:
 
     def test_bulk_distribution_insert(self, db_session):
         """批量插入 500 条分配记录并查询"""
-        engine = DistributionEngine(db_session=db_session)
+        engine = DistributionEngine()
         start = time.perf_counter()
 
         for i in range(500):

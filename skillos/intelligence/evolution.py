@@ -67,6 +67,11 @@ class RecursiveEvolution:
         self._call_counter += 1
         return failure.failure_id
 
+    async def record_success(self) -> str:
+        self._call_counter += 1
+        self._success_counter += 1
+        return "success"
+
     def get_recent_failures(self, limit: int = 50) -> list[FailureRecord]:
         records = list(self._failures.values())
         records.sort(key=lambda r: r.timestamp, reverse=True)

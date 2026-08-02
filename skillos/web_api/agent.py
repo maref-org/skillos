@@ -21,7 +21,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -34,7 +33,7 @@ from skillos.market.bounties import BountyService
 from skillos.market.outcome_contracts import OutcomeContractService
 from skillos.market.providers import ProviderRegistry
 from skillos.protocol.remote_control import RemoteBridge
-from skillos.security.message_signer import MessageSigner
+from skillos.web_api.auth import optional_actor, require_actor
 
 logger = logging.getLogger(__name__)
 
@@ -58,23 +57,16 @@ def _get_outcome_service(db: Session = Depends(get_session)) -> OutcomeContractS
 
 
 async def _require_agent(request: Request, db: Session = Depends(get_session)) -> str:
-    """验证 Agent 请求签名并返回签名者身份 ID（未通过则 401/403）。"""
-    raw = await request.body()
-    payload: dict[str, Any] = json.loads(raw) if raw else {}
-    headers = {k.lower(): v for k, v in request.headers.items()}
-    signer_id = headers.get("x-signer-id", "")
-    if not signer_id or not MessageSigner.verify(payload, headers):
-        raise HTTPException(status_code=401, detail="invalid or missing signature")
-    if not db.query(IdentityModel).filter(IdentityModel.identity_id == signer_id).first():
-        raise HTTPException(status_code=403, detail="identity not registered")
-    return signer_id
+    """验证 Agent 请求签名并返回签名者身份 ID（未通过则 401/403）。
+
+    C1 修复：用注册公钥验签（身份-公钥绑定），防止身份冒充。
+    """
+    return await require_actor(request, db)
 
 
 async def _optional_agent(request: Request, db: Session = Depends(get_session)) -> str | None:
     """可选鉴权：带签名头则强制验证，否则返回 None（匿名只读）。"""
-    if "X-Signature" not in request.headers:
-        return None
-    return await _require_agent(request, db)
+    return await optional_actor(request, db)
 
 
 @router.post("/identities/register-identity")
@@ -201,15 +193,17 @@ async def list_bounties(
     service: BountyService = Depends(_get_bounty_service),
 ):
     """查询 bounty；mine=true 需签名身份，仅返回自己发布的。"""
-    result = service.search(status=status, page=page, page_size=page_size)
-    rows = result.bounties
+    poster_id = None
     if mine:
         if not _agent_id:
             raise HTTPException(status_code=401, detail="mine=true requires signed request")
-        rows = [b for b in rows if b.poster_id == _agent_id]
+        poster_id = _agent_id
+    result = service.search(
+        status=status, page=page, page_size=page_size, poster_id=poster_id
+    )
     return {
-        "bounties": rows,
-        "total": len(rows),
+        "bounties": result.bounties,
+        "total": result.total,
         "page": result.page,
         "page_size": result.page_size,
     }

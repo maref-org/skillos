@@ -28,7 +28,42 @@ def _reset_slo(monkeypatch):
 def client(db_session):
     app = FastAPI()
     app.include_router(monitoring_router)
+    from skillos.web_api.onboarding import router as onboarding_router
+
+    app.include_router(onboarding_router)
     return TestClient(app)
+
+
+def _ops_signer(client, identity_id="ops-monitor-1"):
+    """I9 修复：注册签名身份，用于访问需鉴权的监控写端点。"""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from skillos.security.message_signer import MessageSigner
+
+    key = Ed25519PrivateKey.generate()
+    pem = (
+        key.public_key()
+        .public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
+    r = client.post(
+        "/onboarding/register",
+        json={"identity_id": identity_id, "role": "provider", "public_key_pem": pem},
+    )
+    assert r.status_code == 200
+    return MessageSigner(signer_id=identity_id, private_key=key)
+
+
+def _signed_post(client, signer, path, payload):
+    return client.post(path, json=payload, headers=signer.sign_headers(payload))
+
+
+def _signed_delete(client, signer, path):
+    return client.delete(path, headers=signer.sign_headers({}))
 
 
 class TestSloAlertStateMachine:
@@ -193,13 +228,14 @@ class TestSloAlertSilence:
 
     def test_api_silence_flow(self, client):
         get_slo_manager().record_availability("negmarket_api", False)
+        signer = _ops_signer(client)
         r = client.get("/monitoring/alerts/status")
         assert r.status_code == 200
 
         from datetime import datetime, timedelta, timezone
 
         until = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-        r = client.post("/monitoring/alerts/negmarket_api/silence", json={"until": until})
+        r = _signed_post(client, signer, "/monitoring/alerts/negmarket_api/silence", {"until": until})
         assert r.status_code == 200
         assert r.json()["slo_name"] == "negmarket_api"
 
@@ -207,12 +243,21 @@ class TestSloAlertSilence:
         assert r.status_code == 200
         assert any(s["slo_name"] == "negmarket_api" for s in r.json())
 
-        r = client.delete("/monitoring/alerts/negmarket_api/silence")
+        r = _signed_delete(client, signer, "/monitoring/alerts/negmarket_api/silence")
         assert r.status_code == 200
         assert r.json()["removed"] is True
 
+    def test_api_silence_requires_signature(self, client):
+        """I9：无签名静默告警被拒（401）。"""
+        from datetime import datetime, timedelta, timezone
+
+        until = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        r = client.post("/monitoring/alerts/negmarket_api/silence", json={"until": until})
+        assert r.status_code == 401
+
     def test_api_silence_invalid_until(self, client):
-        r = client.post("/monitoring/alerts/negmarket_api/silence", json={"until": "not-a-date"})
+        signer = _ops_signer(client)
+        r = _signed_post(client, signer, "/monitoring/alerts/negmarket_api/silence", {"until": "not-a-date"})
         assert r.status_code == 400 or r.status_code == 500
 
 
@@ -268,13 +313,14 @@ class TestMaintenanceWindow:
         assert rows[0]["duration_minutes"] == 30
 
     def test_api_maintenance_crud(self, client):
+        signer = _ops_signer(client, "ops-maintenance-1")
         payload = {
             "cron_expression": "0 2 * * 6",
             "duration_minutes": 120,
             "slo_name": "*",
             "description": "每周六维护",
         }
-        r = client.post("/monitoring/alerts/maintenance", json=payload)
+        r = _signed_post(client, signer, "/monitoring/alerts/maintenance", payload)
         assert r.status_code == 200, r.text
         window_id = r.json()["window"]["id"]
 
@@ -282,18 +328,29 @@ class TestMaintenanceWindow:
         assert r.status_code == 200
         assert any(w["id"] == window_id for w in r.json()["windows"])
 
-        r = client.delete(f"/monitoring/alerts/maintenance/{window_id}")
+        r = _signed_delete(client, signer, f"/monitoring/alerts/maintenance/{window_id}")
         assert r.status_code == 200
 
-        r = client.delete(f"/monitoring/alerts/maintenance/{window_id}")
+        r = _signed_delete(client, signer, f"/monitoring/alerts/maintenance/{window_id}")
         assert r.status_code == 404
 
     def test_api_maintenance_invalid_cron(self, client):
-        r = client.post(
+        signer = _ops_signer(client, "ops-maintenance-2")
+        r = _signed_post(
+            client,
+            signer,
             "/monitoring/alerts/maintenance",
-            json={"cron_expression": "bad-cron", "duration_minutes": 60},
+            {"cron_expression": "bad-cron", "duration_minutes": 60},
         )
         assert r.status_code == 400
+
+    def test_api_maintenance_requires_signature(self, client):
+        """I9：无签名创建维护窗口被拒（401）。"""
+        r = client.post(
+            "/monitoring/alerts/maintenance",
+            json={"cron_expression": "0 2 * * 6", "duration_minutes": 60},
+        )
+        assert r.status_code == 401
 
 
 class TestSloAlertApi:

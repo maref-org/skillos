@@ -64,9 +64,12 @@ class Intent:
 @dataclass
 class Approval:
     status: ApprovalStatus
+    approval_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     human_decision: str | None = None
     reasoning: str | None = None
+    session_id: str | None = None
     timestamp: float = field(default_factory=time.time)
+    decided_at: float | None = None
 
 
 @dataclass

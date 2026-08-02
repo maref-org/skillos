@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -25,9 +24,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
-from skillos.db.models import IdentityModel, TenantModel
+from skillos.db.models import TenantModel
 from skillos.market.tenants import TenantService
-from skillos.security.message_signer import MessageSigner
+from skillos.web_api.auth import require_actor
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +38,11 @@ def _get_tenant_service(db: Session = Depends(get_session)) -> TenantService:
 
 
 async def _require_actor(request: Request, db: Session = Depends(get_session)) -> str:
-    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。"""
-    raw = await request.body()
-    payload: dict[str, Any] = json.loads(raw) if raw else {}
-    headers = {k.lower(): v for k, v in request.headers.items()}
-    signer_id = headers.get("x-signer-id", "")
-    if not signer_id or not MessageSigner.verify(payload, headers):
-        raise HTTPException(status_code=401, detail="invalid or missing signature")
-    if not db.query(IdentityModel).filter(IdentityModel.identity_id == signer_id).first():
-        raise HTTPException(status_code=403, detail="identity not registered")
-    return signer_id
+    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。
+
+    C1 修复：用注册公钥验签（身份-公钥绑定），防止身份冒充。
+    """
+    return await require_actor(request, db)
 
 
 def _serialize_tenant(tenant: TenantModel) -> dict[str, Any]:
@@ -56,6 +50,7 @@ def _serialize_tenant(tenant: TenantModel) -> dict[str, Any]:
         "tenant_id": tenant.tenant_id,
         "name": tenant.name,
         "status": tenant.status,
+        "owner_id": tenant.owner_id,
         "scene_config": tenant.scene_config or {},
         "payout_limit": tenant.payout_limit or 0.0,
         "payout_used": tenant.payout_used or 0.0,
@@ -72,13 +67,16 @@ async def create_tenant(
     scene_config: dict = Body({}),
     db: Session = Depends(get_session),
 ):
-    """开通租户（幂等：已存在则返回现有租户，不报冲突）。"""
-    await _require_actor(request, db)
+    """开通租户（幂等：已存在则返回现有租户，不报冲突）。
+
+    I2 修复：开通者成为租户 owner；owner 为空的历史租户不强制。
+    """
+    actor_id = await _require_actor(request, db)
     service = TenantService(db)
     existing = service.get(tenant_id) if _tenant_exists(db, tenant_id) else None
     if existing is not None:
         return {"success": True, "tenant": _serialize_tenant(existing), "created": False}
-    tenant = service.create(tenant_id, name=name, scene_config=scene_config)
+    tenant = service.create(tenant_id, name=name, scene_config=scene_config, owner_id=actor_id)
     return {"success": True, "tenant": _serialize_tenant(tenant), "created": True}
 
 
@@ -109,13 +107,18 @@ async def update_scene(
     scene_config: dict = Body(..., embed=True),
     db: Session = Depends(get_session),
 ):
-    """更新租户场景配置（模板/档位/小费/角色集覆盖）。"""
-    await _require_actor(request, db)
+    """更新租户场景配置（模板/档位/小费/角色集覆盖）。
+
+    I2 修复：仅租户 owner 可修改。
+    """
+    actor_id = await _require_actor(request, db)
     service = TenantService(db)
     try:
+        service.assert_owner(tenant_id, actor_id)
         tenant = service.update_scene_config(tenant_id, scene_config)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        status_code = 403 if "only the tenant owner" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return {"success": True, "tenant": _serialize_tenant(tenant)}
 
 
@@ -125,13 +128,18 @@ async def activate_tenant(
     request: Request,
     db: Session = Depends(get_session),
 ):
-    """开通场景：租户状态 draft → active。"""
-    await _require_actor(request, db)
+    """开通场景：租户状态 draft → active。
+
+    I2 修复：仅租户 owner 可操作。
+    """
+    actor_id = await _require_actor(request, db)
     service = TenantService(db)
     try:
+        service.assert_owner(tenant_id, actor_id)
         tenant = service.set_status(tenant_id, "active")
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        status_code = 403 if "only the tenant owner" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return {"success": True, "tenant": _serialize_tenant(tenant)}
 
 
@@ -142,13 +150,18 @@ async def set_quota(
     payout_limit: float = Body(..., ge=0, embed=True),
     db: Session = Depends(get_session),
 ):
-    """设置租户出款限额（0 = 不限额）。"""
-    await _require_actor(request, db)
+    """设置租户出款限额（0 = 不限额）。
+
+    I2 修复：仅租户 owner 可设置（出款限额为资金管控）。
+    """
+    actor_id = await _require_actor(request, db)
     service = TenantService(db)
     try:
+        service.assert_owner(tenant_id, actor_id)
         tenant = service.set_payout_quota(tenant_id, payout_limit)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        status_code = 403 if "only the tenant owner" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return {"success": True, "tenant": _serialize_tenant(tenant), "usage": service.get_payout_usage(tenant_id)}
 
 

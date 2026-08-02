@@ -4,7 +4,7 @@
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Please report security issues to the MAREF security team via email.
+Please report security issues to the SkillOS security team via email.
 Include as much detail as possible: affected component, steps to reproduce,
 potential impact, and suggested fix if available.
 
@@ -15,32 +15,33 @@ you request anonymity).
 ## Supported Versions
 
 | Version | Supported          |
-|---------|-------------------|
-| 0.20.x  | ✅ Active support |
-| 0.17.x  | ✅ Security fixes |
-| < 0.17  | ❌ End of life    |
+|---------|--------------------|
+| 0.5.x   | ✅ Active support  |
+| 0.4.x   | ⏳ Limited support |
+| < 0.4   | ❌ End of life     |
 
 ## Security Architecture
 
-MAREF implements an **8-layer defense-in-depth** architecture for desktop
-agent security. See [MAREF Security Whitepaper](docs/MAREF-Security-Whitepaper.md)
-for full details.
+SkillOS implements a **defense-in-depth** architecture for AI agent security:
 
-Key security features:
-- **4-Level Policy Decision Tree**: 97% automated safety decisions
-- **CircuitBreaker**: 3 consecutive failures trigger automatic lockout
-- **RedactionEngine**: Automatic screenshot redaction of sensitive content
-- **AuditLogger**: Append-only, HMAC-signed audit trail
-- **TLA+ Formal Verification**: Mathematically proven safety properties
-- **DID/VC Identity**: Cryptographic agent identity and trust scoring
+| Layer | Feature | Description |
+|-------|---------|-------------|
+| L1 | Sandbox Isolation | Process-level execution isolation with resource limits, timeouts, and cleanup |
+| L2 | Identity & Signing | Ed25519 challenge-response authentication with HMAC-SHA256 audit chain |
+| L3 | Input Validation | Intent classification + risk assessment + keyword filtering |
+| L4 | Human-in-the-Loop | High-risk operations require human gate approval before execution |
+| L5 | Audit Logging | Append-only, HMAC-signed audit trail for all sensitive operations |
+| L6 | Anti-Pattern Detection | NegMarket-based adversarial pattern recognition and warning |
+| L7 | Secret Scanning | TruffleHog + pre-commit hooks prevent credential leakage |
+| L8 | Dependency Auditing | pip-audit + Dependabot for CVE monitoring |
 
 ## Security Best Practices
 
-When deploying MAREF in production:
+When deploying SkillOS in production:
 
-1. Always run with `MAREF_SAFETY_LEVEL=production`
-2. Enable all 8 defense layers (they are on by default)
-3. Grant only the minimum required OS permissions
-4. Review audit logs regularly (`maref audit show --last 100`)
-5. Monitor CircuitBreaker trip rate via Prometheus
-6. Keep dependencies updated (`pip list --outdated`)
+1. Always set `SKILLOS_API_KEY` via environment variable (never in code)
+2. Use `--insecure` flag only for local development
+3. Enable all audit logging and monitor logs regularly
+4. Review pre-commit security hooks before bypassing
+5. Keep dependencies updated (`pip list --outdated`)
+6. Run `make security` before any release

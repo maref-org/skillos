@@ -127,6 +127,29 @@ class TestSchedulerHandler:
         out = asyncio.run(run())
         assert out["status"] == "error"
 
+    def test_handler_whitelist_blocks_rce(self):
+        """I8：非 skillos. 包 handler 被白名单拦截（RCE 防护）。"""
+        import asyncio
+
+        from skillos.kernel.task_scheduler import is_allowed_handler
+
+        # 白名单拒绝任意系统模块
+        assert is_allowed_handler("os.system:exec") is False
+        assert is_allowed_handler("subprocess.Popen") is False
+        assert is_allowed_handler("builtins.eval") is False
+        assert is_allowed_handler("os:system") is False
+        # 允许 skillos 内置处理器
+        assert is_allowed_handler("skillos.market.pool_reclaim:reclaim_scheduled") is True
+        assert is_allowed_handler("skillos.observability.slo_alerts.evaluate") is True
+
+        async def run_blocked():
+            scheduler = TaskScheduler()
+            return await scheduler._invoke_handler("os.system:exec", {"command": "id"})
+
+        out = asyncio.run(run_blocked())
+        assert out["status"] == "error"
+        assert "whitelist" in out["error"]
+
     def test_handler_sync_function(self):
         import asyncio
 

@@ -1,6 +1,6 @@
 # SkillOS 轻量发布门禁
 
-**版本**: v0.5.0-beta | **覆盖**: SkillOS 专属 16 项发布门禁，替代 43 项通用标准
+**版本**: v0.5.0-beta | **覆盖**: SkillOS 专属 16 项发布门禁，替代 45 项通用标准
 
 ---
 
@@ -8,12 +8,12 @@
 
 | # | 检查项 | 通过标准 | 验证方式 | 阻塞 |
 |---|--------|---------|---------|:----:|
-| A-1 | 单元测试覆盖率 | 总覆盖率 ≥ 80%，核心模块 ≥ 90% | `pytest --cov-fail-under=80 --cov=kernel --cov=distribution --cov=protocol --cov=negmarket` | ✅ |
-| A-2 | SAST 静态扫描 | 0 Critical, 0 High | `bandit -r kernel/ protocol/ distribution/ negmarket/` | ✅ |
+| A-1 | 单元测试覆盖率 | 总覆盖率 ≥ 80% | `pytest --cov-fail-under=80 --cov=skillos` | ✅ |
+| A-2 | SAST 静态扫描 | 0 Critical, 0 High | `bandit -r skillos/ -c pyproject.toml` | ✅ |
 | A-3 | 依赖漏洞审计 | 0 High/Critical CVE | `pip-audit` | ✅ |
-| A-4 | 代码规范 | 0 Critical (ruff) | `ruff check kernel/ protocol/ distribution/ negmarket/ scripts/` | ✅ |
+| A-4 | 代码规范 | 0 Critical (ruff) | `ruff check skillos/ scripts/` | ✅ |
 | A-5 | 结构化日志 | 全模块 JSON 格式输出，trace_id 传播 | `pytest tests/test_logging_config.py -v` | ✅ |
-| A-6 | 错误码注册 | 所有错误码在 `kernel/error_codes.py` 注册，矩阵文档存在 | `pytest tests/test_error_codes.py -v` | ✅ |
+| A-6 | 错误码注册 | 所有错误码在 `skillos/kernel/error_codes.py` 注册，矩阵文档存在 | `pytest tests/test_error_codes.py -v` | ✅ |
 
 ## Gate B: 功能验证 (Functional)
 
@@ -30,9 +30,18 @@
 
 | # | 检查项 | 通过标准 | 验证方式 | 阻塞 | 状态 |
 |---|--------|---------|---------|:----:|:----:|
-| C-1 | 无硬编码密钥 | 0 硬编码密钥/Token/Credential | 手动审计 (trufflehog v2 不支持本地扫描) | ✅ | 通过(手动) |
+| C-1 | 无硬编码密钥 | 0 硬编码密钥/Token/Credential | `trufflehog --only-verified` (CI 自动化, trufflehog v3) | ✅ | **v0.5.0-beta 已自动化** |
 | C-2 | 结构化日志 | 全模块 JSON 格式，`TraceContext` 传递 trace_id | `pytest tests/test_logging_config.py -v` | ✅ | **v0.5.0-beta 已闭合** |
-| C-3 | 错误码全覆盖 | 55 错误码在 `kernel/error_codes.py` 注册，矩阵文档化 | `pytest tests/test_error_codes.py -v` | ✅ | **v0.5.0-beta 已闭合** |
+| C-3 | 错误码全覆盖 | 55 错误码在 `skillos/kernel/error_codes.py` 注册，矩阵文档化 | `pytest tests/test_error_codes.py -v` | ✅ | **v0.5.0-beta 已闭合** |
+
+## Gate D: 元审计 (Meta-Audit)
+
+| # | 检查项 | 通过标准 | 验证方式 | 阻塞 |
+|---|--------|---------|---------|:----:|
+| D-1 | M0 生存性断言 | 健康快照新鲜 ≤ 120s，审计日志 ≤ 300s，Agent 心跳陈旧率 ≤ 30% | `python scripts/meta_monitor.py --check M0` | ✅ |
+| D-2 | M1 数据一致性 | 审计日志路径一致，HMAC 密钥存在，审计链可校验 | `python scripts/meta_monitor.py --check M1` | ✅ |
+| D-3 | M2 反馈回路闭合 | 无 >72h 未处理告警，重复告警率 < 15% | `python scripts/meta_monitor.py --check M2` | ✅ |
+| D-4 | M3 元可观测性 | meta-monitor 进程存活，报告可读，告警可达 | `python scripts/meta_monitor.py --check M3` | ✅ |
 
 ---
 
@@ -93,10 +102,10 @@ SkillOS 核心 AI/Agent 能力的专项验证标准：
 
 ```bash
 # Gate A
-uv run pytest --cov-fail-under=80 --cov=kernel --cov=distribution --cov=protocol --cov=negmarket
-uv run bandit -r kernel/ protocol/ distribution/ negmarket/ -c pyproject.toml
+uv run pytest --cov-fail-under=80 --cov=skillos
+uv run bandit -r skillos/ -c pyproject.toml
 uv run pip-audit
-uv run ruff check kernel/ protocol/ distribution/ negmarket/ scripts/
+uv run ruff check skillos/ scripts/
 
 # Gate B
 uv run pytest tests/test_distribution_engine.py -v
@@ -107,9 +116,13 @@ uv run pytest tests/test_agent_card.py -v
 uv run pytest tests/test_protocol_gateway.py -v
 
 # Gate C
-# C-1: 手动审计源码确认无硬编码密钥/Token/Credential
+# C-1: 自动化密钥扫描 (CI 使用 trufflehog v3, 见 .github/workflows/release-gate.yml)
 uv run pytest tests/test_logging_config.py -v
 uv run pytest tests/test_error_codes.py -v
+
+# Gate D
+make start-health-daemon    # 启动健康快照守护（前台测试: python scripts/health_snapshot_daemon.py）
+uv run python scripts/meta_monitor.py        # 全量 M0~M3 元审计巡检
 
 # KB Sync
 uv run python scripts/verify_kb_sync.py

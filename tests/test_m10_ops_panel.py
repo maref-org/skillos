@@ -36,7 +36,38 @@ def client(db_session):
     app = FastAPI()
     app.include_router(monitoring_router)
     app.include_router(outcome_router)
+    from skillos.web_api.onboarding import router as onboarding_router
+
+    app.include_router(onboarding_router)
     return TestClient(app)
+
+
+def _ops_signer(client, identity_id="ops-risk-1"):
+    """I1 修复：注册签名身份访问平台风控面板。"""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from skillos.security.message_signer import MessageSigner
+
+    key = Ed25519PrivateKey.generate()
+    pem = (
+        key.public_key()
+        .public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
+    r = client.post(
+        "/onboarding/register",
+        json={"identity_id": identity_id, "role": "provider", "public_key_pem": pem},
+    )
+    assert r.status_code == 200
+    return MessageSigner(signer_id=identity_id, private_key=key)
+
+
+def _signed_get(client, signer, path):
+    return client.get(path, headers=signer.sign_headers({}))
 
 
 class TestSloSnapshotService:
@@ -122,7 +153,7 @@ class TestPlatformRiskApi:
         ts.add_payout_used(tenant_id, used)
 
     def test_empty_db(self, client):
-        r = client.get("/outcome/platform-risk")
+        r = _signed_get(client, _ops_signer(client), "/outcome/platform-risk")
         assert r.status_code == 200
         body = r.json()
         assert body["tenant_count"] == 0
@@ -134,7 +165,7 @@ class TestPlatformRiskApi:
         self._mk_tenant(db_session, "t-ok", 10000, 3000)       # 30% 正常
         self._mk_tenant(db_session, "t-over", 5000, 6000)      # 超限
         self._mk_tenant(db_session, "t-risk", 10000, 8500)     # 85% 高风险
-        r = client.get("/outcome/platform-risk")
+        r = _signed_get(client, _ops_signer(client), "/outcome/platform-risk")
         assert r.status_code == 200
         body = r.json()
         assert body["tenant_count"] == 3
@@ -147,6 +178,6 @@ class TestPlatformRiskApi:
     def test_unlimited_tenants_excluded(self, client, db_session):
         ts = TenantService(db_session)
         ts.create("t-nolimit", "no limit")  # 不限额不参与统计
-        r = client.get("/outcome/platform-risk")
+        r = _signed_get(client, _ops_signer(client), "/outcome/platform-risk")
         assert r.status_code == 200
         assert r.json()["tenant_count"] == 0

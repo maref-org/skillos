@@ -1,7 +1,26 @@
+---
+schema_version: "1.0"
+type: docs_index
+purpose: "SkillOS documentation hub — developer, ops, security, and architecture guides"
+version: "0.5.0-beta"
+updated: "2026-07-30"
+agent_instruction: |
+  This is the canonical docs entry point for SkillOS.
+  Read this file first, then navigate to the specific doc by number.
+  If the task is about API usage → 05-api.md
+  If the task is about deployment → 08-deployment.md
+  If the task is about SLO/error budget → 13-error_budget.md
+  If the task is about incident response → 20-runbooks/
+tags: [skillos, documentation, index]
+cross_reference:
+  - "README.md (project overview)"
+  - "skillos/ (source code — docs complement, not replace, code comments)"
+---
+
 # SkillOS 文档库
 
 **版本**: v0.5.0-beta  
-**更新日期**: 2026-06-06
+**更新日期**: 2026-07-30
 
 ---
 

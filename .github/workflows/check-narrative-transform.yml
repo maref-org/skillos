@@ -40,7 +40,7 @@ jobs:
           echo "Checked $(ls docs/*.md 2>/dev/null | wc -l) docs, $ISSUES issues"
       - name: Check for T3 content in public docs
         run: |
-          T3_PATTERNS='(openclaw[^-]|frankiehot-tech|Athena知识库/OPC工作区|SOUL\.md|IDENTITY\.md)'
+          T3_PATTERNS='(openclaw[^-]|maref-org|Athena知识库/OPC工作区|SOUL\.md|IDENTITY\.md)'
           FOUND=$(grep -rn "$T3_PATTERNS" docs/ AGENTS.md CLAUDE.md 2>/dev/null \
             | grep -v 'CHANGELOG.md' || true)
           if [ -n "$FOUND" ]; then

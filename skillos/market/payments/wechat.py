@@ -44,6 +44,9 @@ class WeChatPayProvider:
         self.private_key_pem = (
             private_key_pem or os.environ.get("SKILLOS_WECHAT_PRIVATE_KEY", "")
         ).replace("\\n", "\n")
+        self.platform_public_key_pem = (
+            os.environ.get("SKILLOS_WECHAT_PLATFORM_PUBLIC_KEY", "")
+        ).replace("\\n", "\n")
         if not self.mch_id or not self.apiv3_key:
             raise ProviderNotConfiguredError(
                 "WeChatPay provider needs SKILLOS_WECHAT_MCH_ID and SKILLOS_WECHAT_APIV3_KEY"
@@ -69,14 +72,42 @@ class WeChatPayProvider:
             raw={"headers": headers, "api_base": WECHAT_API_BASE},
         )
 
-    def verify_webhook(self, headers: dict[str, Any], body: dict[str, Any]) -> WebhookReceipt:
+    def verify_webhook(
+        self,
+        headers: dict[str, Any],
+        body: dict[str, Any],
+        raw_body: str | None = None,
+    ) -> WebhookReceipt:
         """验签微信支付 v3 回调（解密后含 resource 字段）。
 
-        沙箱测试固定结构：resource.instruction_ids 为待回写指令。
+        C5 修复：未配置微信平台公钥（SKILLOS_WECHAT_PLATFORM_PUBLIC_KEY）时
+        拒绝回调（fail-closed）。配置后按 v3 规范校验
+        ``Wechatpay-Signature/Timestamp/Nonce``（RSA-SHA256），防伪伪造回执。
+
+        Note: v3 签名是对**原始请求体字节**计算，``raw_body`` 应传 webhook 端点
+        读取的原始 body 字符串；未传时降级为紧凑重序列化（仅测试用，生产应传 raw）。
+        沙箱环境无平台公钥时本方法抛 ValueError，由调用方映射 401；
+        本地测试应走 SandboxProvider（X-Sandbox-Token 校验）。
         """
-        # v3 回调验签：校验 Wechatpay-Serial / Wechatpay-Signature 头存在（沙箱简化）
+        if not self.platform_public_key_pem:
+            raise ValueError(
+                "wechat webhook requires SKILLOS_WECHAT_PLATFORM_PUBLIC_KEY "
+                "for signature verification (fail-closed)"
+            )
+        signature = headers.get("wechatpay-signature", "")
+        timestamp = headers.get("wechatpay-timestamp", "")
+        nonce = headers.get("wechatpay-nonce", "")
+        if not signature or not timestamp or not nonce:
+            raise ValueError("wechat webhook missing Wechatpay-Signature/Timestamp/Nonce headers")
         if "wechatpay-serial" not in headers:
             raise ValueError("wechat webhook missing Wechatpay-Serial header")
+
+        # v3 验签：签名内容 = {timestamp}\n{nonce}\n{原始 body}\n
+        if raw_body is None:
+            raw_body = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
+        content = f"{timestamp}\n{nonce}\n{raw_body}\n"
+        self._verify_platform_signature(signature, content)
+
         resource = body.get("resource", {})
         event_type = body.get("event_type", "")
         if not resource:
@@ -90,6 +121,27 @@ class WeChatPayProvider:
             instruction_ids=list(instruction_ids),
             external_ref=resource.get("out_bill_no", ""),
         )
+
+    def _verify_platform_signature(self, signature_b64: str, content: str) -> None:
+        """用微信平台公钥验证回调 RSA-SHA256 签名。"""
+        import base64
+
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        try:
+            public_key = serialization.load_pem_public_key(
+                self.platform_public_key_pem.encode("utf-8")
+            )
+            public_key.verify(
+                base64.b64decode(signature_b64.encode("utf-8")),
+                content.encode("utf-8"),
+                padding.PKCS1v15(),
+                hashes.SHA256(),
+            )
+        except (InvalidSignature, ValueError) as exc:
+            raise ValueError(f"invalid wechat v3 callback signature: {exc}") from exc
 
     # ------------------------------------------------------------------
     def _build_transfer_payload(self, manifest: dict[str, Any]) -> dict[str, Any]:

@@ -258,8 +258,11 @@ class BountyService:
         status: str = BountyStatus.OPEN,
         page: int = 1,
         page_size: int = 20,
+        poster_id: str | None = None,
     ) -> BountySearchResult:
         q = self._db.query(BountyModel).filter(BountyModel.status == status)
+        if poster_id:
+            q = q.filter(BountyModel.poster_id == poster_id)
         if query:
             like = f"%{query}%"
             q = q.filter(

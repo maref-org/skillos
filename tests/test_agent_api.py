@@ -88,21 +88,20 @@ class TestAgentRegisterIdentity:
 
 class TestAgentSearchProviders:
     def test_search_requires_complete_profiles(self, client):
-        _register_identity(client, "worker-1")
-        client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "worker-1",
-                "profile": {
-                    "headline": "Runner",
-                    "bio": "I run errands in Shanghai",
-                    "skills": [{"skill_id": "errand", "proficiency": 0.9}],
-                    "city": "Shanghai",
-                    "hourly_rate": 40.0,
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        worker = _register_identity(client, "worker-1")
+        profile_payload = {
+            "provider_id": "worker-1",
+            "profile": {
+                "headline": "Runner",
+                "bio": "I run errands in Shanghai",
+                "skills": [{"skill_id": "errand", "proficiency": 0.9}],
+                "city": "Shanghai",
+                "hourly_rate": 40.0,
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
-        )
+        }
+        r = client.post("/onboarding/profile", json=profile_payload, headers=worker.sign_headers(profile_payload))
+        assert r.status_code == 200, r.text
         r = client.get("/agent/search_providers?skill=errand&city=Shanghai&max_rate=50")
         assert r.status_code == 200
         assert r.json()["total"] == 1
@@ -181,20 +180,20 @@ class TestAgentBountyLifecycle:
     def test_full_flow_with_signature(self, client):
         poster = _register_identity(client, "poster-1")
         worker = _register_identity(client, "worker-1")
-        client.post(
-            "/onboarding/profile",
-            json={
-                "provider_id": "worker-1",
-                "profile": {
-                    "headline": "Runner",
-                    "bio": "I run errands",
-                    "skills": [{"skill_id": "errand", "proficiency": 0.9}],
-                    "city": "Shanghai",
-                    "hourly_rate": 30.0,
-                    "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
-                },
+        worker_profile = {
+            "provider_id": "worker-1",
+            "profile": {
+                "headline": "Runner",
+                "bio": "I run errands",
+                "skills": [{"skill_id": "errand", "proficiency": 0.9}],
+                "city": "Shanghai",
+                "hourly_rate": 30.0,
+                "availability": {"monday": [{"start": "09:00", "end": "17:00"}]},
             },
-        )
+        }
+        # I3 修复：画像更新需签名（worker 自己的画像）
+        r = client.post("/onboarding/profile", json=worker_profile, headers=worker.sign_headers(worker_profile))
+        assert r.status_code == 200, r.text
 
         payload = {
             "title": "Pick up package",
@@ -207,12 +206,12 @@ class TestAgentBountyLifecycle:
         r = _signed_post(client, poster, "/agent/create_bounty", payload)
         bounty_id = r.json()["bounty"]["id"]
 
-        r = client.post(f"/market/bounties/{bounty_id}/publish")
+        r = _signed_post(client, poster, f"/market/bounties/{bounty_id}/publish", {})
         assert r.json()["bounty"]["status"] == "open"
 
-        r = client.post(
-            f"/market/bounties/{bounty_id}/apply",
-            json={"applicant_id": "worker-1", "message": "I can do this"},
+        r = _signed_post(
+            client, worker, f"/market/bounties/{bounty_id}/apply",
+            {"applicant_id": "worker-1", "message": "I can do this"},
         )
         app_id = r.json()["application"]["id"]
 
@@ -234,7 +233,7 @@ class TestAgentBountyLifecycle:
         )
         assert r.json()["bounty"]["status"] == "work_completed"
 
-        r = client.post(f"/market/bounties/{bounty_id}/settle")
+        r = _signed_post(client, poster, f"/market/bounties/{bounty_id}/settle", {})
         assert r.json()["settlement"]["status"] == "paid"
 
     def test_accept_requires_signature(self, client):

@@ -20,12 +20,13 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
 from skillos.db.models import IdentityModel
 from skillos.market.providers import ProviderProfile, ProviderRegistry
+from skillos.web_api.auth import require_actor
 
 logger = logging.getLogger(__name__)
 
@@ -144,12 +145,22 @@ def verify(
 
 
 @router.post("/profile")
-def update_profile(
+async def update_profile(
+    request: Request,
     provider_id: str = Body(...),
     profile: dict = Body(...),
+    db: Session = Depends(get_session),
     registry: ProviderRegistry = Depends(_get_provider_registry),
 ):
-    """创建/更新供应方画像（headline/bio/categories + skills + 位置 + 定价 + 可用性）。"""
+    """创建/更新供应方画像。
+
+    I3 修复：需签名身份，且只能修改自己的画像（provider_id == 签名者身份）。
+    """
+    actor_id = await require_actor(request, db)
+    if provider_id != actor_id:
+        raise HTTPException(
+            status_code=403, detail=f"only the identity owner can update their profile ({actor_id})"
+        )
     if not registry.get_profile(provider_id):
         raise HTTPException(status_code=404, detail=f"Provider not found: {provider_id}")
 

@@ -1,0 +1,61 @@
+name: Meta-Audit Scheduled
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  meta-audit:
+    name: Meta-Audit (M0~M3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+
+      - name: Run Full Meta-Audit
+        env:
+          SKILLOS_AUDIT_SECRET: ${{ secrets.SKILLOS_AUDIT_SECRET }}
+        run: python scripts/meta_monitor.py
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: meta-audit-report
+          path: audit_logs/meta_report.json
+          retention-days: 30
+
+      - name: Alert on Blocking Failure
+        if: failure()
+        run: |
+          echo "::warning::Meta-audit 阻断失败检查项，请立即排查"
+          python -c "
+          import json
+          r = json.load(open('audit_logs/meta_report.json'))
+          for c in r['checks']:
+              if c.get('blocking') and c['status'] == 'fail':
+                  print(f'  ❌ {c[\"check\"]}: {c[\"detail\"]}')
+          "
+
+  train-retrieval:
+    name: Train Retrieval Policy (weekly)
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 6 * * 1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: GRPO Training
+        run: python scripts/train_retrieval_policy.py
+      - name: Upload Weights
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrieval-weights
+          path: data/retrieval_weights.json
+          retention-days: 90

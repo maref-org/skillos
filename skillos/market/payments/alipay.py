@@ -73,15 +73,25 @@ class AlipayProvider:
             raw={"params": params, "gateway": self.gateway},
         )
 
-    def verify_webhook(self, headers: dict[str, Any], body: dict[str, Any]) -> WebhookReceipt:
+    def verify_webhook(
+        self,
+        headers: dict[str, Any],
+        body: dict[str, Any],
+        raw_body: str | None = None,
+    ) -> WebhookReceipt:
         """验签支付宝异步通知。
 
-        - 配置了支付宝公钥（SKILLOS_ALIPAY_PUBLIC_KEY）→ 先做 RSA2 验签，失败抛 ValueError。
-        - 未配置公钥（沙箱降级）→ 仅做字段级校验。
+        C6 修复：未配置支付宝公钥时**拒绝**回调（fail-closed），
+        不再降级为纯字段校验（app_id/notify_type 半公开字段可被伪造）。
+        生产环境必须配置 SKILLOS_ALIPAY_PUBLIC_KEY 才能接收 webhook。
         """
-        if self.public_key_pem:
-            self._verify_rsa2_signature(body)
-        # 字段级校验：app_id 匹配 + 通知类型 + 转账状态
+        if not self.public_key_pem:
+            raise ValueError(
+                "alipay webhook requires SKILLOS_ALIPAY_PUBLIC_KEY for signature "
+                "verification (fail-closed)"
+            )
+        self._verify_rsa2_signature(body)
+        # 字段级校验：app_id 匹配 + 通知类型 + 转账状态（签名验证通过后的二次校验）
         if body.get("app_id") != self.app_id:
             raise ValueError("alipay webhook app_id mismatch")
         notify_type = body.get("notify_type", "")
@@ -170,6 +180,13 @@ def _json_dumps(obj: dict[str, Any]) -> str:
 
 
 def _build_sign_content(params: dict[str, Any]) -> str:
-    """支付宝签名串：剔除 sign 后按键名 ASCII 排序，k=v&k=v。"""
-    items = sorted((k, v) for k, v in params.items() if k != "sign" and v not in (None, ""))
+    """支付宝签名串：剔除 sign 与 sign_type 后按键名 ASCII 排序，k=v&k=v。
+
+    C6 修复：支付宝规范 rsaCheckV1 须剔除 sign 和 sign_type 两个字段，
+    否则真实回调验签必失败。
+    """
+    items = sorted(
+        (k, v) for k, v in params.items()
+        if k not in ("sign", "sign_type") and v not in (None, "")
+    )
     return "&".join(f"{k}={v}" for k, v in items)

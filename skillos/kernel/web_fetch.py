@@ -14,7 +14,7 @@ from typing import Any
 
 import httpx
 from bs4 import BeautifulSoup
-from readability import Document
+from readability import Document  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +86,8 @@ class WebFetcher:
                 content_length=len(html),
             )
 
-            result.title = soup.title.string.strip() if soup.title else ""
-            result.metadata = self._extract_metadata(soup, response.headers)
+            result.title = (soup.title.string or "").strip() if soup.title else ""
+            result.metadata = self._extract_metadata(soup, dict(response.headers))
 
             if extract_mode == "article":
                 result.content = self._extract_article(html)[:max_length]
@@ -131,7 +131,7 @@ class WebFetcher:
 
         links = []
         for a_tag in soup.find_all("a", href=True):
-            href = a_tag["href"].strip()
+            href = str(a_tag.get("href", "")).strip()
             if href and not href.startswith("#") and not href.startswith("javascript:"):
                 full_url = urljoin(base_url, href)
                 links.append(full_url)
@@ -146,10 +146,10 @@ class WebFetcher:
             if name and content:
                 meta[name] = content
 
-        meta["charset"] = soup.find("meta", attrs={"charset": True})
-        meta["charset"] = meta["charset"].get("charset") if meta["charset"] else None
+        charset_tag = soup.find("meta", attrs={"charset": True})
+        meta["charset"] = charset_tag.get("charset") if charset_tag else None  # type: ignore[assignment]
         meta["content_type"] = headers.get("content-type", "")
         meta["last_modified"] = headers.get("last-modified", "")
         meta["server"] = headers.get("server", "")
 
-        return {k: v for k, v in meta.items() if v is not None}
+        return {k: v for k, v in meta.items() if v is not None}  # type: ignore[misc]

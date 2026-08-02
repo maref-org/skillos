@@ -50,10 +50,10 @@ class PricingEngine:
         )
 
         optimal = base
-        if competitor_count > 5:
-            optimal = base * 0.85
-        elif competitor_count > 20:
+        if competitor_count > 20:
             optimal = base * 0.70
+        elif competitor_count > 5:
+            optimal = base * 0.85
         elif competitor_count == 0:
             optimal = base * 1.15
 

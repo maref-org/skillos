@@ -1,0 +1,3 @@
+{"event": "task_start", "task_id": "test-001", "task_type": "release_gate", "tags": ["audit"], "agent_id": "", "timestamp": 1785380033.97321}
+{"event": "doc_read", "task_id": "test-001", "doc_path": "审计文档/report.md", "timestamp": 1785380033.973401}
+{"event": "task_outcome", "task_id": "test-001", "task_type": "release_gate", "tags": ["audit"], "success": true, "docs_read": ["审计文档/report.md"], "docs_count": 1, "duration_seconds": 0.0, "details": {}, "timestamp": 1785380033.973517, "agent_id": ""}

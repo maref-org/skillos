@@ -18,6 +18,10 @@ from typing import Any
 
 import requests  # type: ignore[import-untyped]
 
+from skillos.audit import AuditEventType, log_audit
+from skillos.observability.metrics import get_metrics
+from skillos.security.message_signer import get_default_signer
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +66,7 @@ class SettlementClient:
         retry_backoff: float = 1.0,
     ):
         raw_url = base_url or os.getenv("SKILLOS_SETTLEMENT_URL", "https://localhost:8080")
-        self.base_url = self._enforce_https(raw_url)
+        self.base_url = self._enforce_https(raw_url)  # type: ignore[arg-type]
         self._api_key = api_key or os.getenv("SKILLOS_API_KEY")
         self.timeout = timeout
         self.max_retries = max_retries
@@ -118,13 +122,31 @@ class SettlementClient:
         if self._is_circuit_open():
             raise requests.RequestException("Circuit breaker is open")
 
+        # 自动签名 JSON payload（若 MessageSigner 已配置）
+        json_payload = kwargs.get("json")
+        if json_payload is not None:
+            signer = get_default_signer()
+            if signer is not None:
+                headers = kwargs.get("headers") or {}
+                headers.update(signer.sign_headers_http(json_payload))
+                kwargs["headers"] = headers
+
         last_exception: Exception | None = None
+        from urllib.parse import urlparse
+
+        endpoint = urlparse(url).path or url
         for attempt in range(self.max_retries):
+            start = time.monotonic()
             try:
                 resp = requests.request(method, url, **kwargs)
+                duration = time.monotonic() - start
+                get_metrics().record_request(endpoint, resp.status_code, duration)
                 self._record_success()
                 return resp
             except requests.RequestException as exc:
+                duration = time.monotonic() - start
+                get_metrics().record_request(endpoint, 0, duration)
+                get_metrics().record_error(type(exc).__name__)
                 last_exception = exc
                 self._record_failure()
                 wait = self.retry_backoff * (2**attempt)
@@ -216,7 +238,7 @@ class SettlementClient:
             data = resp.json()
 
             result = data.get("result", {})
-            return SettlementReport(
+            report = SettlementReport(
                 period_start=period_start,
                 period_end=period_end,
                 total_revenue=result.get("total_revenue", 0.0),
@@ -226,8 +248,27 @@ class SettlementClient:
                 record_count=result.get("record_count", 0),
                 status=result.get("status", "completed"),
             )
+            log_audit(
+                AuditEventType.SETTLEMENT_TRIGGERED,
+                "system",
+                f"{period_start}-{period_end}",
+                "Trigger remote settlement",
+                {
+                    "total_revenue": round(report.total_revenue, 6),
+                    "record_count": report.record_count,
+                    "status": report.status,
+                },
+            )
+            return report
         except requests.RequestException as e:
             logger.warning("Settlement trigger failed: %s", e)
+            log_audit(
+                AuditEventType.SETTLEMENT_TRIGGERED,
+                "system",
+                f"{period_start}-{period_end}",
+                "Remote settlement trigger failed",
+                {"success": False, "error": str(e)},
+            )
             return None
 
     def get_pending_count(self) -> int:
@@ -248,6 +289,19 @@ class SettlementClient:
         self._pending_records.remove(record)
         self._settled_records.append(record)
         logger.debug("Auto-settled record: %s ($%.4f)", record.skill_call_id, record.amount_usd)
+        log_audit(
+            AuditEventType.SETTLEMENT_AUTO,
+            record.caller_id,
+            record.skill_id,
+            "Auto-settle small-amount record",
+            {
+                "skill_call_id": record.skill_call_id,
+                "amount_usd": round(record.amount_usd, 6),
+                "platform_fee": round(record.platform_fee, 6),
+                "ecosystem_fee": round(record.ecosystem_fee, 6),
+                "contributor_pool": round(record.contributor_pool, 6),
+            },
+        )
         return True
 
     def _submit_remote(self, record: SettlementRecord) -> bool:
@@ -278,9 +332,44 @@ class SettlementClient:
                 record.status = "submitted"
                 self._pending_records.remove(record)
                 self._settled_records.append(record)
+                log_audit(
+                    AuditEventType.SETTLEMENT_SUBMITTED,
+                    record.caller_id,
+                    record.skill_id,
+                    "Submit settlement record to remote",
+                    {
+                        "skill_call_id": record.skill_call_id,
+                        "amount_usd": round(record.amount_usd, 6),
+                        "status": "submitted",
+                    },
+                )
                 return True
+            log_audit(
+                AuditEventType.SETTLEMENT_SUBMITTED,
+                record.caller_id,
+                record.skill_id,
+                "Remote settlement submit failed (non-200)",
+                {
+                    "skill_call_id": record.skill_call_id,
+                    "amount_usd": round(record.amount_usd, 6),
+                    "status_code": resp.status_code,
+                    "success": False,
+                },
+            )
         except requests.RequestException as e:
             logger.warning("Remote settlement submit failed: %s", e)
+            log_audit(
+                AuditEventType.SETTLEMENT_SUBMITTED,
+                record.caller_id,
+                record.skill_id,
+                "Remote settlement submit failed (exception)",
+                {
+                    "skill_call_id": record.skill_call_id,
+                    "amount_usd": round(record.amount_usd, 6),
+                    "success": False,
+                    "error": str(e),
+                },
+            )
 
         return False
 

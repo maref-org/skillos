@@ -224,3 +224,9 @@ def get_metrics() -> MetricsCollector:
     if _metrics_instance is None:
         _metrics_instance = MetricsCollector()
     return _metrics_instance
+
+
+def reset_metrics() -> None:
+    """重置单例（仅供测试使用）。"""
+    global _metrics_instance
+    _metrics_instance = None

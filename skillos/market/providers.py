@@ -286,8 +286,16 @@ class ProviderRegistry:
             q = q.filter(ProviderProfileModel.skills.cast(Text).ilike(f"%{skill}%"))
 
         total = q.count()
-        rows = sorted(q.all(), key=lambda m: self._rank(m), reverse=True)
+        # M8：rank 为计算值无法下推 SQL，全表加载内存排序。为防止恶意大 page
+        # 触发全量扫描，设置扫描上限；超出直接返回空页（total 仍返回真实值）。
+        max_scan = 1000
         start = (page - 1) * page_size
+        if start >= max_scan:
+            return ProviderSearchResult(
+                providers=[], total=total, page=page, page_size=page_size
+            )
+        scan_end = min(start + page_size, max_scan)
+        rows = sorted(q.limit(scan_end).all(), key=lambda m: self._rank(m), reverse=True)
         paged = rows[start : start + page_size]
         return ProviderSearchResult(
             providers=[ProviderProfile.from_orm(m) for m in paged],

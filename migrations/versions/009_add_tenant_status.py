@@ -19,9 +19,20 @@ def upgrade() -> None:
     from alembic.context import get_context
 
     bind = get_context().bind
-    if bind is not None and sa.inspect(bind).has_table("tenants"):
-        op.execute("ALTER TABLE tenants ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'draft'")
+    insp = sa.inspect(bind)
+    # C11 幂等修复：仅当列不存在才 ADD COLUMN
+    if bind is not None and insp.has_table("tenants"):
+        cols = {c["name"] for c in insp.get_columns("tenants")}
+        if "status" not in cols:
+            op.execute("ALTER TABLE tenants ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'draft'")
 
 
 def downgrade() -> None:
-    op.execute("ALTER TABLE tenants DROP COLUMN status")
+    from alembic.context import get_context
+
+    bind = get_context().bind
+    insp = sa.inspect(bind)
+    if bind is not None and insp.has_table("tenants"):
+        cols = {c["name"] for c in insp.get_columns("tenants")}
+        if "status" in cols:
+            op.execute("ALTER TABLE tenants DROP COLUMN status")

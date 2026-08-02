@@ -207,7 +207,7 @@ Phase 4: 持续监控（长期）
 ### 3.2 三重闸门审批
 
 ```python
-# skillos/governance/finance.py
+# skillos/governance/finance.py  ⚠️ 规划中 — 此模块尚未实现，以下为设计规格
 class TripleGateApproval:
     """三重闸门审批：人类预算授权机制。"""
 
@@ -249,7 +249,7 @@ class TripleGateApproval:
 ### 3.3 优雅暂停机制
 
 ```python
-# skillos/governance/emergency.py
+# skillos/governance/emergency.py  ⚠️ 规划中 — 此模块尚未实现，以下为设计规格
 class GracefulPause:
     """优雅暂停：紧急情况下的人类干预机制。"""
 
@@ -281,7 +281,7 @@ class GracefulPause:
 ### 4.1 自动化合规检查
 
 ```python
-# skillos/governance/compliance.py
+# skillos/governance/compliance.py  ⚠️ 规划中 — 此模块尚未实现，以下为设计规格
 class ComplianceAuditor:
     """合规审计自动化。"""
 

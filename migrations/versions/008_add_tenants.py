@@ -19,7 +19,8 @@ def upgrade() -> None:
     from alembic.context import get_context
 
     bind = get_context().bind
-    if bind is None or not sa.inspect(bind).has_table("tenants"):
+    insp = sa.inspect(bind)
+    if bind is None or not insp.has_table("tenants"):
         op.create_table(
             "tenants",
             sa.Column("tenant_id", sa.String(128), nullable=False),
@@ -29,12 +30,32 @@ def upgrade() -> None:
             sa.Column("updated_at", sa.DateTime(), nullable=False),
             sa.PrimaryKeyConstraint("tenant_id"),
         )
-    op.execute(
-        "ALTER TABLE outcome_contracts ADD COLUMN tenant_id VARCHAR(128)"
-    )
-    op.create_index("ix_outcome_contracts_tenant_id", "outcome_contracts", ["tenant_id"])
+    # C11 幂等修复：仅当列不存在才 ADD COLUMN（create_all 与迁移双轨下重跑安全）
+    if bind is not None and insp.has_table("outcome_contracts"):
+        if "tenant_id" not in {c["name"] for c in insp.get_columns("outcome_contracts")}:
+            op.execute(
+                "ALTER TABLE outcome_contracts ADD COLUMN tenant_id VARCHAR(128)"
+            )
+    if bind is not None and insp.has_table("outcome_contracts"):
+        if "ix_outcome_contracts_tenant_id" not in {
+            ix["name"] for ix in insp.get_indexes("outcome_contracts")
+        }:
+            op.create_index(
+                "ix_outcome_contracts_tenant_id", "outcome_contracts", ["tenant_id"]
+            )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_outcome_contracts_tenant_id", table_name="outcome_contracts")
-    op.drop_table("tenants")
+    from alembic.context import get_context
+
+    bind = get_context().bind
+    insp = sa.inspect(bind)
+    if bind is not None and insp.has_table("outcome_contracts"):
+        if "ix_outcome_contracts_tenant_id" in {
+            ix["name"] for ix in insp.get_indexes("outcome_contracts")
+        }:
+            op.drop_index("ix_outcome_contracts_tenant_id", table_name="outcome_contracts")
+        if "tenant_id" in {c["name"] for c in insp.get_columns("outcome_contracts")}:
+            op.execute("ALTER TABLE outcome_contracts DROP COLUMN tenant_id")
+    if bind is not None and insp.has_table("tenants"):
+        op.drop_table("tenants")

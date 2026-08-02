@@ -19,6 +19,8 @@ from typing import Any
 
 import requests  # type: ignore[import-untyped]
 
+from skillos.observability.metrics import get_metrics
+from skillos.security.message_signer import get_default_signer
 from skillos.types import SkillManifest, SkillStatus
 
 logger = logging.getLogger(__name__)
@@ -101,13 +103,31 @@ class RegistryClient:
         if self._is_circuit_open():
             raise requests.RequestException("Circuit breaker is open")
 
+        # 自动签名 JSON payload（若 MessageSigner 已配置）
+        json_payload = kwargs.get("json")
+        if json_payload is not None:
+            signer = get_default_signer()
+            if signer is not None:
+                headers = kwargs.get("headers") or {}
+                headers.update(signer.sign_headers_http(json_payload))
+                kwargs["headers"] = headers
+
         last_exception: Exception | None = None
+        from urllib.parse import urlparse
+
+        endpoint = urlparse(url).path or url
         for attempt in range(self.config.max_retries):
+            start = time.monotonic()
             try:
                 resp = requests.request(method, url, **kwargs)
+                duration = time.monotonic() - start
+                get_metrics().record_request(endpoint, resp.status_code, duration)
                 self._record_success()
                 return resp
             except requests.RequestException as exc:
+                duration = time.monotonic() - start
+                get_metrics().record_request(endpoint, 0, duration)
+                get_metrics().record_error(type(exc).__name__)
                 last_exception = exc
                 self._record_failure()
                 wait = self.config.retry_backoff * (2**attempt)

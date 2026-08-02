@@ -1,6 +1,6 @@
 # SkillOS 错误码矩阵
 
-**自动生成**: `kernel/error_codes.py` — 所有错误码在此注册
+**自动生成**: `skillos/kernel/error_codes.py` — 所有错误码在此注册
 **格式**: `SKILLOS-{category:02d}-{sub:02d}-{seq:03d}`
 **共 55 个错误码，5 个类别**
 

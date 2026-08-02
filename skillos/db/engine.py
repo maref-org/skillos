@@ -86,8 +86,25 @@ def get_session() -> Generator[Session, None, None]:
         session.close()
 
 
-# 全局 SessionLocal 实例，供需要直接创建会话的模块使用
-SessionLocal = get_sessionmaker()
+# C11 修复：SessionLocal 改为惰性初始化——模块级直接调用 get_sessionmaker()
+# 会在 import 时触发 get_engine() → create_all()，污染 alembic 迁移
+# （env.py 仅 import get_database_url 也会连带建表，导致迁移重跑失败）。
+_global_session_local = None
+
+
+def get_global_session_local():
+    """获取全局 SessionLocal（惰性初始化，避免 import 副作用）。"""
+    global _global_session_local
+    if _global_session_local is None:
+        _global_session_local = get_sessionmaker()
+    return _global_session_local
+
+
+# 兼容旧调用点（惰性代理）
+def __getattr__(name: str):
+    if name == "SessionLocal":
+        return get_global_session_local()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def init_db() -> None:

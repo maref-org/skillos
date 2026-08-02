@@ -4,7 +4,7 @@ import re
 import sys
 from pathlib import Path
 
-SCAN_DIRS = ["kernel", "protocol", "distribution"]
+SCAN_DIRS = ["skillos"]
 
 error_codes = set()
 undocumented = []

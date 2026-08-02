@@ -27,6 +27,7 @@ class TenantService:
         name: str = "",
         scene_config: dict[str, Any] | None = None,
         status: str = "draft",
+        owner_id: str | None = None,
     ) -> TenantModel:
         if status not in self.VALID_STATUS:
             raise ValueError(f"Invalid tenant status: {status}")
@@ -37,6 +38,7 @@ class TenantService:
             tenant_id=tenant_id,
             name=name,
             status=status,
+            owner_id=owner_id,
             scene_config=scene_config or {},
             created_at=now,
             updated_at=now,
@@ -44,6 +46,17 @@ class TenantService:
         self._db.add(model)
         self._db.flush()
         return model
+
+    def assert_owner(self, tenant_id: str, actor_id: str) -> None:
+        """I2 修复：校验 actor 是否为租户 owner；非 owner 抛 ValueError。
+
+        兼容历史租户（owner_id 为空）：仅当 owner 已设置才强制校验。
+        """
+        model = self.get(tenant_id)
+        if model.owner_id and model.owner_id != actor_id:
+            raise ValueError(
+                f"only the tenant owner ({model.owner_id}) can modify tenant {tenant_id}"
+            )
 
     def set_status(self, tenant_id: str, status: str) -> TenantModel:
         if status not in self.VALID_STATUS:

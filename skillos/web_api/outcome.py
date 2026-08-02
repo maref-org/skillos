@@ -19,7 +19,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -28,7 +27,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from skillos.db.engine import get_session
-from skillos.db.models import IdentityModel, OutcomeContractModel, ReputationModel
+from skillos.db.models import OutcomeContractModel, ReputationModel
 from skillos.kernel.slo import get_slo_manager
 from skillos.market.outcome_contracts import (
     OutcomeContract,
@@ -39,7 +38,7 @@ from skillos.market.outcome_contracts import (
 )
 from skillos.market.payouts import PayoutService
 from skillos.market.tenants import TenantService
-from skillos.security.message_signer import MessageSigner
+from skillos.web_api.auth import require_actor
 
 logger = logging.getLogger(__name__)
 
@@ -53,16 +52,11 @@ def _get_service(db: Session = Depends(get_session)) -> OutcomeContractService:
 
 
 async def _require_actor(request: Request, db: Session = Depends(get_session)) -> str:
-    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。"""
-    raw = await request.body()
-    payload: dict[str, Any] = json.loads(raw) if raw else {}
-    headers = {k.lower(): v for k, v in request.headers.items()}
-    signer_id = headers.get("x-signer-id", "")
-    if not signer_id or not MessageSigner.verify(payload, headers):
-        raise HTTPException(status_code=401, detail="invalid or missing signature")
-    if not db.query(IdentityModel).filter(IdentityModel.identity_id == signer_id).first():
-        raise HTTPException(status_code=403, detail="identity not registered")
-    return signer_id
+    """验证请求签名并返回签名者身份 ID（未通过则 401/403）。
+
+    C1 修复：用注册公钥验签（身份-公钥绑定），防止身份冒充。
+    """
+    return await require_actor(request, db)
 
 
 def _serialize_contract(contract: OutcomeContract) -> dict[str, Any]:
@@ -289,11 +283,16 @@ def get_contract(
 
 
 @router.get("/payouts/{contract_id}")
-def get_payout_manifest(
+async def get_payout_manifest(
     contract_id: str,
+    request: Request,
     db: Session = Depends(get_session),
 ):
-    """导出契约出款指令 manifest（只读；实际法币由下游持牌平台执行）。"""
+    """导出契约出款指令 manifest（只读；实际法币由下游持牌平台执行）。
+
+    I1 修复：出款指令含收款人/金额等敏感财务数据，要求签名身份。
+    """
+    await require_actor(request, db)
     payouts = PayoutService(db)
     try:
         manifest = payouts.export_manifest(contract_id)
@@ -321,7 +320,8 @@ def _payout_usage(db: Session, tenant_id: str) -> dict[str, Any]:
 
 
 @router.get("/tenant-stats")
-def get_tenant_stats(
+async def get_tenant_stats(
+    request: Request,
     days: int = Query(7, ge=1, le=90),
     db: Session = Depends(get_session),
 ):
@@ -332,7 +332,10 @@ def get_tenant_stats(
     contracts: 各租户契约明细分页（id/状态/金额/创建时间）。
     stats[]: 各租户配额（payout_limit/payout_used/payout_remaining）。
     slo: SLOManager 实时错误预算快照（M9-P2）。
+
+    I1 修复：跨租户财务聚合，要求签名身份。
     """
+    await require_actor(request, db)
     rows = db.query(OutcomeContractModel).all()
     buckets: dict[str, list[OutcomeContractModel]] = {}
     for r in rows:
@@ -380,7 +383,10 @@ def get_tenant_stats(
             points.append({"date": day, "contracts": b["contracts"], "amount": round(b["amount"], 2)})
         trend[tenant_id] = points
 
-        # 契约明细（id/状态/金额/创建时间，按创建时间倒序）
+        # 契约明细（id/状态/金额/创建时间，按创建时间倒序；M9：limit 防超载）
+        sorted_contracts = sorted(
+            contracts, key=lambda x: x.created_at or today, reverse=True
+        )
         items = [
             {
                 "id": c.id,
@@ -389,9 +395,9 @@ def get_tenant_stats(
                 "price": c.price,
                 "created_at": _iso(c.created_at),
             }
-            for c in sorted(contracts, key=lambda x: x.created_at or today, reverse=True)
+            for c in sorted_contracts[:100]
         ]
-        details[tenant_id] = {"total": len(items), "items": items}
+        details[tenant_id] = {"total": len(sorted_contracts), "items": items}
 
     slo = get_slo_manager().get_slo_summary()
 
@@ -399,12 +405,18 @@ def get_tenant_stats(
 
 
 @router.get("/platform-risk")
-def get_platform_risk(db: Session = Depends(get_session)):
+async def get_platform_risk(
+    request: Request,
+    db: Session = Depends(get_session),
+):
     """平台级跨租户风控面板（M10-P2，只读）。
 
     汇总所有有出款限额的租户：总额/已用/剩余/占用率；
     识别超限租户（used >= limit）与高风险租户（占用率 >= 80%）。
+
+    I1 修复：平台级财务风控数据，要求签名身份。
     """
+    await require_actor(request, db)
     return TenantService(db).get_platform_payout_risk()
 
 

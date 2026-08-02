@@ -110,3 +110,26 @@ class TestSubmitContractPayout:
         ctr = svc.create("req-pay", "做内容")
         with pytest.raises(ValueError, match="Only paid contracts"):
             submit_contract_payout(db_session, ctr.id)
+
+    def test_rejects_double_submit(self, db_session):
+        """C7：同一契约重复提交出款被拒绝（防资金重复划转）。"""
+        from skillos.market.outcome_contracts import OutcomeContractService, Tier
+        from skillos.market.payments import submit_contract_payout
+        from skillos.market.payments.base import get_provider
+
+        svc = OutcomeContractService(db_session)
+        ctr = svc.create("req-pay", "做内容全流程", base_price=5000.0)
+        ctr = svc.select_tier(ctr.id, Tier.BALANCED)
+        svc.create_service_team(
+            ctr.id, "ctr-pay", [{"member_id": "author-pay", "role": "skill_author", "share_ratio": 0.4}]
+        )
+        ctr = svc.sign(ctr.id, "ctr-pay")
+        ctr = svc.submit_delivery(ctr.id)
+        ctr = svc.confirm_delivery(ctr.id, accepted=True)
+        svc.settle(ctr.id)
+
+        first = submit_contract_payout(db_session, ctr.id, provider=get_provider("sandbox"))
+        assert first["status"] == "succeeded"
+        # 第二次提交必须被拒绝（指令已 executed）
+        with pytest.raises(ValueError, match="already submitted"):
+            submit_contract_payout(db_session, ctr.id, provider=get_provider("sandbox"))

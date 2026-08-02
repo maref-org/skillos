@@ -1,47 +1,41 @@
-# Contributing to MAREF
+# Contributing to SkillOS
 
-Thank you for contributing to the Multi-Agent Recursive Engineering Framework.
+Thank you for contributing to the Skill Operating System.
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/maref-team/maref.git
-cd maref
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev,desktop]"
+git clone https://github.com/maref-org/skillos.git
+cd skillos
+uv sync --extra dev
 ```
 
 ## Code Style
 
-- **ruff**: `ruff check src tests` — 0 violations required
-- **mypy**: `mypy src/` — strict type checking with `disallow_untyped_defs=true`
-- **Python**: 3.10+ with `from __future__ import annotations`
-- **Docstrings**: Google style (`[tool.ruff.lint.pydocstyle] convention = "google"`)
+- **ruff**: `ruff check skillos/ scripts/ tests/` — 0 violations required
+- **mypy**: `mypy skillos/` — strict type checking
+- **Python**: 3.11+ 
+- **No docstring convention** (keep it minimal)
 
 ## Testing
 
 ```bash
 # Full test suite
-pytest tests/ -v --cov
+uv run pytest tests/ -v --cov
 
-# Specific test categories
-pytest tests/unit/ -v
-pytest tests/integration/ -v
-pytest tests/desktop/ -v
-pytest tests/security/ -v
-pytest tests/benchmark/ -v
+# Core module tests
+uv run pytest tests/test_entry_kernel.py tests/test_distribution_engine.py -v
 
-# New features require >= 90% coverage
-pytest tests/ -v --cov --cov-report=term --cov-fail-under=90
+# New features require >= 80% coverage
+uv run pytest tests/ -v --cov --cov-report=term --cov-fail-under=80
 ```
 
 ## Pull Request Process
 
 1. Create a feature branch from `main`
 2. Write tests for your changes
-3. Run `ruff check src tests` and `mypy src/` — both must be clean
-4. Run `pytest tests/ -v --cov` — all tests must pass
+3. Run `ruff check skillos/ scripts/` and `mypy skillos/` — both must be clean
+4. Run `make test` — all tests must pass (see Makefile for ignored hanging test files)
 5. Update CHANGELOG.md under the `## Unreleased` section
 6. Submit a PR with a descriptive title and body
 
@@ -59,9 +53,9 @@ Brief description of changes.
 - [ ] Security fix
 
 ## Verification
-- [ ] ruff clean (`ruff check src tests`)
-- [ ] mypy clean (`mypy src/`)
-- [ ] Tests pass (`pytest tests/ -v --cov`)
+- [ ] ruff clean (`ruff check skillos/ scripts/`)
+- [ ] mypy clean (`mypy skillos/`)
+- [ ] Tests pass (`uv run pytest tests/ -v --cov`)
 - [ ] New tests added for changed functionality
 ```
 

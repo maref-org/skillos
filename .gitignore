@@ -15,3 +15,7 @@ task_plan.md
 
 # Legacy rename (old root __init__.py, kept for reference)
 __init__.py.legacy
+
+# Backup files
+*.bak
+*.bak.*

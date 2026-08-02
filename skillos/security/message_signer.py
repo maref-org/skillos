@@ -87,21 +87,25 @@ class MessageSigner:
     def sign(self, payload: dict[str, Any]) -> SignedMessage:
         """对 payload 进行 Ed25519 签名。
 
+        签名内容为 ``canonical(payload) + timestamp`` —— 时间戳纳入签名，
+        防止攻击者改写时间戳绕过 TTL 重放（C2 修复）。
+
         Args:
             payload: 待签名的 JSON-serializable 字典（通常是 JSON-RPC 2.0 payload）
 
         Returns:
             SignedMessage: 签名元数据
         """
-        canonical = self._canonicalize(payload)
+        timestamp = time.time()
+        canonical = self._sign_content(payload, timestamp)
         signature_bytes = self._private_key.sign(canonical.encode("utf-8"))
 
         return SignedMessage(
             signer_id=self.signer_id,
             signature=base64.b64encode(signature_bytes).decode("ascii"),
-            timestamp=time.time(),
+            timestamp=timestamp,
             public_key_pem=self._public_key_pem,
-            payload_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16],
+            payload_hash=hashlib.sha256(self._canonicalize(payload).encode("utf-8")).hexdigest()[:16],
         )
 
     def sign_headers(self, payload: dict[str, Any]) -> dict[str, str]:
@@ -127,12 +131,31 @@ class MessageSigner:
             "X-Public-Key": signed.public_key_pem,
         }
 
+    def sign_headers_http(self, payload: dict[str, Any]) -> dict[str, str]:
+        """对 payload 签名并返回 HTTP 头字典（header 友好编码）。
+
+        ``X-Public-Key`` 用 base64url（无换行）编码，适用于真实 HTTP 传输
+        （HTTP 头不允许含换行符）。服务端 ``verify`` 自动识别并解码。
+
+        Args:
+            payload: 待签名的 payload
+
+        Returns:
+            dict: HTTP 头字典，合并到 ``httpx.post(headers=...)``
+        """
+        headers = self.sign_headers(payload)
+        headers["X-Public-Key"] = base64.urlsafe_b64encode(
+            self._public_key_pem.encode("utf-8")
+        ).decode("ascii")
+        return headers
+
     @staticmethod
     def verify(
         payload: dict[str, Any],
         headers: dict[str, str],
         *,
         max_age: float = SIGNATURE_TTL,
+        expected_public_key_pem: str | None = None,
     ) -> bool:
         """验证请求签名（服务端使用）。
 
@@ -140,6 +163,10 @@ class MessageSigner:
             payload: 接收到的 payload（已解析的 dict）
             headers: 请求头（包含 X-Signature 等）
             max_age: 签名最大有效期（秒），默认 300
+            expected_public_key_pem: 签名者注册公钥（可选）。
+
+                传入时用该公钥验签（不信任请求头里的公钥，C1 修复），
+                从而保证签名者身份与已注册公钥绑定，防止身份冒充。
 
         Returns:
             bool: 签名是否有效
@@ -159,20 +186,32 @@ class MessageSigner:
             logger.warning("Missing signature headers for verification")
             return False
 
-        # 时间窗口校验（防重放）
+        # 时间窗口校验（防重放）：拒绝过期与未来时间戳
         try:
             timestamp = float(timestamp_str)
         except ValueError:
             logger.warning("Invalid signature timestamp: %s", timestamp_str)
             return False
 
-        if time.time() - timestamp > max_age:
-            logger.warning("Signature expired (age=%.1fs, max=%.1fs)", time.time() - timestamp, max_age)
+        skew = time.time() - timestamp
+        if skew > max_age or skew < -max_age:
+            logger.warning("Signature outside time window (age=%.1fs, max=%.1fs)", skew, max_age)
             return False
 
-        # 加载公钥
+        # 选择验签公钥：优先用注册公钥（C1），否则回退 header 公钥（协议客户端兼容）
+        if expected_public_key_pem is not None:
+            key_pem = expected_public_key_pem
+        else:
+            key_pem = public_key_pem
+
+        # 加载公钥（支持 PEM 或 base64url 编码 PEM —— header 友好传输）
         try:
-            public_key = serialization.load_pem_public_key(public_key_pem.encode("utf-8"))
+            if "-----BEGIN" in key_pem:
+                public_key = serialization.load_pem_public_key(key_pem.encode("utf-8"))
+            else:
+                # base64url 编码的 PEM
+                pem_bytes = base64.urlsafe_b64decode(key_pem.encode("ascii"))
+                public_key = serialization.load_pem_public_key(pem_bytes)
             if not isinstance(public_key, Ed25519PublicKey):
                 logger.warning("Public key is not Ed25519")
                 return False
@@ -180,8 +219,8 @@ class MessageSigner:
             logger.warning("Failed to load public key: %s", exc)
             return False
 
-        # 验证签名
-        canonical = MessageSigner._canonicalize(payload)
+        # 验证签名（签名内容 = canonical(payload) + timestamp，timestamp 被改写即失败）
+        canonical = MessageSigner._sign_content(payload, timestamp)
         try:
             signature_bytes = base64.b64decode(signature_b64)
             public_key.verify(signature_bytes, canonical.encode("utf-8"))
@@ -194,6 +233,11 @@ class MessageSigner:
     def _canonicalize(payload: dict[str, Any]) -> str:
         """将 payload 序列化为 canonical JSON（确定性排序）。"""
         return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+    @staticmethod
+    def _sign_content(payload: dict[str, Any], timestamp: float) -> str:
+        """构造签名内容：canonical payload + 时间戳（C2 防重放）。"""
+        return f"{MessageSigner._canonicalize(payload)}\n{timestamp}"
 
 
 # ──────────────────────────────────────────────────────────────────────

@@ -131,7 +131,11 @@ async def test_register_and_full_flow(client, db_session):
         svc.settle(cid)
         db_session.commit()
 
-        r = await client.post(f"/payments/contracts/{cid}/submit", json={"provider": "sandbox"})
+        r = await client.post(
+            f"/payments/contracts/{cid}/submit",
+            json={"provider": "sandbox"},
+            headers=business.sign_headers({"provider": "sandbox"}),
+        )
         assert r.status_code == 200, r.text
         assert r.json()["status"] == "succeeded"
         assert len(r.json()["instructions"]) >= 3

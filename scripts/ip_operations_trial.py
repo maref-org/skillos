@@ -151,7 +151,8 @@ def run_scenario(
 
     # ── 5. 结算 + 出款提交（持牌桥 sandbox） ────────────────────────────
     _settle(cid, real)
-    r = runner.post(f"{prefix}/payments/contracts/{cid}/submit", json={"provider": "sandbox"})
+    submit_payload = {"provider": "sandbox"}
+    r = _signed(runner, business, f"{prefix}/payments/contracts/{cid}/submit", submit_payload, real=real)
     assert r.status_code == 200, r.text
     payout = r.json()
     print(

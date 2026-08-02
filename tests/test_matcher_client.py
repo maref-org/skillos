@@ -73,14 +73,14 @@ class TestMatchResult:
 class TestMatcherClientInit:
     def test_default_init(self):
         client = MatcherClient()
-        assert client.base_url == "http://localhost:8080"
-        assert client.api_key is None
+        assert client.base_url == "https://localhost:8080"
+        assert client._api_key is None
         assert client._match_history == []
 
     def test_custom_init(self):
-        client = MatcherClient(base_url="http://example.com", api_key="api-key-123")
-        assert client.base_url == "http://example.com"
-        assert client.api_key == "api-key-123"
+        client = MatcherClient(base_url="https://example.com", api_key="api-key-123")
+        assert client.base_url == "https://example.com"
+        assert client._api_key == "api-key-123"
 
 
 class TestMatcherClientAuthHeaders:
@@ -114,7 +114,7 @@ class TestMatcherClientMatch:
             ),
         )
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_success(self, mock_post):
         mock_resp = self._make_mock_response(
             [
@@ -131,7 +131,7 @@ class TestMatcherClientMatch:
         assert result.candidates[0].skill_id == "skill-001"
         assert result.candidates[0].score == 0.95
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_with_multiple_candidates(self, mock_post):
         mock_resp = self._make_mock_response(
             [
@@ -149,7 +149,7 @@ class TestMatcherClientMatch:
         assert len(result.candidates) == 3
         assert result.total_available == 5
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_best_candidate_is_first(self, mock_post):
         mock_resp = self._make_mock_response(
             [
@@ -166,7 +166,7 @@ class TestMatcherClientMatch:
         assert result.best_match is not None
         assert result.best_match.skill_id == "skill-002"
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_no_candidates(self, mock_post):
         mock_resp = self._make_mock_response([])
         mock_post.return_value = mock_resp
@@ -178,7 +178,7 @@ class TestMatcherClientMatch:
         assert result.candidates == []
         assert result.best_match is None
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_candidate_defaults(self, mock_post):
         mock_resp = self._make_mock_response(
             [
@@ -197,7 +197,7 @@ class TestMatcherClientMatch:
         assert c.success_rate == 1.0
         assert c.author == "anonymous"
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_sends_correct_payload(self, mock_post):
         mock_resp = self._make_mock_response([])
         mock_post.return_value = mock_resp
@@ -220,7 +220,7 @@ class TestMatcherClientMatch:
         assert kwargs["json"]["params"]["max_results"] == 10
         assert kwargs["json"]["params"]["budget_limit"] == 2.0
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_with_auth_headers(self, mock_post):
         mock_resp = self._make_mock_response([])
         mock_post.return_value = mock_resp
@@ -232,7 +232,7 @@ class TestMatcherClientMatch:
         _, kwargs = mock_post.call_args
         assert kwargs["headers"]["Authorization"] == "Bearer my-key"
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_request_exception(self, mock_post):
         import requests as req_lib
 
@@ -247,7 +247,7 @@ class TestMatcherClientMatch:
         assert result.best_match is None
         assert result.total_available == 0
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_http_error(self, mock_post):
         import requests as req_lib
 
@@ -262,7 +262,7 @@ class TestMatcherClientMatch:
         assert result.request_id == "local"
         assert result.candidates == []
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_appends_to_history(self, mock_post):
         mock_resp = self._make_mock_response(
             [
@@ -277,7 +277,7 @@ class TestMatcherClientMatch:
 
         assert len(client.get_match_history()) == 1
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_match_history_is_copy(self, mock_post):
         mock_resp = self._make_mock_response([])
         mock_post.return_value = mock_resp
@@ -304,7 +304,7 @@ class TestMatcherClientMatch:
 
 
 class TestMatcherClientReportOutcome:
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_report_success(self, mock_post):
         mock_resp = MagicMock(status_code=200)
         mock_post.return_value = mock_resp
@@ -314,7 +314,7 @@ class TestMatcherClientReportOutcome:
 
         assert result is True
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_report_failure(self, mock_post):
         mock_resp = MagicMock(status_code=500)
         mock_post.return_value = mock_resp
@@ -324,7 +324,7 @@ class TestMatcherClientReportOutcome:
 
         assert result is False
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_report_exception(self, mock_post):
         import requests as req_lib
 
@@ -335,7 +335,7 @@ class TestMatcherClientReportOutcome:
 
         assert result is False
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_report_sends_correct_payload(self, mock_post):
         mock_resp = MagicMock(status_code=200)
         mock_post.return_value = mock_resp
@@ -349,7 +349,7 @@ class TestMatcherClientReportOutcome:
         assert params["success"] is False
         assert params["rating"] == 2.0
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_report_with_auth(self, mock_post):
         mock_resp = MagicMock(status_code=200)
         mock_post.return_value = mock_resp
@@ -360,7 +360,7 @@ class TestMatcherClientReportOutcome:
         _, kwargs = mock_post.call_args
         assert kwargs["headers"]["Authorization"] == "Bearer key-123"
 
-    @patch("skillos.protocol.matcher_client.requests.post")
+    @patch("skillos.protocol.matcher_client.requests.request")
     def test_report_default_rating(self, mock_post):
         mock_resp = MagicMock(status_code=200)
         mock_post.return_value = mock_resp

@@ -1,4 +1,4 @@
-# SkillOS — Skill Operating System (v0.5.0-beta)
+# SkillOS — Skill Operating System (v0.6.0-beta)
 
 **Agent skill scheduling and orchestration kernel.**
 
@@ -14,7 +14,8 @@ uv run pytest
 ## Architecture
 
 ```
-L3 经济层    5/25/70 分配引擎 · NegMarket 负样本市场 · 生态基金
+L3 经济层    5/25/70 分配引擎 · Skill Market L3 MVP · NegMarket 负样本市场
+             生态基金 · Registry / Pricing / Settlement
 L2 协议层    Registry / Matcher / Settlement / Identity / Remote Bridge
 L1 内核层    EntryKernel · AgentScheduler · SkillKernel · SessionManager
              SessionIsolator · StatePersistor · TaskScheduler · WebFetcher
@@ -33,7 +34,7 @@ make audit    # full release gate
 
 ## Inspiration
 
-The L5 Intelligence Layer design was inspired by concurrent academic research on skill self-evolution
+The intelligence layer (`skillos.intelligence`) design was inspired by concurrent academic research on skill self-evolution
 (independently implemented, no code or data shared):
 
 - **SkillEvolver: Skill Learning as a Meta-Skill** — Genrui Zhang et al., arXiv:2605.10500, May 2026

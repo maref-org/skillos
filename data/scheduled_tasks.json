@@ -1,0 +1,15 @@
+[
+  {
+    "task_id": "pool-reclaim-daily",
+    "name": "\u6bcf\u65e5\u56de\u6536",
+    "cron_expression": "0 3 * * *",
+    "handler": "skillos.market.pool_reclaim:reclaim_scheduled",
+    "params": {},
+    "enabled": true,
+    "last_run": null,
+    "next_run": "2026-08-02T03:00:00+00:00",
+    "success_count": 0,
+    "failure_count": 0,
+    "last_error": null
+  }
+]

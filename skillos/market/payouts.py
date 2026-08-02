@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from skillos.audit import AuditEventType, log_audit
 from skillos.db.models import OutcomeContractModel, PayoutInstructionModel, ServiceTeamMemberModel, ServiceTeamModel
+from skillos.market.settlement import CONTRIBUTOR_PAYOUT_RATE, PLATFORM_FEE_RATE
 from skillos.market.tenant_pools import TenantPoolService
 from skillos.market.tenants import TenantService
 
@@ -97,28 +98,38 @@ class PayoutService:
         now = datetime.now(timezone.utc)
         instructions: list[PayoutInstruction] = []
 
-        # 项目长结算款（含释放的保证金按契约价记账；实际法币由持牌方划转）
+        # 技能作者分成（service_team_members 的 share_ratio）——先从 70% 贡献池划拨
+        members = self._team_members(contract_id)
+        author_share_total = round(sum(member.share_ratio for member in members), 6)
+        # C3 纵深防御：share 超出 70% 池会令 contractor 金额变负（create_service_team 已拦截，
+        # 此处兜底防止历史脏数据/绕过）
+        if author_share_total > 1.0:
+            raise ValueError(
+                f"author share_ratio sum {author_share_total} exceeds 1.0 (contributor pool)"
+            )
+
+        # 项目长结算款：贡献池（70%）减去作者分成后归项目长，保证总额 ≤ 价格（C3 修复）
         if contract.contractor_id and contract.price > 0:
             instructions.append(
                 self._add_instruction(
                     contract_id=contract_id,
                     payee_id=contract.contractor_id,
                     role="contractor",
-                    amount=round(contract.price * 0.7, 2),
+                    amount=round(contract.price * CONTRIBUTOR_PAYOUT_RATE * (1 - author_share_total), 2),
                     currency=contract.currency,
                     source="settlement",
                     now=now,
                 )
             )
 
-        # 技能作者分成（service_team_members 的 share_ratio）
-        for member in self._team_members(contract_id):
+        # 技能作者分成（贡献池内划拨，不额外超发）
+        for member in members:
             instructions.append(
                 self._add_instruction(
                     contract_id=contract_id,
                     payee_id=member.member_id,
                     role=member.role,
-                    amount=round(contract.price * 0.7 * member.share_ratio, 2),
+                    amount=round(contract.price * CONTRIBUTOR_PAYOUT_RATE * member.share_ratio, 2),
                     currency=contract.currency,
                     source="settlement",
                     now=now,
@@ -131,12 +142,20 @@ class PayoutService:
                 contract_id=contract_id,
                 payee_id="skillos-platform",
                 role="platform",
-                amount=round(contract.price * 0.05, 2),
+                amount=round(contract.price * PLATFORM_FEE_RATE, 2),
                 currency=contract.currency,
                 source="platform_fee",
                 now=now,
             )
         )
+
+        # C3 防超发：出款总额必须 ≤ 契约价（贡献池 70% + 平台费 5% ≤ 100%）
+        total_payout = round(sum(i.amount for i in instructions), 2)
+        if total_payout > round(contract.price, 2):
+            raise ValueError(
+                f"Payout total {total_payout} exceeds contract price {contract.price} "
+                f"(share_ratio sum must be ≤ 1.0)"
+            )
 
         # 租户出款用量累计（M9）：仅在首次生成时累加，幂等导出不叠加
         if contract.tenant_id:
@@ -166,10 +185,13 @@ class PayoutService:
 
     def export_period_manifest(self, start: str, end: str) -> dict[str, Any]:
         """导出时间段内的全部出款指令汇总（按 created_at 过滤）。"""
+        # M7：created_at 列为 naive（SQLite 读回），传入带 tz 的 ISO 会 TypeError，统一剥掉 tz。
+        start_dt = datetime.fromisoformat(start).replace(tzinfo=None)
+        end_dt = datetime.fromisoformat(end).replace(tzinfo=None)
         rows = (
             self._db.query(PayoutInstructionModel)
-            .filter(PayoutInstructionModel.created_at >= datetime.fromisoformat(start))
-            .filter(PayoutInstructionModel.created_at <= datetime.fromisoformat(end))
+            .filter(PayoutInstructionModel.created_at >= start_dt)
+            .filter(PayoutInstructionModel.created_at <= end_dt)
             .order_by(PayoutInstructionModel.created_at.asc())
             .all()
         )
@@ -199,6 +221,7 @@ class PayoutService:
             self._db.query(PayoutInstructionModel)
             .filter(PayoutInstructionModel.payee_id == payee_id)
             .order_by(PayoutInstructionModel.created_at.desc())
+            .limit(200)
             .all()
         )
         return [PayoutInstruction.from_orm(m) for m in rows]

@@ -44,7 +44,12 @@ class SandboxProvider:
             raw={"provider": self.name},
         )
 
-    def verify_webhook(self, headers: dict[str, Any], body: dict[str, Any]) -> WebhookReceipt:
+    def verify_webhook(
+        self,
+        headers: dict[str, Any],
+        body: dict[str, Any],
+        raw_body: str | None = None,
+    ) -> WebhookReceipt:
         """验签沙箱回执：X-Sandbox-Token 匹配 + instruction_ids 非空。"""
         token = headers.get("x-sandbox-token", "")
         if not hmac.compare_digest(token, SANDBOX_TOKEN):

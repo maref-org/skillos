@@ -7,7 +7,7 @@
 #
 # 检查项:
 #   1. 绝对路径泄露 (/Volumes/, /Users/, file:///)
-#   2. 组织名泄露 (openclaw, frankiehot-tech, Athena 知识库路径)
+#   2. 组织名泄露 (openclaw, maref-org, Athena 知识库路径)
 #   3. 专有文件名泄露 (SOUL.md, IDENTITY.md, .openclaw/)
 #   4. API Key/Token 泄露 (环境变量值, sk- 模式)
 # =============================================================================
@@ -38,7 +38,7 @@ ABSOLUTE_MATCHES=$(grep -rn "$ABSOLUTE_PATTERN" \
     --include="*.py" --include="*.md" --include="*.yaml" --include="*.yml" \
     --include="*.json" --include="*.jsonc" --include="*.cfg" --include="*.ini" \
     --include="*.toml" --include="*.txt" \
-    src/ tests/ docs/ scripts/ 2>/dev/null || true)
+    skillos/ tests/ docs/ scripts/ 2>/dev/null || true)
 
 if [ -n "$ABSOLUTE_MATCHES" ]; then
     COUNT=$(echo "$ABSOLUTE_MATCHES" | wc -l | tr -d ' ')
@@ -52,11 +52,11 @@ fi
 # ── Check 2: 组织名泄露 ────────────────────────────────────────────
 echo ""
 echo "─── 检查 2: 组织名泄露 ───"
-ORG_PATTERN='(openclaw|frankiehot-tech|frankiehot@)'
+ORG_PATTERN='(openclaw|maref-org|frankiehot@)'
 ORG_MATCHES=$(grep -rn "$ORG_PATTERN" \
     --include="*.py" --include="*.md" --include="*.yaml" --include="*.yml" \
     --include="*.json" --include="*.jsonc" \
-    src/ tests/ docs/ scripts/ 2>/dev/null \
+    skillos/ tests/ docs/ scripts/ 2>/dev/null \
     | grep -v "__pycache__" | grep -v ".pytest_cache" | grep -v "node_modules" \
     | grep -v "CHANGELOG.md" || true)
 
@@ -92,7 +92,7 @@ KEY_MATCHES=$(grep -rn 'sk-[A-Za-z0-9]\{20,\}' \
     --include="*.py" --include="*.md" --include="*.yaml" --include="*.yml" \
     --include="*.json" --include="*.jsonc" --include="*.cfg" --include="*.ini" \
     --include="*.toml" --include="*.env" \
-    src/ tests/ docs/ scripts/ 2>/dev/null \
+    skillos/ tests/ docs/ scripts/ 2>/dev/null \
     | grep -v "__pycache__" | grep -v ".pytest_cache" \
     | grep -v "test_" | grep -v "sk-abcdef" | grep -v "sk-123456" || true)
 

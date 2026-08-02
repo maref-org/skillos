@@ -390,14 +390,15 @@ class TestSearchSessions:
         results = sm.search_sessions("user-001", "nonexistent")
         assert len(results) == 0
 
-    def test_search_only_active_sessions(self):
+    def test_search_all_statuses(self):
         sm = SessionManager()
         s1 = sm.create_session("user-001", metadata={"project": "alpha"})
         s2 = sm.create_session("user-001", metadata={"project": "alpha"})
         sm.pause_session(s2.session_id)
         results = sm.search_sessions("user-001", "alpha")
-        assert len(results) == 1
-        assert results[0].session_id == s1.session_id
+        assert len(results) == 2
+        assert s1.session_id in {r.session_id for r in results}
+        assert s2.session_id in {r.session_id for r in results}
 
 
 class TestSessionStats:

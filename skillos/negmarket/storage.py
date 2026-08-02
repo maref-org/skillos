@@ -75,6 +75,12 @@ class StorageBackend(ABC):
     @abstractmethod
     def update_call_stats(self, skill_id: str, revenue: float = 0.0) -> None: ...
 
+    @abstractmethod
+    def encrypt_for_sample(self, sample: NegativeSample, contributor_secret: str) -> str: ...
+
+    @abstractmethod
+    def decrypt_sample(self, encrypted_blob: str, contributor_secret: str, sample_id: str) -> str: ...
+
 
 class SQLiteNegMarketStorage(StorageBackend):
     def __init__(self, db_path: str = _DEFAULT_DB_PATH):
