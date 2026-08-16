@@ -129,6 +129,15 @@ def create_app() -> Any:
     except ImportError as exc:
         logger.warning("negmarket router not available: %s", exc)
 
+    # ── CSWDP ─────────────────────────────────────────────────────────
+    try:
+        from skillos.cswdp.api import router as cswdp_router
+
+        app.include_router(cswdp_router)
+        logger.info("Mounted CSWDP router at /cswdp")
+    except ImportError as exc:
+        logger.warning("CSWDP router not available: %s", exc)
+
     # ── Market Layer ───────────────────────────────────────────────────
     try:
         from skillos.market.api import router as market_router
