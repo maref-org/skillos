@@ -13,6 +13,7 @@
 
 import hashlib
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -43,6 +44,25 @@ class SkillNFT:
     owner: str
     metadata_hash: str
     minted_at: float = field(default_factory=time.time)
+
+
+def _build_sandbox_script(tool_chain: ToolChain) -> str:
+    """构造沙箱内执行的脚本（stdin 读入 input_data，stdout 输出 JSON）。
+
+    供 process 沙箱与 docker 沙箱共用，避免两处脚本漂移。
+    """
+    return f'''
+import json
+import sys
+
+input_data = json.loads(sys.stdin.read())
+result = {{
+    "skill_id": "{tool_chain.skill_id}",
+    "status": "completed",
+    "output": {{"message": f"Skill {tool_chain.skill_id} executed successfully", "input_echo": input_data}}
+}}
+print(json.dumps(result))
+'''
 
 
 class SkillKernel:
@@ -291,14 +311,27 @@ class SkillKernel:
             }
 
     def _execute_docker_sandbox(self, tool_chain: ToolChain, input_data: dict[str, Any]) -> dict[str, Any]:
-        """Docker 容器沙箱执行（预留接口）"""
-        logger.info("Docker sandbox requested for skill: %s", tool_chain.skill_id)
-        return {
-            "skill_id": tool_chain.skill_id,
-            "status": "rejected",
-            "error": "Docker sandbox not yet implemented. Use wasm_sandbox or subprocess.",
-            "output": None,
-        }
+        """容器沙箱执行（真实 Docker 隔离，P1#1 修复）。
+
+        Docker 不可用时拒绝执行（不降级到不安全的 process 沙箱），
+        由调用方决定是否提示用户安装/启动 Docker。
+        """
+        from skillos.sandbox.container_sandbox import DockerSandbox
+
+        sandbox = DockerSandbox(image=os.environ.get("SKILLOS_SANDBOX_IMAGE", "python:3.11-slim"))
+        script_content = _build_sandbox_script(tool_chain)
+        result = sandbox.execute(
+            script_content,
+            input_data=input_data,
+            timeout=10,
+            skill_id=tool_chain.skill_id,
+        )
+        if result["status"] == "rejected" and "docker" in result["error"].lower():
+            result["error"] = (
+                "Docker sandbox requires a running Docker daemon. "
+                "Refusing to fall back to process sandbox for security isolation."
+            )
+        return result
 
     def _execute_subprocess_sandbox(self, tool_chain: ToolChain, input_data: dict[str, Any]) -> dict[str, Any]:
         """子进程沙箱执行（带资源限制）"""
@@ -310,19 +343,8 @@ class SkillKernel:
         import subprocess
         import tempfile
 
-        # 创建临时脚本文件
-        script_content = f"""
-import json
-import sys
-
-input_data = json.loads(sys.stdin.read())
-result = {{
-    "skill_id": "{tool_chain.skill_id}",
-    "status": "completed",
-    "output": {{"message": f"Skill {tool_chain.skill_id} executed successfully", "input_echo": input_data}}
-}}
-print(json.dumps(result))
-"""
+        # 创建临时脚本文件（共享模板，与 docker 沙箱一致）
+        script_content = _build_sandbox_script(tool_chain)
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script_content)
             script_path = f.name
