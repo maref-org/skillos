@@ -72,7 +72,7 @@ metadata:
 3. **运行稀缺性评分算法**
    ```bash
    # 运行稀缺性评分脚本
-   python scripts/calculate_scarcity_score.py --system-config openclaw.json --knowledge-base evo/
+   python scripts/calculate_scarcity_score.py --system-config skillos.json --knowledge-base evo/
    ```
 
 ### 第二步：策略生成
@@ -251,10 +251,10 @@ def recommend_strategy(scarcity_score, resources, timeline):
 
 ### OpenClaw系统集成
 ```yaml
-# openclaw.json 扩展配置
+# skillos.json 扩展配置
 "scarcity_marketing": {
   "enabled": true,
-  "skill_path": "~/.openclaw/skills/scarcity-marketing-advisor",
+  "skill_path": "~/.skillos/skills/scarcity-marketing-advisor",
   "auto_analyze_frequency": "weekly",
   "integration_points": [
     "user_management",      # 用户分级体系
@@ -393,7 +393,7 @@ cp templates/marketing_strategy.md .
 cp templates/monitoring_dashboard.md .
 
 # 收集系统数据
-python scripts/collect_system_data.py --config ~/.openclaw/openclaw.json
+python scripts/collect_system_data.py --config ~/.skillos/skillos.json
 
 # 运行稀缺性分析
 python scripts/calculate_scarcity_score.py --data system_data.json

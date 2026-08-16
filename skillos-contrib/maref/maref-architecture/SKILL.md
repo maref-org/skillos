@@ -96,4 +96,4 @@ maref evolution audit --level <L1-L7> --agent-id <id> --approval human
 - 核心方案：MAREF-v0.2.0-全量工程实施方案.md
 - 生态认知：Athena生态全域认知系统文档.md (3.2节)
 - 深度审计：003-maref-深度审计.md
-- 河图策略：openclaw/wiki/ARCHITECTURE.md
+- 河图策略：docs/ARCHITECTURE.md

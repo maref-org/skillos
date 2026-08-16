@@ -102,7 +102,7 @@ if(typeof tasks!='undefined'&&tasks.length) // tasks is undefined here
 ## 11. `conversations.json` Creates 0-Byte File on Crash
 
 **Symptom:** Server fails to start with `NameError: name 'OC' is not defined`.
-**Root cause:** `CONVERSATIONS_PATH = OC / "conversations.json"` defined before `OC = REPO / ".openclaw"`. Also: `_load_conversations()` called before `_read_json()` defined.
+**Root cause:** `CONVERSATIONS_PATH = OC / "conversations.json"` defined before `OC = REPO / ".config"`. Also: `_load_conversations()` called before `_read_json()` defined.
 **Fix:** Order definitions: paths → helpers (_ts, _read_json, _write_json) → conversation store → _load_conversations() call.
 
 ## 12. Status Mapping Missing `running`

@@ -75,7 +75,7 @@ These weights are optimized by GRPO as reward_logs accumulate.
 | Task success | +1.0 if completed, -0.5 if failed | SLO/SkillKernel outcome |
 | Doc efficiency | +0.3 if ≤3 docs read, -0.1 per extra doc | audit_log reader count |
 | Freshness penalty | -0.2 if cited doc >90d stale | doc.updated field |
-| Contamination penalty | -0.5 if doc contains /Volumes/ paths | grep on cited doc |
+| Contamination penalty | -0.5 if doc contains internal absolute paths | grep on cited doc |
 
 ## Training Cadence
 
