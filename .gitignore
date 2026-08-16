@@ -19,3 +19,6 @@ __init__.py.legacy
 # Backup files
 *.bak
 *.bak.*
+
+# 运行时审计日志（不进发布仓库）
+audit_logs/
