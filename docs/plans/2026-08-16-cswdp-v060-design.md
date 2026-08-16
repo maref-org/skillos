@@ -75,6 +75,7 @@ tests/test_cswdp.py   # 24 个断言测试
 
 ## 6. 后续（独立 PR）
 
-- P1 例外 #1: WASM/Docker 沙箱替换 process_sandbox
-- P1 例外 #4: 幻觉率检测接 LLM self-consistency + 引用验证（复用 `[llm]` litellm 依赖）
+- [x] P1 例外 #1: Docker 容器沙箱（container_sandbox.py，`674de32`）— skill_kernel docker 环境接真容器
+- [x] P1 例外 #4: 幻觉率检测接 LLM self-consistency + 引用验证（hallucination_llm.py，`e2699f9`，复用 `[llm]` litellm 依赖）
 - CSWDP DB 持久化（如社区要求）
+- wasm_sandbox 仍需真 WASM 运行时（当前进程模拟），Docker 为推荐默认
