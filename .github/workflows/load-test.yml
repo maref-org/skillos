@@ -29,8 +29,12 @@ jobs:
             sleep 2
           done
           curl -sf http://localhost:8000/health || exit 1
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1.2.2
       - name: Run k6 load test
-        uses: grafana/k6-action@v0.3.1
+        uses: grafana/run-k6-action@v1.5.0
         with:
-          filename: scripts/load-test.js
+          path: scripts/load-test.js
           flags: -e BASE_URL=http://localhost:8000
+          cloud-run-locally: false
+          debug: true

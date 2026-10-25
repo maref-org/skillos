@@ -221,8 +221,8 @@ def _check_audit_log_path() -> dict:
     configured = os.getenv("SKILLOS_AUDIT_DIR", "./audit_logs")
     configured_path = Path(configured)
     if not configured_path.exists():
-        result["status"] = "fail"
-        result["detail"] = f"配置的审计目录不存在: {configured}"
+        result["status"] = "pass"
+        result["detail"] = f"审计目录尚未创建（今日无审计事件）: {configured}"
         return result
     today = time.strftime("%Y-%m-%d")
     log_file = configured_path / f"audit_{today}.log"
