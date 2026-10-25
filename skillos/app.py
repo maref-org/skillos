@@ -109,6 +109,12 @@ def create_app() -> Any:
             media_type="text/plain; version=0.0.4; charset=utf-8",
         )
 
+    # ── 根路由 ────────────────────────────────────────────────────────
+    @app.get("/", tags=["observability"])
+    async def root() -> dict[str, str]:
+        """服务入口信息（避免 DAST/爬虫在根路径得到 404）。"""
+        return {"service": "skillos", "version": "0.6.0-beta", "docs": "/docs"}
+
     # ── /health 端点 ──────────────────────────────────────────────────
     @app.get("/health", tags=["observability"])
     async def health_check() -> dict[str, Any]:
