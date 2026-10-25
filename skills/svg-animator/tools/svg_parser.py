@@ -33,9 +33,9 @@ def parse_svg(svg_content: str) -> dict[str, Any]:
     result["elements"] = list(set(elements))
 
     # 提取 viewBox
-    viewBox_match = re.search(r'viewBox="([^"]*)"', svg_content)
-    if viewBox_match:
-        result["viewBox"] = viewBox_match.group(1)
+    viewbox_match = re.search(r'viewBox="([^"]*)"', svg_content)
+    if viewbox_match:
+        result["viewBox"] = viewbox_match.group(1)
 
     return result
 

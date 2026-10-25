@@ -241,11 +241,7 @@ class SloAlertService:
         """该 SLO 当前是否处于周期维护窗口内（M13-P2）。"""
         if now is None:
             now = datetime.now(timezone.utc)
-        rows = (
-            self._db.query(MaintenanceWindowModel)
-            .filter(MaintenanceWindowModel.enabled.is_(True))
-            .all()
-        )
+        rows = self._db.query(MaintenanceWindowModel).filter(MaintenanceWindowModel.enabled.is_(True)).all()
         for w in rows:
             if w.slo_name != "*" and w.slo_name != slo_name:
                 continue
@@ -298,9 +294,7 @@ class SloAlertService:
 
     def delete_maintenance_window(self, window_id: str) -> bool:
         """删除维护窗口。返回是否确有删除。"""
-        row = (
-            self._db.query(MaintenanceWindowModel).filter(MaintenanceWindowModel.id == window_id).first()
-        )
+        row = self._db.query(MaintenanceWindowModel).filter(MaintenanceWindowModel.id == window_id).first()
         if row is None:
             return False
         self._db.delete(row)

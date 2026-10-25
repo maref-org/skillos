@@ -54,9 +54,7 @@ class TenantService:
         """
         model = self.get(tenant_id)
         if model.owner_id and model.owner_id != actor_id:
-            raise ValueError(
-                f"only the tenant owner ({model.owner_id}) can modify tenant {tenant_id}"
-            )
+            raise ValueError(f"only the tenant owner ({model.owner_id}) can modify tenant {tenant_id}")
 
     def set_status(self, tenant_id: str, status: str) -> TenantModel:
         if status not in self.VALID_STATUS:
@@ -140,9 +138,7 @@ class TenantService:
         total_limit = round(sum(lim for _, lim, _ in limited), 2)
         total_used = round(sum(usd for _, _, usd in limited), 2)
         over_limit = [
-            {"tenant_id": tid, "limit": round(lim, 2), "used": round(usd, 2)}
-            for tid, lim, usd in limited
-            if usd >= lim
+            {"tenant_id": tid, "limit": round(lim, 2), "used": round(usd, 2)} for tid, lim, usd in limited if usd >= lim
         ]
         at_risk = [
             {

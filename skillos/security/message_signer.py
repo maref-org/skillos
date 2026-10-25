@@ -144,9 +144,7 @@ class MessageSigner:
             dict: HTTP 头字典，合并到 ``httpx.post(headers=...)``
         """
         headers = self.sign_headers(payload)
-        headers["X-Public-Key"] = base64.urlsafe_b64encode(
-            self._public_key_pem.encode("utf-8")
-        ).decode("ascii")
+        headers["X-Public-Key"] = base64.urlsafe_b64encode(self._public_key_pem.encode("utf-8")).decode("ascii")
         return headers
 
     @staticmethod

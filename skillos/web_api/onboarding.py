@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import logging
 from datetime import datetime, timezone
+from typing import cast
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -80,10 +81,14 @@ def _register_identity_and_profile(
             raise ValueError(f"Invalid Ed25519 public key PEM: {exc}") from exc
     else:
         private_key = Ed25519PrivateKey.generate()
-        public_key_pem = private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        ).decode("utf-8")
+        public_key_pem = (
+            private_key.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("utf-8")
+        )
         logger.warning("Onboarding generated keypair for %s; private key is not stored", identity_id)
 
     now = datetime.now(timezone.utc)
@@ -120,9 +125,7 @@ def verify(
         raise HTTPException(status_code=404, detail=f"Identity not found: {identity_id}")
 
     try:
-        public_key: Ed25519PublicKey = serialization.load_pem_public_key(
-            identity.public_key_pem.encode("utf-8")
-        )
+        public_key = cast(Ed25519PublicKey, serialization.load_pem_public_key(identity.public_key_pem.encode("utf-8")))
 
         public_key.verify(base64.b64decode(challenge_signature), challenge.encode("utf-8"))
     except Exception as exc:
@@ -158,9 +161,7 @@ async def update_profile(
     """
     actor_id = await require_actor(request, db)
     if provider_id != actor_id:
-        raise HTTPException(
-            status_code=403, detail=f"only the identity owner can update their profile ({actor_id})"
-        )
+        raise HTTPException(status_code=403, detail=f"only the identity owner can update their profile ({actor_id})")
     if not registry.get_profile(provider_id):
         raise HTTPException(status_code=404, detail=f"Provider not found: {provider_id}")
 
@@ -169,16 +170,15 @@ async def update_profile(
     except (ValueError, KeyError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    return {"success": True, "profile": _serialize_profile(registry.get_profile(provider_id))}
+    updated = registry.get_profile(provider_id)
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"Provider not found: {provider_id}")
+    return {"success": True, "profile": _serialize_profile(updated)}
 
 
 def _apply_profile_update(registry: ProviderRegistry, provider_id: str, profile: dict) -> None:
     """将画像更新字段应用到 ProviderRegistry（供端点复用，内部做字段分发）。"""
-    basic = {
-        k: profile[k]
-        for k in ("headline", "bio", "categories", "gender", "phone")
-        if k in profile
-    }
+    basic = {k: profile[k] for k in ("headline", "bio", "categories", "gender", "phone") if k in profile}
     if basic:
         registry.update_profile(provider_id, basic)
 

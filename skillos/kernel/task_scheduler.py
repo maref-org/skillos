@@ -66,8 +66,8 @@ class ScheduledTask:
 class TaskScheduler:
     """定时任务调度器"""
 
-    def __init__(self, config_path: str = _DEFAULT_CONFIG_PATH):
-        self.config_path = Path(config_path)
+    def __init__(self, config_path: str | None = None):
+        self.config_path = Path(config_path or _DEFAULT_CONFIG_PATH)
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         self.tasks: dict[str, ScheduledTask] = {}
         self._running = False

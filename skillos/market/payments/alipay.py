@@ -18,7 +18,7 @@ import base64
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 from skillos.market.payments.base import (
     ProviderNotConfiguredError,
@@ -37,17 +37,14 @@ class AlipayProvider:
 
     def __init__(self, app_id: str = "", private_key_pem: str = "", public_key_pem: str = "", gateway: str = ""):
         self.app_id = app_id or os.environ.get("SKILLOS_ALIPAY_APP_ID", "")
-        self.private_key_pem = (
-            private_key_pem or os.environ.get("SKILLOS_ALIPAY_PRIVATE_KEY", "")
-        ).replace("\\n", "\n")
-        self.public_key_pem = (
-            public_key_pem or os.environ.get("SKILLOS_ALIPAY_PUBLIC_KEY", "")
-        ).replace("\\n", "\n")
+        self.private_key_pem = (private_key_pem or os.environ.get("SKILLOS_ALIPAY_PRIVATE_KEY", "")).replace(
+            "\\n", "\n"
+        )
+        self.public_key_pem = (public_key_pem or os.environ.get("SKILLOS_ALIPAY_PUBLIC_KEY", "")).replace("\\n", "\n")
         self.gateway = gateway or os.environ.get("SKILLOS_ALIPAY_GATEWAY", ALIPAY_GATEWAY)
         if not self.app_id or not (self.private_key_pem or self.public_key_pem):
             raise ProviderNotConfiguredError(
-                "Alipay provider needs SKILLOS_ALIPAY_APP_ID and private key "
-                "(or public key for webhook verification)"
+                "Alipay provider needs SKILLOS_ALIPAY_APP_ID and private key (or public key for webhook verification)"
             )
 
     # ------------------------------------------------------------------
@@ -87,8 +84,7 @@ class AlipayProvider:
         """
         if not self.public_key_pem:
             raise ValueError(
-                "alipay webhook requires SKILLOS_ALIPAY_PUBLIC_KEY for signature "
-                "verification (fail-closed)"
+                "alipay webhook requires SKILLOS_ALIPAY_PUBLIC_KEY for signature verification (fail-closed)"
             )
         self._verify_rsa2_signature(body)
         # 字段级校验：app_id 匹配 + 通知类型 + 转账状态（签名验证通过后的二次校验）
@@ -114,14 +110,14 @@ class AlipayProvider:
 
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
         sign_b64 = body.get("sign", "")
         if not sign_b64:
             raise ValueError("alipay webhook missing signature")
         content = _build_sign_content(body)
         try:
-            public_key = serialization.load_pem_public_key(self.public_key_pem.encode("utf-8"))
+            public_key = cast(rsa.RSAPublicKey, serialization.load_pem_public_key(self.public_key_pem.encode("utf-8")))
             public_key.verify(
                 base64.b64decode(sign_b64.encode("utf-8")),
                 content.encode("utf-8"),
@@ -162,12 +158,15 @@ class AlipayProvider:
     def _sign(self, params: dict[str, Any]) -> str:
         """RSA2 签名（SHA256withRSA，PKCS1v15）。"""
         from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
         content = _build_sign_content(params)
-        private_key = serialization.load_pem_private_key(
-            self.private_key_pem.encode("utf-8"),
-            password=None,
+        private_key = cast(
+            rsa.RSAPrivateKey,
+            serialization.load_pem_private_key(
+                self.private_key_pem.encode("utf-8"),
+                password=None,
+            ),
         )
         signature = private_key.sign(content.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
         return base64.b64encode(signature).decode("utf-8")
@@ -185,8 +184,5 @@ def _build_sign_content(params: dict[str, Any]) -> str:
     C6 修复：支付宝规范 rsaCheckV1 须剔除 sign 和 sign_type 两个字段，
     否则真实回调验签必失败。
     """
-    items = sorted(
-        (k, v) for k, v in params.items()
-        if k not in ("sign", "sign_type") and v not in (None, "")
-    )
+    items = sorted((k, v) for k, v in params.items() if k not in ("sign", "sign_type") and v not in (None, ""))
     return "&".join(f"{k}={v}" for k, v in items)

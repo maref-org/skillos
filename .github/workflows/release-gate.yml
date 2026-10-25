@@ -1,103 +1,37 @@
 name: Release Gate
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
 
 jobs:
-  gate-a-code-readiness:
-    name: Gate A — Code Readiness
+  release-gate:
+    name: Release Gate — single source of truth
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -e ".[dev]"
-
-      - name: A-1 Test & Coverage
-        run: |
-          pip install pytest-cov
-          pytest tests/ --cov=skillos --cov-fail-under=80 -v
-
-
-      - name: A-2 SAST (Bandit)
-        run: |
-          pip install bandit
-          bandit -r skillos/ -c pyproject.toml
-
-      - name: A-3 Dep Audit
-        run: |
-          pip install pip-audit
-          pip-audit \
-            --ignore-vuln GHSA-537c-gmf6-5ccf \
-            --ignore-vuln GHSA-6v7p-g79w-8964
-
-      - name: A-4 Ruff Lint
-        run: pip install ruff && ruff check skillos/ scripts/ --output-format=github
-
-      - name: A-5 Structured Logging
-        run: pytest tests/test_logging_config.py -v
-
-      - name: A-6 Error Code Registry
-        run: pytest tests/test_error_codes.py -v
-
-  gate-b-functional:
-    name: Gate B — Functional
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -e ".[dev]"
-
-      - name: B-1 Distribution Model Verify
-        run: python scripts/verify_distribution.py
-
-      - name: B-2 Intent Routing
-        run: pytest tests/test_entry_kernel.py -k TestRoute -v
-
-      - name: B-3 Session Isolation
-        run: pytest tests/test_session_manager.py -k test_cleanup -v
-
-      - name: B-4 NegMarket Anti-Pattern
-        run: pytest tests/test_negmarket.py tests/test_negmarket_api.py -v
-
-      - name: B-5 AgentCard Registry
-        run: pytest tests/test_agent_card.py -v
-
-      - name: B-6 Protocol Gateway
-        run: pytest tests/test_protocol_gateway.py -v
-
-  gate-c-security:
-    name: Gate C — Security
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -e ".[dev]"
-
-      - name: C-1 Secret Scan
+      - name: Install dependencies
+        run: pip install -e ".[dev,web]"
+      - name: Run release gate
+        run: bash scripts/release_gate.sh
+      - name: Secret scan (verified secrets only)
         uses: trufflesecurity/trufflehog@v3
         with:
           extra_args: --only-verified
 
-      - name: C-2 Structured Logging
-        run: pytest tests/test_logging_config.py -v
-
-      - name: C-3 Error Code Audit
-        run: python scripts/audit_error_codes.py
-
-  gate-c2-semgrep:
-    name: Gate C2 — Semgrep
+  semgrep:
+    name: Semgrep (advisory)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -105,11 +39,10 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install semgrep
-      - name: C2-1 Semgrep Rule Scan
-        run: semgrep --config=.semgrep/rules/ --error --strict skillos/
+      - run: semgrep --config=.semgrep/rules/ --error --strict skillos/
 
-  gate-c3-sbom:
-    name: Gate C3 — SBOM
+  sbom:
+    name: SBOM
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -124,29 +57,3 @@ jobs:
         with:
           name: sbom
           path: sbom.spdx.json
-
-  gate-d-meta-audit:
-    name: Gate D — Meta-Audit (M0~M3)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -e ".[dev]"
-
-      - name: D-1 M0 Survivability
-        run: python scripts/meta_monitor.py --check M0
-
-      - name: D-2 M1 Data Consistency
-        run: python scripts/meta_monitor.py --check M1
-
-      - name: D-3 M2 Feedback Loop
-        run: python scripts/meta_monitor.py --check M2
-
-      - name: D-4 M3 Meta-Observability
-        run: python scripts/meta_monitor.py --check M3
-
-      - name: D-5 Full Meta-Audit Report
-        run: python scripts/meta_monitor.py

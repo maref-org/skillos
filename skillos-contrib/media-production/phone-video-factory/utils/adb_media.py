@@ -8,6 +8,7 @@ Phone Video Factory — ADB 媒体工具
 """
 
 import logging
+import os
 import subprocess
 from pathlib import Path
 

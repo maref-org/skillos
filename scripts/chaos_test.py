@@ -43,7 +43,9 @@ def chaos_process_kill() -> list[str]:
     try:
         result = subprocess.run(
             ["pgrep", "-f", "skillos"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         pids = [int(p) for p in result.stdout.strip().split() if p]
         if not pids:
@@ -78,11 +80,13 @@ def chaos_network_disconnect() -> list[str]:
     try:
         subprocess.run(
             ["iptables", "-A", "OUTPUT", "-p", "tcp", "--dport", "8000", "-j", "DROP"],
-            check=True, timeout=10,
+            check=True,
+            timeout=10,
         )
         subprocess.run(
             ["iptables", "-A", "INPUT", "-p", "tcp", "--sport", "8000", "-j", "DROP"],
-            check=True, timeout=10,
+            check=True,
+            timeout=10,
         )
         print("[chaos] Network blocked")
 
@@ -95,11 +99,13 @@ def chaos_network_disconnect() -> list[str]:
     finally:
         subprocess.run(
             ["iptables", "-D", "OUTPUT", "-p", "tcp", "--dport", "8000", "-j", "DROP"],
-            capture_output=True, timeout=10,
+            capture_output=True,
+            timeout=10,
         )
         subprocess.run(
             ["iptables", "-D", "INPUT", "-p", "tcp", "--sport", "8000", "-j", "DROP"],
-            capture_output=True, timeout=10,
+            capture_output=True,
+            timeout=10,
         )
 
     if _wait_for_recovery():
@@ -119,6 +125,7 @@ def chaos_resource_exhaustion() -> list[str]:
 
     # Check that sandbox correctly limits memory
     import resource
+
     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
     print(f"[chaos] RLIMIT_AS: soft={soft}, hard={hard}")
 

@@ -88,7 +88,9 @@ def main() -> int:
     print("=" * 66)
     print(f"内容 IP 代运营 · 垂直场景内测 —— 模板「{scenario.name}」")
     print(f"连接模式: {'真实 HTTP (' + args.url + ')' if args.real_server else '内置 TestClient'}")
-    print(f"角色: 企业主 / 外部 Agent（项目长）/ 技能作者  档位: {scenario.tier}  小费: {int(scenario.tip_ratio*100)}%")
+    print(
+        f"角色: 企业主 / 外部 Agent（项目长）/ 技能作者  档位: {scenario.tier}  小费: {int(scenario.tip_ratio * 100)}%"
+    )
     if tenant_id:
         print(f"租户: {tenant_id}")
     print("=" * 66)
@@ -120,7 +122,9 @@ def run_scenario(
     cid = body["contract"]["id"]
     print(f"\n[1/5] 企业主提需求「{scenario.requirement[:40]}…」→ 三方案报价:")
     for p in body["plans"]:
-        print(f"      {p['tier']:8s} 成功率 {int(p['success_rate']*100)}%  ¥{p['price']:>7.0f}  {p['delivery_days']}天")
+        print(
+            f"      {p['tier']:8s} 成功率 {int(p['success_rate'] * 100)}%  ¥{p['price']:>7.0f}  {p['delivery_days']}天"
+        )
 
     # ── 2. 选档 ──────────────────────────────────────────────────────────
     tier_payload = {"tier": scenario.tier}
@@ -147,7 +151,7 @@ def run_scenario(
     confirm_payload = {"accepted": True, "tip_ratio": scenario.tip_ratio}
     r = _signed(runner, business, f"{prefix}/outcome/contracts/{cid}/confirm", confirm_payload, real=real)
     assert r.status_code == 200, r.text
-    print(f"[4/5] 企业主验收通过 + 超预期小费 ¥{r.json()['tip']['amount']:.0f}（{int(scenario.tip_ratio*100)}%）")
+    print(f"[4/5] 企业主验收通过 + 超预期小费 ¥{r.json()['tip']['amount']:.0f}（{int(scenario.tip_ratio * 100)}%）")
 
     # ── 5. 结算 + 出款提交（持牌桥 sandbox） ────────────────────────────
     _settle(cid, real)
@@ -156,8 +160,7 @@ def run_scenario(
     assert r.status_code == 200, r.text
     payout = r.json()
     print(
-        f"[5/5] 结算完成 → 出款提交 持牌桥 {payout['provider']}（流水号 "
-        f"{payout['external_ref']}，{payout['status']}）:"
+        f"[5/5] 结算完成 → 出款提交 持牌桥 {payout['provider']}（流水号 {payout['external_ref']}，{payout['status']}）:"
     )
     for i in payout["instructions"]:
         print(f"      - {i['payee_id']:22s} {i['role']:12s} ¥{i['amount']:>8.2f}  {i['status']}  {i['external_ref']}")
@@ -180,6 +183,7 @@ def run_scenario(
 
 
 # ── 客户端抽象 ────────────────────────────────────────────────────────────
+
 
 class _InMemoryRunner:
     """内置模式：TestClient（无需起服务）。"""
@@ -224,6 +228,7 @@ class _RealRunner:
 
 
 # ── 工具函数 ──────────────────────────────────────────────────────────────
+
 
 def _signer_and_register(runner, prefix, identity_id, role):
     from cryptography.hazmat.primitives import serialization

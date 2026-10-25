@@ -280,9 +280,7 @@ class BountyApplicationModel(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
     bounty_id: Mapped[str] = mapped_column(ForeignKey("bounties.id"), nullable=False, index=True)
-    applicant_id: Mapped[str] = mapped_column(
-        ForeignKey("provider_profiles.provider_id"), nullable=False, index=True
-    )
+    applicant_id: Mapped[str] = mapped_column(ForeignKey("provider_profiles.provider_id"), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
     applied_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utc_now)
@@ -409,9 +407,7 @@ class PayoutInstructionModel(Base):
     __tablename__ = "payout_instructions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
-    contract_id: Mapped[str] = mapped_column(
-        ForeignKey("outcome_contracts.id"), nullable=False, index=True
-    )
+    contract_id: Mapped[str] = mapped_column(ForeignKey("outcome_contracts.id"), nullable=False, index=True)
     payee_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="contractor")
     amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)

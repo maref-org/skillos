@@ -79,7 +79,7 @@ def main() -> int:
     new_weights = grpo_update(combined_rewards, old_weights, lr=args.lr)
 
     print(f"  {'Weight':<15} {'Before':<10} {'After':<10} {'Delta':<10}")
-    print(f"  {'-'*45}")
+    print(f"  {'-' * 45}")
     for key in sorted(old_weights):
         delta = new_weights.get(key, 0) - old_weights[key]
         print(f"  {key:<15} {old_weights[key]:<10.4f} {new_weights.get(key, 0):<10.4f} {delta:<+10.4f}")
@@ -90,7 +90,7 @@ def main() -> int:
 
     policy.update_weights(new_weights)
     print("\nWeights saved to data/retrieval_weights.json")
-    print(f"Average reward: {sum(combined_rewards)/len(combined_rewards):.4f}")
+    print(f"Average reward: {sum(combined_rewards) / len(combined_rewards):.4f}")
 
     return 0
 

@@ -20,6 +20,16 @@ from skillos.web_api.onboarding import router as onboarding_router
 from skillos.web_api.scheduler import router as scheduler_router
 
 
+@pytest.fixture(autouse=True)
+def _isolate_scheduler_config(tmp_path, monkeypatch):
+    """禁止测试写入仓库内 data/scheduled_tasks.json。"""
+    monkeypatch.setattr(
+        "skillos.kernel.task_scheduler._DEFAULT_CONFIG_PATH",
+        str(tmp_path / "scheduled_tasks.json"),
+    )
+    yield
+
+
 @pytest.fixture
 def client(db_session):
     app = FastAPI()
@@ -201,7 +211,9 @@ class TestReclaimApi:
     def test_add_scheduler_task_invalid_handler(self, client):
         s = self._register(client, "req-sched-1")
         r = self._post(
-            client, s, "/scheduler/tasks",
+            client,
+            s,
+            "/scheduler/tasks",
             {
                 "task_id": "bad-task",
                 "name": "x",
@@ -215,7 +227,9 @@ class TestReclaimApi:
         s = self._register(client, "req-sched-2")
         handler = "skillos.market.pool_reclaim:reclaim_scheduled"
         r = self._post(
-            client, s, "/scheduler/tasks",
+            client,
+            s,
+            "/scheduler/tasks",
             {"task_id": "bad-cron", "name": "x", "cron_expression": "not-a-cron", "handler": handler},
         )
         assert r.status_code == 400
@@ -224,7 +238,9 @@ class TestReclaimApi:
         s = self._register(client, "req-sched-3")
         handler = "skillos.market.pool_reclaim:reclaim_scheduled"
         r = self._post(
-            client, s, "/scheduler/tasks",
+            client,
+            s,
+            "/scheduler/tasks",
             {"task_id": "pool-reclaim-daily", "name": "每日回收", "cron_expression": "0 3 * * *", "handler": handler},
         )
         assert r.status_code == 200, r.text

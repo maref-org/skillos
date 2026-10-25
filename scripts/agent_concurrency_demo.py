@@ -247,9 +247,7 @@ async def _run_builtin(app, n_agents: int) -> list[dict]:
         session.commit()
         session.close()
 
-        return await run_demo(
-            "http://testserver", n_agents, contract_ids=ids, transport=httpx.ASGITransport(app=app)
-        )
+        return await run_demo("http://testserver", n_agents, contract_ids=ids, transport=httpx.ASGITransport(app=app))
 
 
 if __name__ == "__main__":

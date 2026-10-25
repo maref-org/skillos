@@ -46,11 +46,7 @@ export default function () {
   const responses = http.batch([
     ['GET', `${BASE_URL}/health`, null, { tags: { endpoint: 'health' } }],
     ['GET', `${BASE_URL}/api/v1/skills`, null, { tags: { endpoint: 'skills_list' } }],
-    ['POST', `${BASE_URL}/api/v1/skills`, JSON.stringify({
-      name: 'test-skill',
-      version: '1.0.0',
-      category: 'utility',
-    }), { tags: { endpoint: 'skills_create' }, headers: { 'Content-Type': 'application/json' } }],
+    ['GET', `${BASE_URL}/api/v1/nfts`, null, { tags: { endpoint: 'nft_list' } }],
   ]);
 
   responses.forEach((res) => {

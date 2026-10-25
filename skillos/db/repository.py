@@ -4,7 +4,6 @@
 为各核心模块提供类型安全的 CRUD 接口，屏蔽 ORM 细节。
 """
 
-
 from sqlalchemy.orm import Session
 
 from skillos.db.models import (

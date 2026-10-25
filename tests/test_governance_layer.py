@@ -8,7 +8,10 @@
 
 import pytest
 
-governance = pytest.importorskip("skillos.governance")
+governance = pytest.importorskip(
+    "skillos.governance",
+    reason="skillos.governance 尚未实现（见 ARCHITECTURE.md: 缺失层）",
+)
 
 from skillos.governance.compliance import (
     AuditStatus,

@@ -368,9 +368,7 @@ class DistributionEngine:
             from skillos.db.models import DistributionRecordModel
 
             models = (
-                self._db_session.query(DistributionRecordModel)
-                .order_by(DistributionRecordModel.timestamp.desc())
-                .all()
+                self._db_session.query(DistributionRecordModel).order_by(DistributionRecordModel.timestamp.desc()).all()
             )
             records = []
             for m in models:
@@ -404,13 +402,11 @@ class DistributionEngine:
 
         from skillos.db.models import DistributionRecordModel
 
-        start_dt = datetime.datetime.fromtimestamp(
-            self._get_period_start(period), tz=datetime.timezone.utc
-        )
+        if self._db_session is None:
+            return 0.0
+        start_dt = datetime.datetime.fromtimestamp(self._get_period_start(period), tz=datetime.timezone.utc)
         rows = (
-            self._db_session.query(DistributionRecordModel)
-            .filter(DistributionRecordModel.timestamp >= start_dt)
-            .all()
+            self._db_session.query(DistributionRecordModel).filter(DistributionRecordModel.timestamp >= start_dt).all()
         )
         return round(sum(float(r.total_amount or 0.0) for r in rows), 6)
 

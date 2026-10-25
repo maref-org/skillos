@@ -303,10 +303,14 @@ class BountyService:
             raise ValueError(f"Bounty is not open for applications, current: {model.status}")
         if (model.spots_filled or 0) >= (model.spots_available or 1):
             raise ValueError("No spots available for this bounty")
-        if self._db.query(BountyApplicationModel).filter(
-            BountyApplicationModel.bounty_id == bounty_id,
-            BountyApplicationModel.applicant_id == applicant_id,
-        ).first():
+        if (
+            self._db.query(BountyApplicationModel)
+            .filter(
+                BountyApplicationModel.bounty_id == bounty_id,
+                BountyApplicationModel.applicant_id == applicant_id,
+            )
+            .first()
+        ):
             raise ValueError(f"Provider already applied to this bounty: {applicant_id}")
 
         app = BountyApplicationModel(
@@ -326,10 +330,14 @@ class BountyService:
         model = self._require(bounty_id)
         if model.status != BountyStatus.OPEN:
             raise ValueError(f"Bounty is not open, current: {model.status}")
-        app = self._db.query(BountyApplicationModel).filter(
-            BountyApplicationModel.id == application_id,
-            BountyApplicationModel.bounty_id == bounty_id,
-        ).first()
+        app = (
+            self._db.query(BountyApplicationModel)
+            .filter(
+                BountyApplicationModel.id == application_id,
+                BountyApplicationModel.bounty_id == bounty_id,
+            )
+            .first()
+        )
         if app is None:
             raise ValueError(f"Application not found for bounty: {application_id}")
         if app.status != ApplicationStatus.PENDING:
@@ -353,10 +361,14 @@ class BountyService:
         return Bounty.from_orm(model)
 
     def reject_application(self, bounty_id: str, application_id: str) -> None:
-        app = self._db.query(BountyApplicationModel).filter(
-            BountyApplicationModel.id == application_id,
-            BountyApplicationModel.bounty_id == bounty_id,
-        ).first()
+        app = (
+            self._db.query(BountyApplicationModel)
+            .filter(
+                BountyApplicationModel.id == application_id,
+                BountyApplicationModel.bounty_id == bounty_id,
+            )
+            .first()
+        )
         if app is None:
             raise ValueError(f"Application not found for bounty: {application_id}")
         if app.status != ApplicationStatus.PENDING:

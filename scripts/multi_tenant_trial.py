@@ -114,11 +114,7 @@ def _check_isolation(real: bool, tenant_ids: list[str], rows: list[dict]) -> dic
     try:
         per_tenant: dict[str, int] = {}
         for tid in tenant_ids:
-            per_tenant[tid] = (
-                session.query(OutcomeContractModel)
-                .filter(OutcomeContractModel.tenant_id == tid)
-                .count()
-            )
+            per_tenant[tid] = session.query(OutcomeContractModel).filter(OutcomeContractModel.tenant_id == tid).count()
         ok = all(count >= 1 for count in per_tenant.values())
         return {"ok": ok, "per_tenant": per_tenant}
     finally:

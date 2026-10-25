@@ -224,7 +224,7 @@ def _isolate_message_signer(monkeypatch):
 @pytest.fixture
 def db_session():
     """提供 SQLAlchemy 会话，在每个测试前自动重置数据库。"""
-    from skillos.db.engine import get_engine, get_sessionmaker
+    from skillos.db.engine import get_sessionmaker
 
     Session = get_sessionmaker()
     session = Session()

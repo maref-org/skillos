@@ -23,13 +23,13 @@ async def list_sessions(user_id: str | None = None):
     return {
         "sessions": [
             {
-                "id": s.session_id if not isinstance(s, dict) else s.get("session_id", ""),
-                "user_id": s.user_id if not isinstance(s, dict) else s.get("user_id", ""),
-                "status": s.status.value if not isinstance(s, dict) else s.get("status", "active"),
+                "id": s.session_id,
+                "user_id": s.user_id,
+                "status": s.status.value,
             }
-            for s in (sessions if isinstance(sessions, list) else [])
+            for s in sessions
         ],
-        "total": len(sessions) if isinstance(sessions, list) else 0,
+        "total": len(sessions),
     }
 
 

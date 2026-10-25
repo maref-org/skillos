@@ -15,13 +15,15 @@ COPY migrations/ ./migrations/
 COPY alembic.ini ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -e "."
+RUN pip install --no-cache-dir -e ".[web]"
 
 # Create non-root user
 RUN useradd -m -u 1000 skillos && chown -R skillos:skillos /app
 USER skillos
 
 # Expose port
+ENV SKILLOS_HOST=0.0.0.0
+ENV SKILLOS_PORT=8080
 EXPOSE 8080
 
 # Health check

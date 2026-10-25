@@ -143,7 +143,9 @@ def main() -> int:
     cid = body["contract"]["id"]
     print(f"\n[2/7] 企业主提需求，生成三方案报价（{len(body['plans'])} 档）:")
     for p in body["plans"]:
-        print(f"      {p['tier']:8s} 成功率 {int(p['success_rate']*100)}%  ¥{p['price']:>7.0f}  {p['delivery_days']}天")
+        print(
+            f"      {p['tier']:8s} 成功率 {int(p['success_rate'] * 100)}%  ¥{p['price']:>7.0f}  {p['delivery_days']}天"
+        )
 
     # 3. 企业主选 B 均衡档
     r = _signed_post(business, f"/outcome/contracts/{cid}/select-tier", {"tier": "balanced"})

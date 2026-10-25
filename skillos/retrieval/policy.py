@@ -63,6 +63,7 @@ class RetrievalPolicy:
         if end == -1:
             return {}
         import yaml  # type: ignore[import-untyped]
+
         try:
             return yaml.safe_load(text[3:end]) or {}
         except yaml.YAMLError:
@@ -135,7 +136,7 @@ class RetrievalPolicy:
         top_k: int = 5,
     ) -> list[tuple[float, str]]:
         scored = []
-        for path, text in (candidates or []):
+        for path, text in candidates or []:
             s = self.score(task_tags=task_tags, task_type=task_type, doc_path=path, doc_text=text)
             if s > 0:
                 scored.append((s, path))

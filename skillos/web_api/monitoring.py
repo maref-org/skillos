@@ -43,17 +43,12 @@ async def overview(db: Session = Depends(get_session)):
     slo = get_slo_manager()
     slo_summary = slo.get_slo_summary()
     healthy_count = sum(
-        1 for s in slo_summary.values()
-        if isinstance(s, dict) and s.get("error_budget", {}).get("status") == "healthy"
+        1 for s in slo_summary.values() if isinstance(s, dict) and s.get("error_budget", {}).get("status") == "healthy"
     )
     # M10：用真实 SLO 观测数据替代硬编码假值（请求量 / 可用性失败率）。
     total_requests = sum(int(s.get("requests", 0)) for s in slo_summary.values())
-    availability_failures = sum(
-        int(s.get("availability_failures", 0)) for s in slo_summary.values()
-    )
-    error_rate = (
-        round(availability_failures / total_requests, 4) if total_requests else 0.0
-    )
+    availability_failures = sum(int(s.get("availability_failures", 0)) for s in slo_summary.values())
+    error_rate = round(availability_failures / total_requests, 4) if total_requests else 0.0
     return {
         "total_slos": len(slo_summary),
         "healthy_slos": healthy_count,
@@ -171,13 +166,16 @@ async def create_maintenance_window(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"success": True, "window": {
-        "id": window.id,
-        "slo_name": window.slo_name,
-        "cron_expression": window.cron_expression,
-        "duration_minutes": window.duration_minutes,
-        "enabled": window.enabled,
-    }}
+    return {
+        "success": True,
+        "window": {
+            "id": window.id,
+            "slo_name": window.slo_name,
+            "cron_expression": window.cron_expression,
+            "duration_minutes": window.duration_minutes,
+            "enabled": window.enabled,
+        },
+    }
 
 
 @router.get("/monitoring/alerts/maintenance")

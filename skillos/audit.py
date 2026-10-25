@@ -86,7 +86,8 @@ class AuditLogger:
         self.log_dir = Path(str(log_dir or os.getenv("SKILLOS_AUDIT_DIR", "./audit_logs")))
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        # HMAC 密钥：优先环境变量，其次随机生成（随机生成时警告）
+        # HMAC 密钥：优先环境变量；否则使用审计目录内持久化密钥文件，
+        # 保证进程重启后既有链仍可验签（文件权限 0600）。
         self._secret_key = self._load_secret_key(secret_key)
 
         # 当前日志文件
@@ -99,15 +100,35 @@ class AuditLogger:
         # 否则并发线程读到同一 _last_hash 会产生两条同 prev_hash 记录（断链）
         self._write_lock = threading.Lock()
 
+    SECRET_FILENAME = ".audit_secret"
+
     def _load_secret_key(self, secret_key: str | None) -> bytes:
-        """加载 HMAC 密钥"""
+        """加载 HMAC 密钥（env > 持久化密钥文件 > 新建 0600 密钥文件）。"""
         key = secret_key or os.getenv("SKILLOS_AUDIT_SECRET")
-        if not key:
-            logger.warning(
-                "SKILLOS_AUDIT_SECRET not set. Generating random key. This will prevent verification across restarts."
-            )
-            key = secrets.token_hex(32)
-        return key.encode("utf-8")
+        if key:
+            return key.encode("utf-8")
+
+        secret_path = self.log_dir / self.SECRET_FILENAME
+        if secret_path.exists():
+            return secret_path.read_text(encoding="utf-8").strip().encode("utf-8")
+
+        generated = secrets.token_hex(32)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        fd = os.open(secret_path, flags, 0o600)
+        try:
+            os.write(fd, generated.encode("utf-8"))
+        finally:
+            os.close(fd)
+        try:
+            os.chmod(secret_path, 0o600)
+        except OSError:
+            pass
+        logger.warning(
+            "SKILLOS_AUDIT_SECRET not set; generated persistent key at %s (mode 0600). "
+            "Set the env var in production to share the key across hosts.",
+            secret_path,
+        )
+        return generated.encode("utf-8")
 
     def _today(self) -> str:
         """返回当前日期字符串"""
@@ -146,8 +167,7 @@ class AuditLogger:
         """
         target_name = log_file.name
         candidates = [
-            path for path in sorted(self.log_dir.glob("audit_*.log"), reverse=True)
-            if path.name < target_name
+            path for path in sorted(self.log_dir.glob("audit_*.log"), reverse=True) if path.name < target_name
         ]
         for path in candidates:
             try:

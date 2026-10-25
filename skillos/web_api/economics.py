@@ -73,5 +73,6 @@ async def list_contributors():
 async def register_contributor(contributor_id: str, name: str = ""):
     eng = _get()
     from skillos.types import Contributor
+
     eng.register_contributor(Contributor(contributor_id=contributor_id, name=name or contributor_id))
     return {"status": "registered", "contributor_id": contributor_id}

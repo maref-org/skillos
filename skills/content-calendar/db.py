@@ -4,6 +4,7 @@ SQLite database layer for content calendar.
 
 import json
 import logging
+import os
 import sqlite3
 from typing import Any
 
@@ -146,7 +147,3 @@ class CalendarDB:
             except (json.JSONDecodeError, TypeError):
                 d[key] = {}
         return d
-
-
-# Separate import to avoid circular dependency
-import os

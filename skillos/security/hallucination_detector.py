@@ -98,9 +98,7 @@ class SelfConsistencyCheck:
                 w2 = _words(s2)
                 overlap = w1 & w2
                 if len(overlap) >= 3:
-                    contradictions.append(
-                        f"Statement {i} and context {j} share {len(overlap)} words: {overlap}"
-                    )
+                    contradictions.append(f"Statement {i} and context {j} share {len(overlap)} words: {overlap}")
         return contradictions
 
     @staticmethod
@@ -201,9 +199,7 @@ class HallucinationDetector:
         known_entities: set[str] = set(context.get("known_entities", []))
         if known_entities:
             text_entities = re.findall(r"\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\b", text)
-            entity_issues = SelfConsistencyCheck.check_entity_references(
-                list(set(text_entities)), known_entities
-            )
+            entity_issues = SelfConsistencyCheck.check_entity_references(list(set(text_entities)), known_entities)
             if entity_issues:
                 reasons.extend(entity_issues[:5])
                 score += min(0.1 * len(entity_issues), 0.3)

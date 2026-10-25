@@ -38,9 +38,7 @@ def create_app() -> Any:
         from fastapi import FastAPI, Request, Response
         from starlette.middleware.base import BaseHTTPMiddleware
     except ImportError as exc:
-        raise ImportError(
-            "FastAPI is not installed. Install with: pip install skillos[web]"
-        ) from exc
+        raise ImportError("FastAPI is not installed. Install with: pip install skillos[web]") from exc
 
     from skillos.kernel.slo import get_slo_manager
     from skillos.observability.metrics import get_metrics
@@ -59,6 +57,7 @@ def create_app() -> Any:
     async def log_startup():
         try:
             from skillos.audit import AuditEventType, get_audit_logger
+
             audit = get_audit_logger()
             audit.log(AuditEventType.SYSTEM_ERROR, "system", "skillos", "Application started")
         except Exception:

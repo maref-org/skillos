@@ -62,7 +62,9 @@ class TestGeneratePlans:
     def test_delivery_days(self, db_session):
         svc = OutcomeContractService(db_session)
         plans = {p.tier: p for p in svc.generate_plans("做内容")}
-        assert plans[Tier.STABLE].delivery_days >= plans[Tier.BALANCED].delivery_days >= plans[Tier.SPRINT].delivery_days
+        assert (
+            plans[Tier.STABLE].delivery_days >= plans[Tier.BALANCED].delivery_days >= plans[Tier.SPRINT].delivery_days
+        )
         assert plans[Tier.BALANCED].deposit > 0
 
 

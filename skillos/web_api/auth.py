@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Iterator
 
 from fastapi import HTTPException, Request
 from sqlalchemy.orm import Session
@@ -42,9 +42,7 @@ async def require_actor(
     if not signer_id:
         raise HTTPException(status_code=401, detail="missing x-signer-id")
 
-    identity = (
-        db.query(IdentityModel).filter(IdentityModel.identity_id == signer_id).first()
-    )
+    identity = db.query(IdentityModel).filter(IdentityModel.identity_id == signer_id).first()
     if identity is None:
         raise HTTPException(status_code=403, detail="identity not registered")
 
@@ -84,5 +82,5 @@ async def _parse_payload(request: Request) -> dict[str, Any]:
 
 
 # 兼容 FastAPI Depends 的默认值（与既有 _get_session 依赖一致）
-def _get_session() -> Session:
+def _get_session() -> Iterator[Session]:
     return get_session()

@@ -117,9 +117,7 @@ class ProviderRegistry:
             raise ValueError("provider_id must be a non-empty string")
         if role not in VALID_ROLES:
             raise ValueError(f"role must be one of {VALID_ROLES}")
-        if self._db.query(ProviderProfileModel).filter(
-            ProviderProfileModel.provider_id == provider_id
-        ).first():
+        if self._db.query(ProviderProfileModel).filter(ProviderProfileModel.provider_id == provider_id).first():
             raise ValueError(f"Provider profile already exists: {provider_id}")
 
         now = datetime.now(timezone.utc)
@@ -153,9 +151,7 @@ class ProviderRegistry:
         return ProviderProfile.from_orm(model)
 
     def get_profile(self, provider_id: str) -> ProviderProfile | None:
-        model = self._db.query(ProviderProfileModel).filter(
-            ProviderProfileModel.provider_id == provider_id
-        ).first()
+        model = self._db.query(ProviderProfileModel).filter(ProviderProfileModel.provider_id == provider_id).first()
         return ProviderProfile.from_orm(model) if model else None
 
     def update_profile(self, provider_id: str, fields: dict[str, Any]) -> ProviderProfile:
@@ -291,9 +287,7 @@ class ProviderRegistry:
         max_scan = 1000
         start = (page - 1) * page_size
         if start >= max_scan:
-            return ProviderSearchResult(
-                providers=[], total=total, page=page, page_size=page_size
-            )
+            return ProviderSearchResult(providers=[], total=total, page=page, page_size=page_size)
         scan_end = min(start + page_size, max_scan)
         rows = sorted(q.limit(scan_end).all(), key=lambda m: self._rank(m), reverse=True)
         paged = rows[start : start + page_size]
@@ -358,9 +352,7 @@ class ProviderRegistry:
         return any(bool(slots) for slots in availability.values())
 
     def _require(self, provider_id: str) -> ProviderProfileModel:
-        model = self._db.query(ProviderProfileModel).filter(
-            ProviderProfileModel.provider_id == provider_id
-        ).first()
+        model = self._db.query(ProviderProfileModel).filter(ProviderProfileModel.provider_id == provider_id).first()
         if model is None:
             raise ValueError(f"Provider profile not found: {provider_id}")
         return model

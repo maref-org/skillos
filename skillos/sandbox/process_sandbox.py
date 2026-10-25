@@ -125,9 +125,7 @@ class ProcessSandbox:
                 }
 
             if proc.returncode != 0:
-                error_msg = (
-                    (stderr or "").strip() or f"exit code {proc.returncode}"
-                )
+                error_msg = (stderr or "").strip() or f"exit code {proc.returncode}"
                 return {
                     "skill_id": effective_skill_id,
                     "status": "error",

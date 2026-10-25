@@ -86,9 +86,10 @@ class ByzantineConsensus:
         proposal = self._proposals.get(proposal_id)
         if proposal is None:
             return False
-        return self._count(proposal, VoteValue.APPROVE) >= self.required_agreements or self._count(
-            proposal, VoteValue.REJECT
-        ) >= self.required_agreements
+        return (
+            self._count(proposal, VoteValue.APPROVE) >= self.required_agreements
+            or self._count(proposal, VoteValue.REJECT) >= self.required_agreements
+        )
 
     def finalize(self, proposal_id: str) -> ConsensusResult:
         proposal = self._proposals.get(proposal_id)

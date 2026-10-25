@@ -9,6 +9,9 @@ findings.md
 progress.md
 task_plan.md
 .coverage
+coverage.json
+.registry/
+scripts/oss-exclude-list.txt
 
 # Trae AI config (local only)
 .trae/

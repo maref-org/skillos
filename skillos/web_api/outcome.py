@@ -107,7 +107,7 @@ def _serialize_tip(tip: Tip) -> dict[str, Any]:
     }
 
 
-def _iso(dt: datetime) -> str:
+def _iso(dt: datetime) -> str | None:
     return dt.isoformat() if dt else None
 
 
@@ -384,9 +384,7 @@ async def get_tenant_stats(
         trend[tenant_id] = points
 
         # 契约明细（id/状态/金额/创建时间，按创建时间倒序；M9：limit 防超载）
-        sorted_contracts = sorted(
-            contracts, key=lambda x: x.created_at or today, reverse=True
-        )
+        sorted_contracts = sorted(contracts, key=lambda x: x.created_at or today, reverse=True)
         items = [
             {
                 "id": c.id,

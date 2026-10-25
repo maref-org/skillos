@@ -57,9 +57,7 @@ def _verify_alipay() -> bool:
 
 
 def _alipay_signature(provider, manifest: dict) -> str:
-    params = provider._build_signed_params(
-        "alipay.fund.trans.uni.transfer", provider._build_biz_content(manifest)
-    )
+    params = provider._build_signed_params("alipay.fund.trans.uni.transfer", provider._build_biz_content(manifest))
     return params.get("sign", "")
 
 
@@ -78,10 +76,14 @@ def _verify_wechat() -> bool:
     headers = provider._signed_headers("POST", "/v3/fund-app/mch-transfer/transfer-bills", payload)
     auth = headers.get("Authorization", "")
     sig = auth.split('signature="')[1].split('"')[0] if 'signature="' in auth else ""
-    print("  wechat 载荷摘要: out_bill_no=%s transfer_amount=%d"
-          % (payload.get("out_bill_no", ""), payload.get("transfer_amount", 0)))
-    print("  wechat 签名长度: %d chars, scheme=%s（可构造 ✅）"
-          % (len(sig), "RSA-SHA256" if provider.private_key_pem else "HMAC-sandbox"))
+    print(
+        "  wechat 载荷摘要: out_bill_no=%s transfer_amount=%d"
+        % (payload.get("out_bill_no", ""), payload.get("transfer_amount", 0))
+    )
+    print(
+        "  wechat 签名长度: %d chars, scheme=%s（可构造 ✅）"
+        % (len(sig), "RSA-SHA256" if provider.private_key_pem else "HMAC-sandbox")
+    )
     return bool(sig)
 
 

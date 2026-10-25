@@ -7,8 +7,8 @@ SkillOS is the terminal implementation layer of the OpenHuman Protocol — a Pyt
 ## Quick Start
 
 ```bash
-uv sync --extra dev
-uv run pytest
+pip install -e ".[dev,web]"
+pytest
 ```
 
 ## Architecture
@@ -29,7 +29,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 ```bash
 make test     # run all tests
 make lint     # ruff check
-make audit    # full release gate
+make gate     # full release gate (same script as CI)
 ```
 
 ## Inspiration

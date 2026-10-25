@@ -84,11 +84,7 @@ class SettlementEngine:
         )
 
     def settle_period(self, period: str) -> list[SettlementResult]:
-        listings = (
-            self._db.query(SkillListingModel)
-            .filter(SkillListingModel.total_revenue > 0)
-            .all()
-        )
+        listings = self._db.query(SkillListingModel).filter(SkillListingModel.total_revenue > 0).all()
         results = []
         for listing in listings:
             amount = listing.total_revenue
@@ -129,7 +125,7 @@ class SettlementEngine:
     def get_earnings_summary(self, listing_id: str) -> dict:
         from sqlalchemy import func
 
-        stats = (
+        row = (
             self._db.query(
                 func.sum(SettlementModel.total_amount),
                 func.sum(SettlementModel.platform_fee),
@@ -140,6 +136,7 @@ class SettlementEngine:
             .filter(SettlementModel.listing_id == listing_id)
             .first()
         )
+        stats = row if row is not None else (0.0, 0.0, 0.0, 0.0, 0)
 
         return {
             "listing_id": listing_id,

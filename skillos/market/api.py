@@ -243,7 +243,8 @@ async def create_bounty(
     dry_run = bool(payload.get("dry_run", False))
     try:
         result = service.create(
-            poster_id=payload["poster_id"],            title=payload["title"],
+            poster_id=payload["poster_id"],
+            title=payload["title"],
             description=payload.get("description", ""),
             completion_criteria=payload.get("completion_criteria", ""),
             evidence_types=payload.get("evidence_types"),

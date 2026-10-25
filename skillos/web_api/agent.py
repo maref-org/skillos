@@ -198,9 +198,7 @@ async def list_bounties(
         if not _agent_id:
             raise HTTPException(status_code=401, detail="mine=true requires signed request")
         poster_id = _agent_id
-    result = service.search(
-        status=status, page=page, page_size=page_size, poster_id=poster_id
-    )
+    result = service.search(status=status, page=page, page_size=page_size, poster_id=poster_id)
     return {
         "bounties": result.bounties,
         "total": result.total,

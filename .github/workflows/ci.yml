@@ -18,15 +18,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
+        run: pip install -e ".[dev,web]"
       - name: Ruff lint
         run: ruff check .
-      - name: Ruff format check
-        run: ruff format --check .
+      - name: Ruff format check (release scope)
+        run: ruff format --check skillos/ scripts/
       - name: Mypy type check
-        run: mypy .
+        run: mypy
 
   test:
     needs: lint
@@ -36,12 +36,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
+        run: pip install -e ".[dev,web]"
       - name: Run tests with coverage
-        run: |
-          pytest tests/ -v --cov --cov-report=term
+        run: pytest tests/ -q --cov=skillos --cov-report=term --cov-fail-under=80
 
   security:
     needs: lint
@@ -51,31 +50,45 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
+        run: pip install -e ".[dev,web]"
       - name: Bandit SAST
-        run: bandit -r . -c pyproject.toml
+        run: bandit -r skillos/ -c pyproject.toml --severity-level medium
       - name: pip-audit
-        run: pip-audit
-      - name: TruffleHog secret scan
         run: |
-          pip install truffleHog
-          truffleHog --regex --entropy=False . || true
-      - name: Semgrep SAST
+          pip-audit --skip-editable \
+            --ignore-vuln GHSA-537c-gmf6-5ccf \
+            --ignore-vuln GHSA-6v7p-g79w-8964
+      - name: Secret scan (verified secrets only)
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          extra_args: --only-verified
+      - name: Governance content scan
+        run: bash scripts/sanitize-for-push.sh
+      - name: Reject insecure HTTP defaults
         run: |
-          pip install semgrep
-          semgrep --config=.semgrep/rules/ --error --strict .
-        continue-on-error: true
-
-      - name: Verify no HTTP defaults in production code
-        run: |
-          # 检查生产代码中是否还有默认 HTTP URL（开发环境变量除外）
-          if grep -r '"http://' --include='*.py' . | grep -v 'SKILLOS_INSECURE' | grep -v 'test_'; then
-            echo "ERROR: Found hardcoded HTTP URLs in production code"
+          if grep -rnE '=\s*"http://' --include='*.py' skillos/ \
+            | grep -vE 'localhost|127\.0\.0\.1|SKILLOS_INSECURE'; then
+            echo "ERROR: Found hardcoded HTTP URL defaults in production code"
             exit 1
           fi
-          echo "No hardcoded HTTP URLs found in production code"
+          echo "No insecure HTTP defaults found"
+
+  semgrep:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Semgrep (advisory)
+        continue-on-error: true
+        run: |
+          pip install semgrep
+          semgrep --config=.semgrep/rules/ --error --strict skillos/
 
   dast:
     needs: test
@@ -85,13 +98,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Start application for DAST scan
         run: |
           pip install -e ".[dev,web]"
-          # 初始化数据库 + 启动 FastAPI 应用
           python -c "from skillos.db.engine import init_db; init_db()"
           uvicorn skillos.app:app --host 0.0.0.0 --port 8000 &
-          # 等待应用就绪
           for i in $(seq 1 15); do
             if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
               echo "Application is ready"

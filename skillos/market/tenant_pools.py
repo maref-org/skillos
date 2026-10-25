@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import builtins
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -55,7 +56,7 @@ class TenantPoolService:
     def get(self, pool_id: str) -> TenantPoolModel | None:
         return self._db.query(TenantPoolModel).filter(TenantPoolModel.pool_id == pool_id).first()
 
-    def list(self) -> list[TenantPoolModel]:
+    def list(self) -> builtins.list[TenantPoolModel]:
         return self._db.query(TenantPoolModel).order_by(TenantPoolModel.created_at.asc()).all()
 
     def add_member(self, pool_id: str, tenant_id: str, share_ratio: float = 1.0) -> TenantPoolMemberModel:
@@ -83,10 +84,8 @@ class TenantPoolService:
         ).delete()
         self._db.flush()
 
-    def members(self, pool_id: str) -> list[TenantPoolMemberModel]:
-        return (
-            self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.pool_id == pool_id).all()
-        )
+    def members(self, pool_id: str) -> builtins.list[TenantPoolMemberModel]:
+        return self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.pool_id == pool_id).all()
 
     def set_limit(self, pool_id: str, new_limit: float, requested_by: str = "") -> PoolAdjustmentModel:
         """发起池额度调整申请（pending 待审批）。"""
@@ -133,9 +132,7 @@ class TenantPoolService:
 
     def pool_for_tenant(self, tenant_id: str) -> tuple[TenantPoolModel, TenantPoolMemberModel] | None:
         """返回租户所属的第一个池及其成员关系。"""
-        member = (
-            self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.tenant_id == tenant_id).first()
-        )
+        member = self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.tenant_id == tenant_id).first()
         if member is None:
             return None
         pool = self.get(member.pool_id)
@@ -189,9 +186,7 @@ class TenantPoolService:
         """
         if self.get(to_pool_id) is None:
             raise PoolNotFoundError(f"Pool not found: {to_pool_id}")
-        current = (
-            self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.tenant_id == tenant_id).first()
-        )
+        current = self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.tenant_id == tenant_id).first()
         if current is not None and current.pool_id == to_pool_id:
             if share_ratio is not None:
                 current.share_ratio = share_ratio
@@ -200,9 +195,7 @@ class TenantPoolService:
         ratio = share_ratio if share_ratio is not None else (current.share_ratio if current else 1.0)
         if current is not None:
             self._db.delete(current)
-        self._db.add(
-            TenantPoolMemberModel(pool_id=to_pool_id, tenant_id=tenant_id, share_ratio=ratio)
-        )
+        self._db.add(TenantPoolMemberModel(pool_id=to_pool_id, tenant_id=tenant_id, share_ratio=ratio))
         self._db.flush()
         return True
 

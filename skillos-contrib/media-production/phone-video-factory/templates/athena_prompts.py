@@ -4,6 +4,8 @@ Phone Video Factory — Athena 角色视频模板
 PENTA 五层提示词模板，适配各平台 AI 视频生成。
 """
 
+import os
+
 # 角色参考图路径 (用于 I2V 模式)
 # 通过环境变量或运行时参数配置
 DEFAULT_REF_IMAGE = os.environ.get("PHONE_VIDEO_REF_IMAGE", "./assets/character_ref.jpg")

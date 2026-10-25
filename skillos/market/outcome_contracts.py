@@ -401,9 +401,7 @@ class OutcomeContractService:
                 risk.risk.name,
                 risk.score,
             )
-            raise ValueError(
-                f"Evidence failed compliance check (risk={risk.risk.name}, score={risk.score:.2f})"
-            )
+            raise ValueError(f"Evidence failed compliance check (risk={risk.risk.name}, score={risk.score:.2f})")
 
         evidence_hash = ""
         if evidence_text:
@@ -543,15 +541,10 @@ class OutcomeContractService:
         if not votes:
             raise ValueError("votes must not be empty")
         if len(votes) < MIN_ARBITRATION_VOTES:
-            raise ValueError(
-                f"Arbitration requires at least {MIN_ARBITRATION_VOTES} validators, "
-                f"received {len(votes)}"
-            )
+            raise ValueError(f"Arbitration requires at least {MIN_ARBITRATION_VOTES} validators, received {len(votes)}")
         conflicting = {model.requester_id, model.contractor_id} & set(votes)
         if conflicting:
-            raise ValueError(
-                f"Disputing parties cannot arbitrate: {sorted(conflicting)}"
-            )
+            raise ValueError(f"Disputing parties cannot arbitrate: {sorted(conflicting)}")
 
         from skillos.collaboration.consensus import ByzantineConsensus, VoteValue
 
@@ -647,9 +640,7 @@ class OutcomeContractService:
                 raise ValueError(f"share_ratio must be within [0, 1], got {ratio}")
             share_total += ratio
         if share_total > 1.0:
-            raise ValueError(
-                f"sum of share_ratio must be ≤ 1.0 (70% contributor pool), got {round(share_total, 4)}"
-            )
+            raise ValueError(f"sum of share_ratio must be ≤ 1.0 (70% contributor pool), got {round(share_total, 4)}")
         team = ServiceTeamModel(
             id=f"team-{uuid.uuid4().hex[:12]}",
             contract_id=contract.id,
@@ -684,15 +675,7 @@ class OutcomeContractService:
         return model
 
     def _team_members(self, contract_id: str) -> list[ServiceTeamMemberModel]:
-        team = (
-            self._db.query(ServiceTeamModel)
-            .filter(ServiceTeamModel.contract_id == contract_id)
-            .first()
-        )
+        team = self._db.query(ServiceTeamModel).filter(ServiceTeamModel.contract_id == contract_id).first()
         if team is None:
             return []
-        return (
-            self._db.query(ServiceTeamMemberModel)
-            .filter(ServiceTeamMemberModel.team_id == team.id)
-            .all()
-        )
+        return self._db.query(ServiceTeamMemberModel).filter(ServiceTeamMemberModel.team_id == team.id).all()

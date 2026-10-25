@@ -154,9 +154,7 @@ class AgentScheduler:
                     AuditEventType.SKILL_EXECUTED,
                     caller_id,
                     task.task_id,
-                    "execute_with_fallback succeeded"
-                    if idx > 0
-                    else "execute_with_fallback succeeded (primary)",
+                    "execute_with_fallback succeeded" if idx > 0 else "execute_with_fallback succeeded (primary)",
                     {
                         "model_group": model_group,
                         "attempt": idx + 1,
@@ -202,9 +200,7 @@ class AgentScheduler:
                 "total_attempts": len(chain),
             },
         )
-        raise AgentExecutionError(
-            f"All {len(chain)} fallback models exhausted for task {task.task_id}"
-        ) from last_error
+        raise AgentExecutionError(f"All {len(chain)} fallback models exhausted for task {task.task_id}") from last_error
 
     def cascade(self, task: Task, confidence: float) -> ModelRoute:
         """级联策略：置信度不足时升级模型"""
@@ -340,6 +336,7 @@ class AgentScheduler:
         if not scores or n <= 1:
             return 0
         from itertools import combinations
+
         pairs = list(combinations(range(n), 2))
         if not pairs:
             return 0

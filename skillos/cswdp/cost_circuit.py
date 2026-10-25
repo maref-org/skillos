@@ -17,10 +17,10 @@ from skillos.cswdp.models import CostCircuitSnapshot
 
 class CostCircuitBreaker:
     MODES = {
-        "NORMAL": (0.30, float("inf")),    # >30% 预算剩余
-        "LOW": (0.10, 0.30),               # 10-30%
-        "CRITICAL": (0.02, 0.10),          # 2-10%
-        "PAUSED": (0.0, 0.02),             # <2%
+        "NORMAL": (0.30, float("inf")),  # >30% 预算剩余
+        "LOW": (0.10, 0.30),  # 10-30%
+        "CRITICAL": (0.02, 0.10),  # 2-10%
+        "PAUSED": (0.0, 0.02),  # <2%
     }
 
     # CRITICAL 档单次成本阈值 = 日预算 × critical_cost_ratio

@@ -25,9 +25,7 @@ async def list_flags():
             {
                 "name": getattr(f, "name", f.get("name", "")) if isinstance(f, dict) else str(f),
                 "flag_type": (
-                    getattr(f, "flag_type", f.get("flag_type", "boolean"))
-                    if isinstance(f, dict)
-                    else "boolean"
+                    getattr(f, "flag_type", f.get("flag_type", "boolean")) if isinstance(f, dict) else "boolean"
                 ),
                 "state": getattr(f, "state", f.get("state", "disabled")) if isinstance(f, dict) else "disabled",
                 "value": getattr(f, "value", f.get("value", {})) if isinstance(f, dict) else {},

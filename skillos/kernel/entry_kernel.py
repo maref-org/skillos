@@ -95,9 +95,7 @@ class EntryKernel:
                 {
                     "risk_score": round(injection.risk_score, 4),
                     "matched_patterns": injection.matched_patterns[:5],
-                    "input_hash": hashlib.sha256(
-                        user_input.encode("utf-8")
-                    ).hexdigest()[:16],
+                    "input_hash": hashlib.sha256(user_input.encode("utf-8")).hexdigest()[:16],
                 },
             )
 
@@ -174,9 +172,7 @@ class EntryKernel:
                 {
                     "intent_type": intent.intent_type.value,
                     "risk_level": "high",
-                    "raw_input_hash": hashlib.sha256(
-                        intent.raw_input.encode("utf-8")
-                    ).hexdigest()[:16],
+                    "raw_input_hash": hashlib.sha256(intent.raw_input.encode("utf-8")).hexdigest()[:16],
                 },
             )
             return self._register_approval(
@@ -227,10 +223,7 @@ class EntryKernel:
         with self._lock:
             if approval.status == ApprovalStatus.PENDING:
                 # 清理已决策条目，保留 PENDING
-                decided_ids = [
-                    aid for aid, a in self._approvals.items()
-                    if a.status != ApprovalStatus.PENDING
-                ]
+                decided_ids = [aid for aid, a in self._approvals.items() if a.status != ApprovalStatus.PENDING]
                 for aid in decided_ids:
                     self._approvals.pop(aid, None)
                     self._approval_events.pop(aid, None)
@@ -356,9 +349,7 @@ class EntryKernel:
                     approval.approval_id,
                 )
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Failed to pause session %s: %s", session_id, exc
-                )
+                logger.warning("Failed to pause session %s: %s", session_id, exc)
         return approval
 
     def cancel_session(
@@ -381,9 +372,9 @@ class EntryKernel:
         # 快照后锁外 reject（reject_approval 会自己加锁，RLock 支持嵌套）
         with self._lock:
             pending_ids = [
-                a.approval_id for a in self._approvals.values()
-                if a.session_id == session_id
-                and a.status == ApprovalStatus.PENDING
+                a.approval_id
+                for a in self._approvals.values()
+                if a.session_id == session_id and a.status == ApprovalStatus.PENDING
             ]
         for aid in pending_ids:
             self.reject_approval(
@@ -447,10 +438,7 @@ class EntryKernel:
     def get_pending_approvals(self) -> list[Approval]:
         """获取所有待决策审批。"""
         with self._lock:
-            return [
-                a for a in self._approvals.values()
-                if a.status == ApprovalStatus.PENDING
-            ]
+            return [a for a in self._approvals.values() if a.status == ApprovalStatus.PENDING]
 
     def get_routing_stats(self) -> dict[str, Any]:
         total = len(self._routing_history)

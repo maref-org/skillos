@@ -77,10 +77,12 @@ class RewardLogger:
         docs_count = len(task.get("docs_read", []))
 
         agent_id = task.get("agent_id", "system")
-        reward = self.compute_reward({
-            "success": success,
-            "docs_count": docs_count,
-        })
+        reward = self.compute_reward(
+            {
+                "success": success,
+                "docs_count": docs_count,
+            }
+        )
         record = {
             "event": "task_outcome",
             "task_id": task_id,

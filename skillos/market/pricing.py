@@ -38,6 +38,8 @@ class PricingEngine:
 
         base = current["base_price"]
         model = self._db.query(SkillListingModel).filter(SkillListingModel.id == listing_id).first()
+        if model is None:
+            return {"error": "Listing not found", "price": 0.0}
 
         competitor_count = (
             self._db.query(SkillListingModel)

@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.orm import Session
 
@@ -123,7 +123,7 @@ class SkillRegistry:
             q = q.filter(SkillListingModel.category == category)
         if tags:
             for tag in tags:
-                q = q.filter(SkillListingModel.tags.any(tag))
+                q = q.filter(cast(Any, SkillListingModel.tags).any(tag))
         if min_quality > 0:
             q = q.filter(SkillListingModel.quality_score >= min_quality)
         if max_price is not None:

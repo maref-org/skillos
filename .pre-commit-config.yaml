@@ -3,19 +3,7 @@ repos:
     hooks:
       - id: athena-leak-check
         name: Athena T3/T2 leak prevention
-        entry: |
-          bash -c '
-          FAILURES=0
-          for f in "$@"; do
-            if test -f "$f"; then
-              if grep -Pn "(/Users/|/Volumes/|sk-[a-zA-Z0-9]{20,}|\$\d+\.\d+/)" "$f" 2>/dev/null; then
-                printf "T3 leak detected in %s\n" "$f"
-                FAILURES=$((FAILURES + 1))
-              fi
-            fi
-          done
-          exit $FAILURES
-          ' --
+        entry: python3 scripts/check_staged_leaks.py
         language: system
         stages: [pre-commit]
 
@@ -28,16 +16,18 @@ repos:
         always_run: true
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.0
+    rev: v0.15.16
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.0.0
+    rev: v1.11.0
     hooks:
       - id: mypy
+        args: [--config-file=pyproject.toml]
+        pass_filenames: false
         additional_dependencies: [types-requests]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -48,7 +38,9 @@ repos:
       - id: check-toml
       - id: check-merge-conflict
       - id: end-of-file-fixer
+        exclude: ^audit_logs/
       - id: trailing-whitespace
+        exclude: ^audit_logs/
       - id: check-added-large-files
         args: ["--maxkb=1024"]
       - id: check-case-conflict

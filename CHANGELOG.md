@@ -1,5 +1,49 @@
 # Changelog
 
+## [Unreleased] - 2026-10-25
+
+### Fixed
+- **发布门禁统一入口** — 新增 `scripts/release_gate.sh`，本地 `make gate` 与
+  CI/release 流水线执行同一套 11 步检查；`release.yml` 通过可复用
+  `release-gate.yml` 强制门禁，tag 不再绕过测试。
+- **CI 红灯** — 修复 `F821`（skillos-contrib 缺 `import os`）、统一 ruff 作用域、
+  `mypy` 54 处类型错误归零；`ci.yml` 的 lint/security 与门禁口径对齐。
+- **治理扫描空转** — `sanitize-for-push.sh` 修正 `grep` 缺少 `-E` 的失效匹配，
+  改为 `git grep` 扫描全部已跟踪文件（含 skills/、skillos-contrib/、audit_logs/），
+  并新增负向测试 `tests/test_sanitize_script.py` 保证门禁真的会失败。
+- **审计链跨重启** — 无 `SKILLOS_AUDIT_SECRET` 时生成持久化
+  `audit_logs/.audit_secret`（0600），M1 仅校验当日链；M0 运行态检查改为
+  `SKILLOS_META_ENFORCE_RUNTIME=1` 显式开启。
+- **依赖漏洞** — `cryptography>=50.0.0`、`gitpython>=3.2.1`、`litellm>=1.96.2`，
+  补齐 dev 依赖（mypy/pip-audit/pre-commit/OpenTelemetry）；`uv.lock` 重建为独立 lock。
+- **容器入口** — 新增 `skillos/__main__.py`，`python -m skillos` 可启动并响应
+  `/health`；Dockerfile 安装 `.[web]`；新增 `.dockerignore`。
+- **制品完整性** — wheel 打包 `migrations/` 与 `alembic.ini`；安装元数据与源码版本对齐。
+- **测试隔离** — `TaskScheduler` 默认配置路径改为运行时解析，测试不再写
+  `data/scheduled_tasks.json`；`test_governance_layer.py` 显式声明 skip 原因。
+- **仓库卫生** — `audit_logs/` 与 `.DS_Store` 移出索引，`coverage.json`/`.registry/`
+  加入忽略。
+
+## [Unreleased] - 2026-10-24
+
+### Changed
+- **CSWDP 生存保障金拆分为地板/天花板两账户** — `SurvivalFundRecord` 新增
+  `unconditional_amount` / `performance_bonus` / `accounts` / `floor_is_unconditional`；
+  `SurvivalFundCalculator` 保证无条件基础不参与任何 clamp / min / 条件分支，
+  绩效奖金上限 = 基础 × (cap_multiplier − 1)；`calculate()` 新增
+  `include_performance_bonus` 开关；API 请求体同步新增该字段。设计见
+  `docs/plans/2026-10-24-cswdp-unconditional-floor-split.md`。+8 测试。
+  旧公式（base + bonus 混算）标注为历史记录，不再作为语义依据。
+
+### Fixed
+- **小费出款链路补齐** — `PayoutService.generate_for_contract()` 此前只生成
+  contractor / skill_author / platform 三类指令，`tips` 表记账的小费
+  （`source=tip`）从不进入出款 manifest，导致到账率被高估。现按小费分配明细
+  生成独立指令；防超发校验拆为「结算 ≤ 契约价」与「小费 ≤ 记账小费」两条。
+- **manifest 增加 reconciliation 块** — 显式列出 `ecosystem_pending_allocation`，
+  避免 25% 生态基金因无收款主体而被误读为已出款。
+
+
 ## [Unreleased] - 2026-08-01
 
 ### Added

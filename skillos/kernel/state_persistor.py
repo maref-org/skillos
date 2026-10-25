@@ -31,6 +31,7 @@ def _parse_utc(value: str) -> datetime:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
 
+
 _DEFAULT_DB_PATH = "data/skillos_state.db"
 
 

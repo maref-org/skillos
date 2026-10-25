@@ -61,6 +61,7 @@ async def execute_skill(skill_id: str):
     kernel = _get_kernel()
     try:
         from skillos.kernel.skill_kernel import ToolChain
+
         result = await kernel.execute(
             ToolChain(skill_id=skill_id, tools=[], mcp_connectors=[], a2a_adapters=[]),
             {},

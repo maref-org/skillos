@@ -232,11 +232,7 @@ class RemoteBridge:
     def _purge_stale(self) -> None:
         """清理心跳超过 TTL 未刷新的桥接会话。"""
         now = time.time()
-        stale = [
-            sid
-            for sid, b in self.active_bridges.items()
-            if now - b.last_heartbeat > BRIDGE_HEARTBEAT_TTL
-        ]
+        stale = [sid for sid, b in self.active_bridges.items() if now - b.last_heartbeat > BRIDGE_HEARTBEAT_TTL]
         for sid in stale:
             bridge = self.active_bridges.pop(sid, None)
             if bridge:

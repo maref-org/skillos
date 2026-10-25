@@ -47,9 +47,7 @@ class PoolReclaimService:
 
         for pool in pools:
             released_for_pool = 0.0
-            for member in self._db.query(TenantPoolMemberModel).filter(
-                TenantPoolMemberModel.pool_id == pool.pool_id
-            ):
+            for member in self._db.query(TenantPoolMemberModel).filter(TenantPoolMemberModel.pool_id == pool.pool_id):
                 usage = tenant_svc.get_payout_usage(member.tenant_id)
                 limit = usage.get("limit", 0.0)
                 used = usage.get("used", 0.0)

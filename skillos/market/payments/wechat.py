@@ -20,7 +20,7 @@ import json
 import os
 import time
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from skillos.market.payments.base import (
     ProviderNotConfiguredError,
@@ -41,12 +41,10 @@ class WeChatPayProvider:
         self.mch_id = mch_id or os.environ.get("SKILLOS_WECHAT_MCH_ID", "")
         self.apiv3_key = apiv3_key or os.environ.get("SKILLOS_WECHAT_APIV3_KEY", "")
         self.mch_cert_sn = mch_cert_sn or os.environ.get("SKILLOS_WECHAT_MCH_CERT_SN", "")
-        self.private_key_pem = (
-            private_key_pem or os.environ.get("SKILLOS_WECHAT_PRIVATE_KEY", "")
-        ).replace("\\n", "\n")
-        self.platform_public_key_pem = (
-            os.environ.get("SKILLOS_WECHAT_PLATFORM_PUBLIC_KEY", "")
-        ).replace("\\n", "\n")
+        self.private_key_pem = (private_key_pem or os.environ.get("SKILLOS_WECHAT_PRIVATE_KEY", "")).replace(
+            "\\n", "\n"
+        )
+        self.platform_public_key_pem = (os.environ.get("SKILLOS_WECHAT_PLATFORM_PUBLIC_KEY", "")).replace("\\n", "\n")
         if not self.mch_id or not self.apiv3_key:
             raise ProviderNotConfiguredError(
                 "WeChatPay provider needs SKILLOS_WECHAT_MCH_ID and SKILLOS_WECHAT_APIV3_KEY"
@@ -91,8 +89,7 @@ class WeChatPayProvider:
         """
         if not self.platform_public_key_pem:
             raise ValueError(
-                "wechat webhook requires SKILLOS_WECHAT_PLATFORM_PUBLIC_KEY "
-                "for signature verification (fail-closed)"
+                "wechat webhook requires SKILLOS_WECHAT_PLATFORM_PUBLIC_KEY for signature verification (fail-closed)"
             )
         signature = headers.get("wechatpay-signature", "")
         timestamp = headers.get("wechatpay-timestamp", "")
@@ -128,11 +125,12 @@ class WeChatPayProvider:
 
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
         try:
-            public_key = serialization.load_pem_public_key(
-                self.platform_public_key_pem.encode("utf-8")
+            public_key = cast(
+                rsa.RSAPublicKey,
+                serialization.load_pem_public_key(self.platform_public_key_pem.encode("utf-8")),
             )
             public_key.verify(
                 base64.b64decode(signature_b64.encode("utf-8")),
@@ -172,7 +170,7 @@ class WeChatPayProvider:
         else:
             signature = hmac.new(self.apiv3_key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
         authorization = (
-            f'WECHATPAY2-SHA256-RSA2048 '
+            f"WECHATPAY2-SHA256-RSA2048 "
             f'mchid="{self.mch_id}",nonce_str="{nonce}",timestamp="{timestamp}",'
             f'signature="{signature}"'
         )
@@ -190,11 +188,14 @@ class WeChatPayProvider:
         import base64
 
         from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-        private_key = serialization.load_pem_private_key(
-            self.private_key_pem.encode("utf-8"),
-            password=None,
+        private_key = cast(
+            rsa.RSAPrivateKey,
+            serialization.load_pem_private_key(
+                self.private_key_pem.encode("utf-8"),
+                password=None,
+            ),
         )
         signature = private_key.sign(message.encode("utf-8"), padding.PKCS1v15(), hashes.SHA256())
         return base64.b64encode(signature).decode("utf-8")

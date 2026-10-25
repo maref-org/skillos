@@ -28,9 +28,7 @@ def _enforce_https(url: str) -> str:
         if os.getenv("SKILLOS_INSECURE", "0") == "1":
             logger.warning("Insecure HTTP enabled via SKILLOS_INSECURE=1")
             return url
-        raise ValueError(
-            "HTTP is not allowed in production. Use HTTPS or set SKILLOS_INSECURE=1 for development only."
-        )
+        raise ValueError("HTTP is not allowed in production. Use HTTPS or set SKILLOS_INSECURE=1 for development only.")
     if not url.startswith("https://"):
         return f"https://{url}"
     return url
@@ -138,9 +136,7 @@ class ProtocolGateway:
             client = MCPClient()
             tool_name = req.payload.get("tool", "execute")
             # MCP 服务 URL 从环境变量读取，强制 HTTPS
-            mcp_base = _enforce_https(
-                os.getenv("SKILLOS_MCP_URL", "https://localhost:8000")
-            )
+            mcp_base = _enforce_https(os.getenv("SKILLOS_MCP_URL", "https://localhost:8000"))
             result = asyncio.run(
                 client.call_tool(
                     f"{mcp_base}/mcp/v1/{target_id}",

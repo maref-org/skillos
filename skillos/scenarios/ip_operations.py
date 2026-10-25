@@ -15,9 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 # 垂直场景默认需求（内容 IP 代运营）
-DEFAULT_REQUIREMENT = (
-    "给公司公众号做 30 天内容运营，写文章并分发到多平台，最后要复盘"
-)
+DEFAULT_REQUIREMENT = "给公司公众号做 30 天内容运营，写文章并分发到多平台，最后要复盘"
 
 # 场景角色集：契约方 + 团队预设
 SCENE_ROLES: dict[str, dict[str, Any]] = {

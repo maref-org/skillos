@@ -115,6 +115,9 @@ class IdentityClient:
             self._private_keys[identity_id] = private_key
             logger.info("Generated new Ed25519 key pair for identity: %s", identity_id)
 
+        if public_key_pem is None:
+            raise ValueError("public_key_pem is required")
+
         record = IdentityRecord(
             identity_id=identity_id,
             public_key_pem=public_key_pem,
