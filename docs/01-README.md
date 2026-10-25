@@ -2,7 +2,7 @@
 schema_version: "1.0"
 type: docs_index
 purpose: "SkillOS documentation hub — developer, ops, security, and architecture guides"
-version: "0.6.0-beta"
+version: "0.6.0-beta.1"
 updated: "2026-07-30"
 agent_instruction: |
   This is the canonical docs entry point for SkillOS.
@@ -19,7 +19,7 @@ cross_reference:
 
 # SkillOS 文档库
 
-**版本**: v0.6.0-beta
+**版本**: v0.6.0-beta.1
 **更新日期**: 2026-07-30
 
 ---

@@ -55,7 +55,7 @@ async def overview(db: Session = Depends(get_session)):
         "error_rate": error_rate,
         "active_sessions": 0,
         "total_skills": 0,
-        "version": "0.6.0-beta",
+        "version": "0.6.0-beta.1",
         "uptime_seconds": round(time.time() - _PROCESS_START, 2),
     }
 

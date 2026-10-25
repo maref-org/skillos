@@ -90,4 +90,4 @@ class TestVersionManager:
             assert mgr2.get_current_version() == "0.3.0"
 
     def test_get_version(self):
-        assert get_version() == "0.6.0-beta"
+        assert get_version() == "0.6.0-beta.1"

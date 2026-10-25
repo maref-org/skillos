@@ -46,7 +46,7 @@ def create_app() -> Any:
     app = FastAPI(
         title="SkillOS",
         description="Skill Operating System — Agent 技能调度与编排",
-        version="0.6.0-beta",
+        version="0.6.0-beta.1",
     )
 
     metrics = get_metrics()
@@ -113,7 +113,7 @@ def create_app() -> Any:
     @app.get("/", tags=["observability"])
     async def root() -> dict[str, str]:
         """服务入口信息（避免 DAST/爬虫在根路径得到 404）。"""
-        return {"service": "skillos", "version": "0.6.0-beta", "docs": "/docs"}
+        return {"service": "skillos", "version": "0.6.0-beta.1", "docs": "/docs"}
 
     # ── /health 端点 ──────────────────────────────────────────────────
     @app.get("/health", tags=["observability"])
@@ -121,7 +121,7 @@ def create_app() -> Any:
         """健康检查端点。"""
         return {
             "status": "healthy",
-            "version": "0.6.0-beta",
+            "version": "0.6.0-beta.1",
             "slo_summary": slo.get_slo_summary(),
         }
 

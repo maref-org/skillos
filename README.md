@@ -1,4 +1,4 @@
-# SkillOS — Skill Operating System (v0.6.0-beta)
+# SkillOS — Skill Operating System (v0.6.0-beta.1)
 
 **Agent skill scheduling and orchestration kernel.**
 

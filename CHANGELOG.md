@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - 2026-10-25
+## [0.6.0-beta.1] - 2026-10-25
 
 ### Fixed
 - **发布门禁统一入口** — 新增 `scripts/release_gate.sh`，本地 `make gate` 与
