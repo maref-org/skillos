@@ -8,7 +8,7 @@
   - 暴露 /metrics 端点供 Prometheus 抓取
 
 依赖：
-  - FastAPI / Starlette（可选，通过 ``pip install skillos[web]`` 安装）
+  - FastAPI / Starlette（可选，通过 ``pip install "skillos-os[web]"`` 安装）
   - prometheus-client（可选，未安装时 MetricsCollector 以 no-op 模式运行）
 
 使用示例::
@@ -32,13 +32,13 @@ def create_app() -> Any:
         FastAPI: 配置好的 FastAPI 应用实例
 
     Raises:
-        ImportError: FastAPI 未安装时抛出（安装: ``pip install skillos[web]``）
+        ImportError: FastAPI 未安装时抛出（安装: ``pip install "skillos-os[web]"``）
     """
     try:
         from fastapi import FastAPI, Request, Response
         from starlette.middleware.base import BaseHTTPMiddleware
     except ImportError as exc:
-        raise ImportError("FastAPI is not installed. Install with: pip install skillos[web]") from exc
+        raise ImportError("FastAPI is not installed. Install with: pip install 'skillos-os[web]'") from exc
 
     from skillos.kernel.slo import get_slo_manager
     from skillos.observability.metrics import get_metrics
@@ -46,7 +46,7 @@ def create_app() -> Any:
     app = FastAPI(
         title="SkillOS",
         description="Skill Operating System — Agent 技能调度与编排",
-        version="0.6.0-beta.1",
+        version="0.6.0-beta.2",
     )
 
     metrics = get_metrics()
@@ -113,7 +113,7 @@ def create_app() -> Any:
     @app.get("/", tags=["observability"])
     async def root() -> dict[str, str]:
         """服务入口信息（避免 DAST/爬虫在根路径得到 404）。"""
-        return {"service": "skillos", "version": "0.6.0-beta.1", "docs": "/docs"}
+        return {"service": "skillos", "version": "0.6.0-beta.2", "docs": "/docs"}
 
     # ── /health 端点 ──────────────────────────────────────────────────
     @app.get("/health", tags=["observability"])
@@ -121,7 +121,7 @@ def create_app() -> Any:
         """健康检查端点。"""
         return {
             "status": "healthy",
-            "version": "0.6.0-beta.1",
+            "version": "0.6.0-beta.2",
             "slo_summary": slo.get_slo_summary(),
         }
 
@@ -170,4 +170,4 @@ try:
 except ImportError:
     # FastAPI 未安装时不阻止导入（允许其他模块引用 app 模块）
     app = None  # type: ignore[assignment]
-    logger.warning("FastAPI not installed. skillos.app.app is None. Install with: pip install skillos[web]")
+    logger.warning("FastAPI not installed. skillos.app.app is None. Install with: pip install 'skillos-os[web]'")

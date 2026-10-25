@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NegMarket FastAPI 路由适配器（可选）
 
-需要额外安装: pip install skillos[web]
+需要额外安装: pip install "skillos-os[web]"
 提供 REST API:
   - POST /negmarket/upload      上传负样本
   - POST /negmarket/{id}/call   调用反模式 Skill
@@ -11,7 +11,7 @@
 try:
     from fastapi import APIRouter, Body, Depends, HTTPException
 except ImportError:
-    raise ImportError("FastAPI is not installed. Install with: pip install skillos[web]")
+    raise ImportError("FastAPI is not installed. Install with: pip install 'skillos-os[web]'")
 
 import logging
 

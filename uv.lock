@@ -3541,8 +3541,8 @@ wheels = [
 ]
 
 [[package]]
-name = "skillos"
-version = "0.6.0b1"
+name = "skillos-os"
+version = "0.6.0b2"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },

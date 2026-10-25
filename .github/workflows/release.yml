@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -15,14 +14,12 @@ jobs:
     name: Release Gate
     uses: ./.github/workflows/release-gate.yml
 
-  pypi:
-    name: Publish to PyPI
-    if: github.event_name == 'push'
+  build-pypi:
+    name: Build distributions
     needs: gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,31 +31,6 @@ jobs:
         run: |
           pip install build
           python -m build
-
-      - name: Check PyPI credentials
-        id: creds
-        env:
-          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          if [ -n "$PYPI_API_TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish to PyPI
-        if: steps.creds.outputs.available == 'true'
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          pip install twine
-          twine upload dist/*
-
-      - name: PyPI publish skipped
-        if: steps.creds.outputs.available != 'true'
-        run: |
-          echo "::warning title=PyPI publish skipped::PYPI_API_TOKEN is not configured; only container artifacts will be published."
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
@@ -66,39 +38,30 @@ jobs:
           name: python-dist
           path: dist/*
 
-  testpypi:
-    name: Publish to TestPyPI (Trusted Publishing)
-    if: github.event_name == 'workflow_dispatch'
-    needs: gate
+  pypi:
+    name: Publish to PyPI (Trusted Publishing)
+    needs: build-pypi
     runs-on: ubuntu-latest
     environment:
-      name: testpypi
-      url: https://test.pypi.org/p/skillos
+      name: pypi
+      url: https://pypi.org/p/skillos-os
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Download distributions
+        uses: actions/download-artifact@v4
         with:
-          python-version: "3.11"
-          cache: pip
+          name: python-dist
+          path: dist/
 
-      - name: Build distributions
-        run: |
-          pip install build
-          python -m build
-
-      - name: Publish to TestPyPI
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
           print-hash: true
 
   container:
     name: Publish container
-    if: github.event_name == 'push'
     needs: gate
     runs-on: ubuntu-latest
     permissions:

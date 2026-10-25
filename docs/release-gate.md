@@ -1,6 +1,6 @@
 # SkillOS 发布门禁
 
-**版本**: v0.6.0-beta.1 | **单一入口**: `bash scripts/release_gate.sh`
+**版本**: v0.6.0-beta.2 | **单一入口**: `bash scripts/release_gate.sh`
 
 本文件不再维护独立的“通过状态”清单。门禁是否通过，以脚本退出码与原始输出为准：
 

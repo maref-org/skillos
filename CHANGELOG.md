@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0-beta.2] - 2026-10-25
+
+### Changed
+- **PyPI 发行名** — 发行包名改为 `skillos-os`（导入包仍为 `skillos`），避开被第三方占用的 `skillos`。
+- **Trusted Publishing** — Release 的 PyPI 发布改用 OIDC（`pypa/gh-action-pypi-publish`），
+  不再依赖长期 `PYPI_API_TOKEN`；构建与发布 job 分离。
+- **元数据** — 补充 `readme` 与 `project.urls`，`twine check` 无警告。
+
 ## [0.6.0-beta.1] - 2026-10-25
 
 ### Fixed

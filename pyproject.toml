@@ -1,6 +1,6 @@
 [project]
-name = "skillos"
-version = "0.6.0-beta.1"
+name = "skillos-os"
+version = "0.6.0-beta.2"
 description = "SkillOS - Skill Execution Kernel with 5/25/70 Distribution (Open Source, AGPL-3.0)"
 readme = "README.md"
 requires-python = ">=3.11"

@@ -35,7 +35,7 @@ def main() -> int:
     from skillos.app import app
 
     if app is None:
-        print("ERROR: FastAPI not installed. Run: .venv/bin/pip install skillos[web]")
+        print("ERROR: FastAPI not installed. Run: .venv/bin/pip install 'skillos-os[web]'")
         return 1
 
     print(f"SkillOS HTTP service: http://{args.host}:{args.port}")

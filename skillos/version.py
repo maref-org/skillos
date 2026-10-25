@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 # 当前版本号（与 pyproject.toml 保持一致）
-__version__ = "0.6.0-beta.1"
+__version__ = "0.6.0-beta.2"
 
 _DEFAULT_STATE_DIR = Path("./.skillos/state")
 

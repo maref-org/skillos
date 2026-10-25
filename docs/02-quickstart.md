@@ -7,8 +7,10 @@
 ## 1. Installation
 
 ```bash
-pip install skillos
+pip install skillos-os
 ```
+
+> 发行包名为 `skillos-os`，Python 导入名仍为 `skillos`。
 
 Verify installation:
 
