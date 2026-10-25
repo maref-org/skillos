@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -16,6 +17,7 @@ jobs:
 
   pypi:
     name: Publish to PyPI
+    if: github.event_name == 'push'
     needs: gate
     runs-on: ubuntu-latest
     permissions:
@@ -64,8 +66,39 @@ jobs:
           name: python-dist
           path: dist/*
 
+  testpypi:
+    name: Publish to TestPyPI (Trusted Publishing)
+    if: github.event_name == 'workflow_dispatch'
+    needs: gate
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/skillos
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build distributions
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+          print-hash: true
+
   container:
     name: Publish container
+    if: github.event_name == 'push'
     needs: gate
     runs-on: ubuntu-latest
     permissions:

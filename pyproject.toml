@@ -2,6 +2,7 @@
 name = "skillos"
 version = "0.6.0-beta.1"
 description = "SkillOS - Skill Execution Kernel with 5/25/70 Distribution (Open Source, AGPL-3.0)"
+readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0" }
 authors = [ { name = "SkillOS Contributors" } ]
@@ -15,6 +16,10 @@ dependencies = [
     "cryptography>=50.0.0",
     "sqlalchemy>=2.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/maref-org/skillos"
+Repository = "https://github.com/maref-org/skillos"
 
 [project.optional-dependencies]
 web = [
