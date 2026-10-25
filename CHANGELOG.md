@@ -23,6 +23,12 @@
   `data/scheduled_tasks.json`；`test_governance_layer.py` 显式声明 skip 原因。
 - **仓库卫生** — `audit_logs/` 与 `.DS_Store` 移出索引，`coverage.json`/`.registry/`
   加入忽略。
+- **CI 恢复绿灯** — 用公开文件替换 `docs/CONTRIBUTING.md`、`docs/CROSS_PROJECT.md`、
+  `docs/api` 三个指向私有知识库的符号链接；sanitize 新增绝对路径符号链接检测；
+  `verify_kb_version_sync` 仅校验活跃文档并忽略依赖版本号。
+- **工作流修复** — TruffleHog action 改为 `@main`；DAST 目标改为 `/health` 并关闭
+  issue 写入；Meta-Audit 将空审计目录视为无事件；k6 改用 runner 本机执行。
+  重新启用因不活跃被禁用的 CodeQL / Security Scan / Meta-Audit / Load Test。
 
 ## [Unreleased] - 2026-10-24
 
