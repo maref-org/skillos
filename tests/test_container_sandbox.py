@@ -78,9 +78,7 @@ class TestDockerSandboxCommandAssembly:
 
 class TestDockerSandboxExecution:
     def test_success_path_decodes_json(self) -> None:
-        runner = _FakeRunner(
-            stdout=json.dumps({"skill_id": "s1", "status": "completed", "output": {"ok": 1}})
-        )
+        runner = _FakeRunner(stdout=json.dumps({"skill_id": "s1", "status": "completed", "output": {"ok": 1}}))
         sandbox = DockerSandbox(docker_available=lambda: True, runner=runner)
         result = sandbox.execute("import sys; sys.stdout.write('{}')", timeout=5)
         assert result["status"] == "completed"
