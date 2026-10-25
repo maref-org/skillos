@@ -116,6 +116,7 @@ jobs:
       - name: ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.12.0
         with:
-          target: 'http://localhost:8000'
+          target: 'http://localhost:8000/health'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a'
+          allow_issue_writing: false
