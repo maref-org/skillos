@@ -14,7 +14,7 @@
 
 发布门禁见 `docs/release-gate.md`（15 项精简标准）。
 
-验证命令: `python scripts/verify_distribution.py && python scripts/arch_check.py && python scripts/verify_kb_sync.py`
+验证命令: `make gate`（等价 `bash scripts/release_gate.sh`，本地与 CI 同一口径）
 
 ## Architecture
 
