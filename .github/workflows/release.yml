@@ -29,8 +29,9 @@ jobs:
 
       - name: Build distributions
         run: |
-          pip install build
+          pip install build twine
           python -m build
+          twine check dist/*
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
@@ -58,6 +59,7 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          skip-existing: true
           print-hash: true
 
   container:
