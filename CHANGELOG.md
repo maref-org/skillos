@@ -29,6 +29,8 @@
 - **工作流修复** — TruffleHog action 改为 `@main`；DAST 目标改为 `/health` 并关闭
   issue 写入；Meta-Audit 将空审计目录视为无事件；k6 改用 runner 本机执行。
   重新启用因不活跃被禁用的 CodeQL / Security Scan / Meta-Audit / Load Test。
+- **发布流水线解耦** — PyPI 与容器发布拆为独立 job；缺少 `PYPI_API_TOKEN` 时跳过
+  PyPI 并告警，不再阻断镜像发布；容器构建启用 provenance/SBOM。
 
 ## [Unreleased] - 2026-10-24
 
