@@ -37,6 +37,10 @@ total = min(base + bonus, base × 3.0)
 ```
 三个因子均在 `[0,1]` 内 clamp；负收益 clamp 到 0；输出 `describe()` 携带权重/上限/因子明细用于审计。
 
+> **2026-10-24 修订**：本公式把地板与绩效混在同一个 `total`，运行时违反无条件性。
+> 已拆分为 `survival`（无条件基础）与 `ceiling`（绩效奖金）两账户，见
+> [2026-10-24-cswdp-unconditional-floor-split.md](2026-10-24-cswdp-unconditional-floor-split.md)。本节仅保留为历史记录。
+
 ### D3 成本熔断四档阈值（roadmap §5.2.3 固守）
 | 档位 | 剩余预算 | 放行条件 |
 |------|----------|----------|

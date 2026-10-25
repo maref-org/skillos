@@ -10,6 +10,7 @@
   - manifest 幂等：同一契约重复导出不产生重复指令（按 contract_id 去重）
 """
 
+import json
 import logging
 import uuid
 from dataclasses import dataclass
@@ -19,7 +20,14 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from skillos.audit import AuditEventType, log_audit
-from skillos.db.models import OutcomeContractModel, PayoutInstructionModel, ServiceTeamMemberModel, ServiceTeamModel
+from skillos.db.models import (
+    DistributionRecordModel,
+    OutcomeContractModel,
+    PayoutInstructionModel,
+    ServiceTeamMemberModel,
+    ServiceTeamModel,
+    TipModel,
+)
 from skillos.market.settlement import CONTRIBUTOR_PAYOUT_RATE, PLATFORM_FEE_RATE
 from skillos.market.tenant_pools import TenantPoolService
 from skillos.market.tenants import TenantService
@@ -68,9 +76,9 @@ class PayoutService:
 
     def generate_for_contract(self, contract_id: str) -> list[PayoutInstruction]:
         """为已结算契约生成出款指令（幂等：已生成过则直接返回现有指令）。"""
-        existing = self._db.query(PayoutInstructionModel).filter(
-            PayoutInstructionModel.contract_id == contract_id
-        ).all()
+        existing = (
+            self._db.query(PayoutInstructionModel).filter(PayoutInstructionModel.contract_id == contract_id).all()
+        )
         if existing:
             return [PayoutInstruction.from_orm(m) for m in existing]
 
@@ -104,9 +112,7 @@ class PayoutService:
         # C3 纵深防御：share 超出 70% 池会令 contractor 金额变负（create_service_team 已拦截，
         # 此处兜底防止历史脏数据/绕过）
         if author_share_total > 1.0:
-            raise ValueError(
-                f"author share_ratio sum {author_share_total} exceeds 1.0 (contributor pool)"
-            )
+            raise ValueError(f"author share_ratio sum {author_share_total} exceeds 1.0 (contributor pool)")
 
         # 项目长结算款：贡献池（70%）减去作者分成后归项目长，保证总额 ≤ 价格（C3 修复）
         if contract.contractor_id and contract.price > 0:
@@ -149,13 +155,41 @@ class PayoutService:
             )
         )
 
-        # C3 防超发：出款总额必须 ≤ 契约价（贡献池 70% + 平台费 5% ≤ 100%）
-        total_payout = round(sum(i.amount for i in instructions), 2)
-        if total_payout > round(contract.price, 2):
+        # 小费分配（10-20%，项目长 50% + 技能作者 50%）——独立于契约价，单独出款
+        tips = self._db.query(TipModel).filter(TipModel.contract_id == contract_id).all()
+        recorded_tip_total = round(sum(float(t.amount) for t in tips), 2)
+        tip_total = 0.0
+        for tip in tips:
+            dists = tip.distributions
+            if isinstance(dists, str):
+                dists = json.loads(dists or "[]")
+            for dist in dists or []:
+                tip_amount = round(float(dist.get("amount", 0.0)), 2)
+                if tip_amount <= 0:
+                    continue
+                instructions.append(
+                    self._add_instruction(
+                        contract_id=contract_id,
+                        payee_id=dist["member_id"],
+                        role=dist.get("role", "tip"),
+                        amount=tip_amount,
+                        currency=contract.currency,
+                        source="tip",
+                        now=now,
+                    )
+                )
+                tip_total = round(tip_total + tip_amount, 2)
+
+        # C3 防超发：结算出款（贡献池 70% + 平台费 5%）必须 ≤ 契约价；
+        # 小费另账，须 ≤ 小费记账总额。
+        settlement_total = round(sum(i.amount for i in instructions if i.source != "tip"), 2)
+        if settlement_total > round(contract.price, 2):
             raise ValueError(
-                f"Payout total {total_payout} exceeds contract price {contract.price} "
+                f"Payout total {settlement_total} exceeds contract price {contract.price} "
                 f"(share_ratio sum must be ≤ 1.0)"
             )
+        if tip_total > recorded_tip_total:
+            raise ValueError(f"Tip payout {tip_total} exceeds recorded tip {recorded_tip_total}")
 
         # 租户出款用量累计（M9）：仅在首次生成时累加，幂等导出不叠加
         if contract.tenant_id:
@@ -172,15 +206,41 @@ class PayoutService:
         return instructions
 
     def export_manifest(self, contract_id: str) -> dict[str, Any]:
-        """导出单个契约的出款 manifest（供持牌平台消费）。"""
+        """导出单个契约的出款 manifest（供持牌平台消费）。
+
+        ``reconciliation`` 块显式列出「已出款」与「已记账未出款」的差额：
+        生态基金 25% 目前没有收款主体，故不计入 instructions，而在该块中
+        以 ``ecosystem_pending_allocation`` 标出，避免 manifest 看似全额出款。
+        """
         instructions = self.generate_for_contract(contract_id)
+        settlement_total = round(sum(i.amount for i in instructions if i.source != "tip"), 2)
+        tip_total = round(sum(i.amount for i in instructions if i.source == "tip"), 2)
         return {
             "manifest_id": f"pay-{uuid.uuid4().hex[:12]}",
             "contract_id": contract_id,
             "currency": instructions[0].currency if instructions else "CNY",
             "instructions": [self._serialize(i) for i in instructions],
             "total_amount": round(sum(i.amount for i in instructions), 2),
+            "reconciliation": self._reconciliation(contract_id, settlement_total, tip_total),
             "note": "记账指令：实际法币划转由下游持牌支付平台执行（不托管资金）",
+        }
+
+    def _reconciliation(self, contract_id: str, settlement_total: float, tip_total: float) -> dict[str, Any]:
+        contract = self._db.query(OutcomeContractModel).filter(OutcomeContractModel.id == contract_id).first()
+        record = (
+            self._db.query(DistributionRecordModel)
+            .filter(DistributionRecordModel.skill_id == f"contract:{contract_id}")
+            .first()
+        )
+        price = round(float(contract.price), 2) if contract else 0.0
+        ecosystem_fee = round(float(record.ecosystem_fee), 2) if record else 0.0
+        return {
+            "contract_price": price,
+            "settlement_executable": settlement_total,
+            "tip_executable": tip_total,
+            "ecosystem_fee_recorded": ecosystem_fee,
+            "ecosystem_pending_allocation": ecosystem_fee,
+            "note": "生态基金无收款主体，待治理条款指定托管方后出款",
         }
 
     def export_period_manifest(self, start: str, end: str) -> dict[str, Any]:
@@ -205,9 +265,7 @@ class PayoutService:
 
     def mark_executed(self, instruction_id: str, external_ref: str = "") -> PayoutInstruction:
         """标记出款指令已由持牌平台执行（下游回调）。"""
-        model = self._db.query(PayoutInstructionModel).filter(
-            PayoutInstructionModel.id == instruction_id
-        ).first()
+        model = self._db.query(PayoutInstructionModel).filter(PayoutInstructionModel.id == instruction_id).first()
         if model is None:
             raise ValueError(f"Payout instruction not found: {instruction_id}")
         model.status = "executed"
@@ -255,18 +313,10 @@ class PayoutService:
         return PayoutInstruction.from_orm(model)
 
     def _team_members(self, contract_id: str) -> list[ServiceTeamMemberModel]:
-        team = (
-            self._db.query(ServiceTeamModel)
-            .filter(ServiceTeamModel.contract_id == contract_id)
-            .first()
-        )
+        team = self._db.query(ServiceTeamModel).filter(ServiceTeamModel.contract_id == contract_id).first()
         if team is None:
             return []
-        return (
-            self._db.query(ServiceTeamMemberModel)
-            .filter(ServiceTeamMemberModel.team_id == team.id)
-            .all()
-        )
+        return self._db.query(ServiceTeamMemberModel).filter(ServiceTeamMemberModel.team_id == team.id).all()
 
     @staticmethod
     def _serialize(i: PayoutInstruction) -> dict[str, Any]:

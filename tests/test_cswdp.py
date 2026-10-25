@@ -96,6 +96,72 @@ class TestSurvivalFund:
         assert "-" in rec.period
         assert len(rec.period.split("-")) == 2
 
+    # -- 地板与天花板分账（2026-10-24） --------------------------------------
+
+    def test_floor_unconditional_when_all_factors_zero(self):
+        """零贡献者的地板必须与满贡献者的地板完全相同。"""
+        calc = SurvivalFundCalculator(local_min_wage=1000.0)
+        zero = calc.calculate("zero", 0.0, 0.0, 0.0, 0.0)
+        full = calc.calculate("full", 1.0, 0.0, 1.0, 1.0)
+        assert zero.unconditional_amount == 1500.0
+        assert full.unconditional_amount == 1500.0
+        assert zero.unconditional_amount == full.unconditional_amount
+        assert zero.floor_is_unconditional is True
+
+    def test_floor_invariant_under_extreme_factors(self):
+        calc = SurvivalFundCalculator(local_min_wage=1200.0)
+        for factors in [
+            (0.0, 0.0, 0.0),
+            (1.0, 1.0, 1.0),
+            (-3.0, 9.0, -0.2),
+            (0.3, 0.0, 0.7),
+        ]:
+            rec = calc.calculate("c1", factors[0], 0.0, factors[1], factors[2])
+            assert rec.unconditional_amount == 1800.0
+            assert rec.base_amount == rec.unconditional_amount
+
+    def test_bonus_isolated_in_ceiling_account(self):
+        calc = SurvivalFundCalculator(local_min_wage=1000.0)
+        rec = calc.calculate("c1", 0.5, 0.0, 0.5, 0.5)
+        assert rec.accounts["survival"] == rec.unconditional_amount
+        assert rec.accounts["ceiling"] == rec.performance_bonus
+        assert rec.accounts["survival"] + rec.accounts["ceiling"] == rec.total_amount
+
+    def test_disable_performance_bonus_keeps_floor(self):
+        calc = SurvivalFundCalculator(local_min_wage=1000.0)
+        rec = calc.calculate("c1", 1.0, 0.0, 1.0, 1.0, include_performance_bonus=False)
+        assert rec.unconditional_amount == 1500.0
+        assert rec.performance_bonus == 0.0
+        assert rec.total_amount == 1500.0
+        assert rec.factors["include_performance_bonus"] is False
+
+    def test_bonus_cap_never_touches_floor(self):
+        calc = SurvivalFundCalculator(
+            local_min_wage=1000.0,
+            contribution_weight=1.0,
+            success_weight=1.0,
+            governance_weight=1.0,
+        )
+        rec = calc.calculate("c1", 1.0, 0.0, 1.0, 1.0)
+        # raw bonus = 1500 * 3.0 = 4500，按 cap_multiplier=3.0 截到 3000
+        assert rec.performance_bonus == 3000.0
+        assert rec.unconditional_amount == 1500.0
+        assert rec.total_amount == 4500.0
+        assert rec.floor_is_unconditional is True
+
+    def test_cap_multiplier_below_one_rejected(self):
+        with pytest.raises(ValueError):
+            SurvivalFundCalculator(cap_multiplier=0.5)
+
+    def test_describe_declares_account_policies(self):
+        calc = SurvivalFundCalculator(local_min_wage=1000.0)
+        rec = calc.calculate("c1", 0.2, 0.0, 0.2, 0.2)
+        desc = calc.describe(rec)
+        assert desc["policies"]["floor"].startswith("unconditional")
+        assert desc["policies"]["ceiling"].startswith("performance")
+        assert desc["accounts"]["survival"] == desc["unconditional_amount"]
+        assert desc["floor_is_unconditional"] is True
+
 
 # ---------------------------------------------------------------------------
 # CostCircuitBreaker
@@ -176,8 +242,11 @@ class TestCostCircuit:
 class TestQualityGate:
     def test_check_result_dataclass(self):
         result = QualityCheckResult(
-            name="ruff", command="ruff check .", passed=True,
-            duration_sec=0.1, output_tail="ok",
+            name="ruff",
+            command="ruff check .",
+            passed=True,
+            duration_sec=0.1,
+            output_tail="ok",
         )
         assert result.passed is True
 
@@ -198,7 +267,9 @@ class TestQualityGate:
     def test_parse_coverage(self):
         report = QualityReport()
         report.results["pytest"] = QualityCheckResult(
-            name="pytest", command="pytest", passed=True,
+            name="pytest",
+            command="pytest",
+            passed=True,
             duration_sec=0.1,
             output_tail="tests=100 ... TOTAL 92%",
         )
@@ -208,8 +279,11 @@ class TestQualityGate:
     def test_evaluate_coverage_threshold_fail(self):
         report = QualityReport()
         report.results["pytest"] = QualityCheckResult(
-            name="pytest", command="pytest", passed=True,
-            duration_sec=0.1, output_tail="TOTAL 50%",
+            name="pytest",
+            command="pytest",
+            passed=True,
+            duration_sec=0.1,
+            output_tail="TOTAL 50%",
         )
         gate = QualityGate()
         evaluation = gate.evaluate(report)
@@ -219,8 +293,11 @@ class TestQualityGate:
     def test_evaluate_missing_pytest_ok(self):
         report = QualityReport()
         report.results["ruff"] = QualityCheckResult(
-            name="ruff", command="ruff", passed=True,
-            duration_sec=0.1, output_tail="ok",
+            name="ruff",
+            command="ruff",
+            passed=True,
+            duration_sec=0.1,
+            output_tail="ok",
         )
         gate = QualityGate()
         evaluation = gate.evaluate(report)
@@ -266,3 +343,27 @@ class TestAppMount:
         assert body["ok"] is True
         assert body["record"]["contributor_id"] == "t1"
         assert body["record"]["total_amount"] > 0
+
+    def test_survival_fund_floor_only_via_api(self):
+        from fastapi.testclient import TestClient
+
+        from skillos.app import create_app
+
+        client = TestClient(create_app())
+        resp = client.post(
+            "/cswdp/survival-fund/calculate",
+            json={
+                "contributor_id": "t2",
+                "historical_contribution": 1.0,
+                "skill_success_rate": 1.0,
+                "governance_participation": 1.0,
+                "local_min_wage": 1000.0,
+                "include_performance_bonus": False,
+            },
+        )
+        assert resp.status_code == 200
+        record = resp.json()["record"]
+        assert record["unconditional_amount"] == 1500.0
+        assert record["performance_bonus"] == 0.0
+        assert record["total_amount"] == 1500.0
+        assert record["floor_is_unconditional"] is True

@@ -50,8 +50,11 @@ class QualityGate:
         if not shutil.which(command[0]):
             tail = f"binary not found: {command[0]}"
             return QualityCheckResult(
-                name=name, command=" ".join(command), passed=False,
-                duration_sec=round(time.monotonic() - started, 3), output_tail=tail,
+                name=name,
+                command=" ".join(command),
+                passed=False,
+                duration_sec=round(time.monotonic() - started, 3),
+                output_tail=tail,
             )
 
         try:
@@ -67,7 +70,9 @@ class QualityGate:
             if proc.stdout is None:  # 防御：PIPE 模式下不可能为 None
                 tail = "error: stdout not captured"
                 return QualityCheckResult(
-                    name=name, command=" ".join(command), passed=False,
+                    name=name,
+                    command=" ".join(command),
+                    passed=False,
                     duration_sec=round(time.monotonic() - started, 3),
                     output_tail=tail,
                 )
@@ -90,8 +95,11 @@ class QualityGate:
             tail = f"error: {exc}"
 
         return QualityCheckResult(
-            name=name, command=" ".join(command), passed=passed,
-            duration_sec=round(time.monotonic() - started, 3), output_tail=tail,
+            name=name,
+            command=" ".join(command),
+            passed=passed,
+            duration_sec=round(time.monotonic() - started, 3),
+            output_tail=tail,
         )
 
     def run_all(self) -> QualityReport:
@@ -102,14 +110,8 @@ class QualityGate:
         return QualityReport(results=results, passed=passed)
 
     def run_named(self, *names: str) -> QualityReport:
-        results = {
-            name: self._run_check(name, command)
-            for name, command in self.CHECKS.items()
-            if name in names
-        }
-        return QualityReport(
-            results=results, passed=all(r.passed for r in results.values())
-        )
+        results = {name: self._run_check(name, command) for name, command in self.CHECKS.items() if name in names}
+        return QualityReport(results=results, passed=all(r.passed for r in results.values()))
 
     def parse_coverage(self, report: QualityReport) -> float:
         """从 pytest 输出尾部解析总覆盖率（0.0~1.0），默认 0.0"""

@@ -46,8 +46,10 @@ class TestGeneratePayout:
         svc.create_service_team(
             ctr.id,
             "contractor-pay",
-            [{"member_id": "author-a", "role": "skill_author", "share_ratio": 0.5},
-             {"member_id": "author-b", "role": "skill_author", "share_ratio": 0.5}],
+            [
+                {"member_id": "author-a", "role": "skill_author", "share_ratio": 0.5},
+                {"member_id": "author-b", "role": "skill_author", "share_ratio": 0.5},
+            ],
         )
         ctr = svc.sign(ctr.id, "contractor-pay")
         ctr = svc.submit_delivery(ctr.id)
@@ -124,15 +126,18 @@ class TestShareRatioGuard:
             svc.create_service_team(
                 ctr.id,
                 "contractor-pay",
-                [{"member_id": "author-a", "role": "skill_author", "share_ratio": 0.6},
-                 {"member_id": "author-b", "role": "skill_author", "share_ratio": 0.6}],
+                [
+                    {"member_id": "author-a", "role": "skill_author", "share_ratio": 0.6},
+                    {"member_id": "author-b", "role": "skill_author", "share_ratio": 0.6},
+                ],
             )
 
     def test_negative_share_ratio_rejected(self, db_session):
         svc, ctr = self._contract(db_session)
         with pytest.raises(ValueError, match="share_ratio must be within"):
             svc.create_service_team(
-                ctr.id, "contractor-pay",
+                ctr.id,
+                "contractor-pay",
                 [{"member_id": "author-a", "role": "skill_author", "share_ratio": -0.2}],
             )
 
@@ -140,9 +145,12 @@ class TestShareRatioGuard:
         svc, ctr = self._contract(db_session)
         with pytest.raises(ValueError, match="sum of share_ratio"):
             svc.create_service_team(
-                ctr.id, "contractor-pay",
-                [{"member_id": "author-a", "role": "skill_author", "share_ratio": 0.7},
-                 {"member_id": "author-b", "role": "skill_author", "share_ratio": 0.4}],
+                ctr.id,
+                "contractor-pay",
+                [
+                    {"member_id": "author-a", "role": "skill_author", "share_ratio": 0.7},
+                    {"member_id": "author-b", "role": "skill_author", "share_ratio": 0.4},
+                ],
             )
 
 
@@ -167,3 +175,45 @@ class TestMarkExecuted:
         rows = payouts.list_by_payee(contractor)
         assert len(rows) == 1
         assert rows[0].role == "contractor"
+
+
+class TestTipPayout:
+    def test_tip_creates_separate_instructions(self, db_session):
+        """小费应生成独立出款指令（source=tip），不再只记账不出款。"""
+        cid, contractor = _paid_contract(db_session)
+        svc = OutcomeContractService(db_session)
+        tip = svc.add_tip(cid, "requester-pay", 0.10)
+
+        instructions = PayoutService(db_session).generate_for_contract(cid)
+        tip_instructions = [i for i in instructions if i.source == "tip"]
+        assert len(tip_instructions) == 2
+        assert sum(i.amount for i in tip_instructions) == pytest.approx(tip.amount)
+        assert {i.payee_id for i in tip_instructions} == {contractor, "author-pay"}
+
+    def test_tip_does_not_break_contract_total_guard(self, db_session):
+        cid, _ = _paid_contract(db_session)
+        svc = OutcomeContractService(db_session)
+        svc.add_tip(cid, "requester-pay", 0.20)
+
+        instructions = PayoutService(db_session).generate_for_contract(cid)
+        settlement = sum(i.amount for i in instructions if i.source != "tip")
+        assert settlement <= 5000.0
+        assert sum(i.amount for i in instructions) > settlement
+
+
+class TestManifestReconciliation:
+    def test_manifest_reports_ecosystem_pending_allocation(self, db_session):
+        cid, _ = _paid_contract(db_session)
+        manifest = PayoutService(db_session).export_manifest(cid)
+        rec = manifest["reconciliation"]
+        assert rec["contract_price"] == pytest.approx(5000.0)
+        assert rec["settlement_executable"] == pytest.approx(5000.0 * 0.75)
+        assert rec["ecosystem_fee_recorded"] == pytest.approx(5000.0 * 0.25)
+        assert rec["ecosystem_pending_allocation"] == pytest.approx(5000.0 * 0.25)
+        assert "治理条款" in rec["note"]
+
+    def test_reconciliation_tip_after_tip(self, db_session):
+        cid, _ = _paid_contract(db_session)
+        tip = OutcomeContractService(db_session).add_tip(cid, "requester-pay", 0.10)
+        rec = PayoutService(db_session).export_manifest(cid)["reconciliation"]
+        assert rec["tip_executable"] == pytest.approx(tip.amount)

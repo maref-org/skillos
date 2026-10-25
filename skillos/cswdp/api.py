@@ -29,6 +29,10 @@ class SurvivalFundRequest(BaseModel):
     skill_success_rate: float = Field(default=0.0, ge=0.0, le=1.0)
     governance_participation: float = Field(default=0.0, ge=0.0, le=1.0)
     local_min_wage: float = Field(default=1000.0, gt=0.0)
+    include_performance_bonus: bool = Field(
+        default=True,
+        description="是否计入天花板账户的绩效奖金；地板账户不受该开关影响",
+    )
 
 
 class CostCircuitCheckRequest(BaseModel):
@@ -47,6 +51,7 @@ def calculate_survival_fund(req: SurvivalFundRequest) -> dict[str, Any]:
         current_period_revenue=req.current_period_revenue,
         skill_success_rate=req.skill_success_rate,
         governance_participation=req.governance_participation,
+        include_performance_bonus=req.include_performance_bonus,
     )
     return {"ok": True, "record": calculator.describe(record)}
 
