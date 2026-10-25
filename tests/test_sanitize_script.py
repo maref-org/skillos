@@ -47,6 +47,14 @@ def test_private_key_fails(tmp_path):
     assert result.returncode == 1
 
 
+def test_absolute_symlink_fails(tmp_path):
+    (tmp_path / "real.md").write_text("ok\n", encoding="utf-8")
+    (tmp_path / "link.md").symlink_to("/etc/hosts")
+    result = _run(tmp_path)
+    assert result.returncode == 1
+    assert "符号链接" in result.stdout
+
+
 def test_proprietary_file_fails(tmp_path):
     (tmp_path / "SOUL.md").write_text("internal\n", encoding="utf-8")
     result = _run(tmp_path)

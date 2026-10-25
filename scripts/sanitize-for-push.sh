@@ -76,6 +76,32 @@ else
     echo -e "${GREEN}✅ 无绝对路径泄露${NC}"
 fi
 
+# ── Check 1b: 符号链接指向 ──────────────────────────────────────────
+echo ""
+echo "─── 检查 1b: 符号链接指向 ───"
+if [ -n "${SKILLOS_SANITIZE_ROOT:-}" ]; then
+    SYMLINK_MATCHES=$(find "$SCAN_ROOT" -type l 2>/dev/null | while IFS= read -r link; do
+        target=$(readlink "$link" 2>/dev/null || true)
+        if [[ "$target" == /* ]]; then echo "$link -> $target"; fi
+    done)
+else
+    SYMLINK_MATCHES=$(git ls-files -s | while IFS=$'\t' read -r meta path; do
+        if [[ "$meta" == 120000* ]]; then
+            target=$(readlink "$path" 2>/dev/null || true)
+            if [[ "$target" == /* ]]; then echo "$path -> $target"; fi
+        fi
+    done)
+fi
+
+if [ -n "$SYMLINK_MATCHES" ]; then
+    COUNT=$(echo "$SYMLINK_MATCHES" | wc -l | tr -d ' ')
+    echo -e "${RED}❌ 发现 $COUNT 个指向绝对路径的符号链接${NC}"
+    echo "$SYMLINK_MATCHES" | head -10
+    FAILED=1
+else
+    echo -e "${GREEN}✅ 无绝对路径符号链接${NC}"
+fi
+
 # ── Check 2: 组织名/内部代号 ───────────────────────────────────────
 echo ""
 echo "─── 检查 2: 组织名/内部代号引用 ───"

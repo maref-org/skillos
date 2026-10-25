@@ -1,1 +1,3 @@
-/Volumes/1TB-M2/Athena知识库/OPC工作区/项目知识库/skillos/03-开发文档/本地开发指南.md
+# Contributing
+
+See the repository root [CONTRIBUTING.md](../CONTRIBUTING.md) for the full guide.

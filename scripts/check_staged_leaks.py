@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -46,6 +47,12 @@ def main(argv: list[str]) -> int:
     failures = 0
     for raw in argv:
         path = Path(raw)
+        if path.is_symlink():
+            target = os.readlink(path)
+            if target.startswith("/"):
+                print(f"{path}: [symlink_absolute_target] -> {target}")
+                failures += 1
+            continue
         if not path.is_file() or path.suffix.lower() in IGNORED_SUFFIXES or _is_rule_file(path):
             continue
         try:

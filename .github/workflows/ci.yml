@@ -61,7 +61,7 @@ jobs:
             --ignore-vuln GHSA-537c-gmf6-5ccf \
             --ignore-vuln GHSA-6v7p-g79w-8964
       - name: Secret scan (verified secrets only)
-        uses: trufflesecurity/trufflehog@v3
+        uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
       - name: Governance content scan

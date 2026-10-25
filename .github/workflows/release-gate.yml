@@ -24,7 +24,7 @@ jobs:
       - name: Run release gate
         run: bash scripts/release_gate.sh
       - name: Secret scan (verified secrets only)
-        uses: trufflesecurity/trufflehog@v3
+        uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 

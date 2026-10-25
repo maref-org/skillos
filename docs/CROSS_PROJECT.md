@@ -1,1 +1,4 @@
-/Volumes/1TB-M2/Athena知识库/OPC工作区/项目知识库/skillos/CROSS_PROJECT.md
+# Cross-Project Notes
+
+Cross-project integration notes are maintained in the private knowledge base.
+Public API behavior is documented under `docs/` and at the live OpenAPI endpoint.

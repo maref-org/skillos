@@ -27,7 +27,7 @@ curl http://localhost:8080/health
 
 期望返回：
 ```json
-{"status": "ok", "version": "0.5.0-beta"}
+{"status": "ok", "version": "0.6.0-beta"}
 ```
 
 ## 日志查询

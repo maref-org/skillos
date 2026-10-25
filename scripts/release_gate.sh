@@ -48,6 +48,7 @@ run "pytest + coverage" "$PY" -m pytest tests/ -q --cov=skillos --cov-fail-under
 run "verify_distribution" "$PY" scripts/verify_distribution.py
 run "arch_check" "$PY" scripts/arch_check.py
 run "verify_kb_sync" "$PY" scripts/verify_kb_sync.py
+run "verify_kb_version_sync" "$PY" scripts/verify_kb_version_sync.py
 run "governance sanitize" bash scripts/sanitize-for-push.sh
 run "meta_monitor M0-M3" "$PY" scripts/meta_monitor.py --check M0,M1,M2,M3
 
